@@ -221,33 +221,20 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 normalizedLanguage = "default";
             }
-            string heading = Strings.GetInLanguage(normalizedLanguage, "ui_description_heading", BodySectionHeaderDefault);
             string joinLabel = Strings.GetInLanguage(normalizedLanguage, "ui_description_join_label", "Meeting link:");
             string passwordLineFormat = Strings.GetInLanguage(normalizedLanguage, "ui_description_password_line", "Password: {0}");
-            string helpLabel = Strings.GetInLanguage(normalizedLanguage, "ui_description_help_label", "Need help?");
-            string helpUrl = Strings.GetInLanguage(
-                normalizedLanguage,
-                "ui_description_help_url",
-                "https://docs.nextcloud.com/server/latest/user_manual/en/talk/guest.html");
 
             var lines = new List<string>
             {
-                heading,
-                string.Empty,
                 joinLabel,
-                roomUrl ?? string.Empty,
-                string.Empty
+                roomUrl ?? string.Empty
             };
 
             if (!string.IsNullOrWhiteSpace(password))
             {
-                lines.Add(string.Format(CultureInfo.InvariantCulture, passwordLineFormat, password.Trim()));
                 lines.Add(string.Empty);
+                lines.Add(string.Format(CultureInfo.InvariantCulture, passwordLineFormat, password.Trim()));
             }
-
-            lines.Add(helpLabel);
-            lines.Add(string.Empty);
-            lines.Add(helpUrl);
             return string.Join("\r\n", lines).TrimEnd('\r', '\n');
         }
 
@@ -267,21 +254,12 @@ namespace NcTalkOutlookAddIn.Controllers
                 {
                     normalizedLanguage = "default";
                 }
-                string heading = Strings.GetInLanguage(normalizedLanguage, "ui_description_heading", BodySectionHeaderDefault);
                 string joinLabel = Strings.GetInLanguage(normalizedLanguage, "ui_description_join_label", "Meeting link:");
                 string passwordLineFormat = Strings.GetInLanguage(normalizedLanguage, "ui_description_password_line", "Password: {0}");
-                string helpLabel = Strings.GetInLanguage(normalizedLanguage, "ui_description_help_label", "Need help?");
-                string helpUrl = Strings.GetInLanguage(
-                    normalizedLanguage,
-                    "ui_description_help_url",
-                    "https://docs.nextcloud.com/server/latest/user_manual/en/talk/guest.html");
 
                 var html = new StringBuilder();
                 html.Append("<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-collapse:collapse;\">");
                 html.Append("<tbody>");
-                html.Append("<tr><td valign=\"top\" align=\"left\"><strong>")
-                    .Append(HttpUtility.HtmlEncode(heading))
-                    .Append("</strong></td></tr>");
                 html.Append("<tr><td valign=\"top\" align=\"left\">")
                     .Append(HttpUtility.HtmlEncode(joinLabel))
                     .Append("<br><a href=\"")
@@ -297,13 +275,6 @@ namespace NcTalkOutlookAddIn.Controllers
                         .Append("</td></tr>");
                 }
 
-                html.Append("<tr><td valign=\"top\" align=\"left\">")
-                    .Append(HttpUtility.HtmlEncode(helpLabel))
-                    .Append("<br><a href=\"")
-                    .Append(HttpUtility.HtmlAttributeEncode(helpUrl))
-                    .Append("\">")
-                    .Append(HttpUtility.HtmlEncode(helpUrl))
-                    .Append("</a></td></tr>");
                 html.Append("</tbody>");
                 html.Append("</table>");
                 innerHtml = html.ToString();
@@ -339,7 +310,17 @@ namespace NcTalkOutlookAddIn.Controllers
                     return i;
                 }
             }
-            return -1;
+            // Fallback for compact block format (no help section): find last non-empty line within a short range.
+            int compactEnd = -1;
+            int maxCompact = Math.Min(lines.Count - 1, headerIndex + 6);
+            for (int i = headerIndex; i <= maxCompact; i++)
+            {
+                if (!string.IsNullOrWhiteSpace(lines[i] ?? string.Empty))
+                {
+                    compactEnd = i;
+                }
+            }
+            return compactEnd;
         }
 
         private static bool ContainsTalkHelpUrlMarker(string value)
@@ -365,7 +346,8 @@ namespace NcTalkOutlookAddIn.Controllers
             var headers = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
                 LegacyBodySectionHeader,
-                BodySectionHeaderDefault
+                BodySectionHeaderDefault,
+                "Meeting link:"
             };
 
             IReadOnlyList<string> supportedCodes = Strings.SupportedLanguageCodes;
@@ -375,6 +357,11 @@ namespace NcTalkOutlookAddIn.Controllers
                 if (!string.IsNullOrWhiteSpace(heading))
                 {
                     headers.Add(heading.Trim());
+                }
+                string joinLabel = Strings.GetInLanguage(supportedCodes[i], "ui_description_join_label", "Meeting link:");
+                if (!string.IsNullOrWhiteSpace(joinLabel))
+                {
+                    headers.Add(joinLabel.Trim());
                 }
             }
 
