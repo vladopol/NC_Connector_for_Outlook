@@ -53,44 +53,36 @@ namespace NcTalkOutlookAddIn.Utilities
                 : (result.ShareUrl ?? string.Empty);
 
             var html = new StringBuilder();
-            html.Append("<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-collapse:collapse;\">");
-            html.Append("<tbody>");
-            html.Append("<tr><td valign=\"top\" align=\"left\">")
-                .Append(HttpUtility.HtmlEncode(downloadLabel))
+            html.Append(HttpUtility.HtmlEncode(downloadLabel))
                 .Append("<br><a href=\"")
                 .Append(HttpUtility.HtmlAttributeEncode(downloadUrl))
                 .Append("\">")
                 .Append(HttpUtility.HtmlEncode(downloadUrl))
-                .Append("</a></td></tr>");
+                .Append("</a>");
 
             if (!string.IsNullOrEmpty(result.Password) && !separatePassword)
             {
-                html.Append("<tr><td valign=\"top\" align=\"left\"><br>")
+                html.Append("<br><br>")
                     .Append(HttpUtility.HtmlEncode(passwordLabel))
                     .Append(": ")
-                    .Append(HttpUtility.HtmlEncode(result.Password))
-                    .Append("</td></tr>");
+                    .Append(HttpUtility.HtmlEncode(result.Password));
             }
             else if (separatePassword)
             {
-                html.Append("<tr><td valign=\"top\" align=\"left\"><br>")
+                html.Append("<br><br>")
                     .Append(HttpUtility.HtmlEncode(passwordLabel))
                     .Append(": ")
-                    .Append(HttpUtility.HtmlEncode(passwordSeparateHint))
-                    .Append("</td></tr>");
+                    .Append(HttpUtility.HtmlEncode(passwordSeparateHint));
             }
 
             if (result.ExpireDate.HasValue)
             {
-                html.Append("<tr><td valign=\"top\" align=\"left\"><br>")
+                html.Append("<br><br>")
                     .Append(HttpUtility.HtmlEncode(expireLabel))
                     .Append(": ")
-                    .Append(HttpUtility.HtmlEncode(result.ExpireDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)))
-                    .Append("</td></tr>");
+                    .Append(HttpUtility.HtmlEncode(result.ExpireDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)));
             }
 
-            html.Append("</tbody>");
-            html.Append("</table>");
             return html.ToString();
         }
 
@@ -119,17 +111,9 @@ namespace NcTalkOutlookAddIn.Utilities
             }
             string passwordLabel = Strings.GetInLanguage(effectiveLanguage, "sharing_html_password_label", "Password");
 
-            var html = new StringBuilder();
-            html.Append("<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-collapse:collapse;\">");
-            html.Append("<tbody>");
-            html.Append("<tr><td valign=\"top\" align=\"left\">")
-                .Append(HttpUtility.HtmlEncode(passwordLabel))
-                .Append(": ")
-                .Append(HttpUtility.HtmlEncode(result.Password ?? string.Empty))
-                .Append("</td></tr>");
-            html.Append("</tbody>");
-            html.Append("</table>");
-            return html.ToString();
+            return HttpUtility.HtmlEncode(passwordLabel)
+                + ": "
+                + HttpUtility.HtmlEncode(result.Password ?? string.Empty);
         }
 
                 // Resolve effective HTML block language with policy override support.
