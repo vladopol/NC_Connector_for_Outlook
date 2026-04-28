@@ -28,13 +28,14 @@ jobs:
         run: |
           $msbuild = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\MSBuild.exe"
           $extDll = Get-ChildItem "C:\Program Files\Microsoft Visual Studio" -Recurse -Filter "Extensibility.dll" -ErrorAction SilentlyContinue | Select-Object -First 1
-          if ($extDll) {
-            Write-Host "Found Extensibility.dll at: $($extDll.FullName)"
-            & $msbuild NcTalkOutlookAddIn.sln /m /t:Rebuild /p:Configuration=Release /p:ReferencePath="$($extDll.DirectoryName)"
-          } else {
-            Write-Error "Extensibility.dll not found in VS installation"
-            exit 1
+          if (-not $extDll) {
+            $extDll = Get-ChildItem "C:\Program Files (x86)" -Recurse -Filter "Extensibility.dll" -ErrorAction SilentlyContinue | Select-Object -First 1
           }
+          if (-not $extDll) { Write-Error "Extensibility.dll not found"; exit 1 }
+          Write-Host "Found: $($extDll.FullName)"
+          New-Item -ItemType Directory -Force C:\refs | Out-Null
+          Copy-Item $extDll.FullName C:\refs\
+          & $msbuild NcTalkOutlookAddIn.sln /m /t:Rebuild /p:Configuration=Release /p:ReferencePath=C:\refs
         shell: pwsh
 
       - name: Read assembly version
