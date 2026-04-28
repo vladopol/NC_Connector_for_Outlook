@@ -363,7 +363,44 @@ namespace NcTalkOutlookAddIn.Controllers
                     DiagnosticsLogger.LogException(LogCategories.Core, "Failed to move cursor in Word editor before pasting HTML (best-effort).", ex);
                 }
 
+                int pasteStart = 0;
+                try
+                {
+                    object startVal = selection.GetType().InvokeMember("Start", BindingFlags.GetProperty, null, selection, null);
+                    if (startVal != null)
+                    {
+                        int.TryParse(startVal.ToString(), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out pasteStart);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read selection start before paste (best-effort).", ex);
+                }
+
                 selection.GetType().InvokeMember("Paste", BindingFlags.InvokeMethod, null, selection, null);
+
+                // Clear character formatting on the pasted range so the text
+                // inherits the email's default paragraph style instead of
+                // carrying over font/size from the HTML clipboard fragment.
+                try
+                {
+                    object endVal = selection.GetType().InvokeMember("End", BindingFlags.GetProperty, null, selection, null);
+                    int pasteEnd = pasteStart;
+                    if (endVal != null)
+                    {
+                        int.TryParse(endVal.ToString(), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out pasteEnd);
+                    }
+                    if (pasteEnd > pasteStart)
+                    {
+                        selection.GetType().InvokeMember("SetRange", BindingFlags.InvokeMethod, null, selection, new object[] { pasteStart, pasteEnd });
+                        selection.GetType().InvokeMember("ClearCharacterAllFormatting", BindingFlags.InvokeMethod, null, selection, null);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to clear character formatting after HTML paste (best-effort).", ex);
+                }
+
                 return true;
             }
             catch (Exception ex)
