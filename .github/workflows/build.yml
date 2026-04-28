@@ -1,0 +1,57 @@
+name: Build MSI
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Install WiX
+        run: dotnet tool install --global wix --version 6.0.2
+
+      - name: Add WiX HTTP extension
+        run: wix extension add WixToolset.Http.wixext/6.0.2
+
+      - name: Build solution
+        run: |
+          $msbuild = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\MSBuild.exe"
+          & $msbuild NcTalkOutlookAddIn.sln /m /t:Rebuild /p:Configuration=Release
+        shell: pwsh
+
+      - name: Read assembly version
+        id: version
+        run: |
+          $dll = "src\NcTalkOutlookAddIn\bin\Release\NcTalkOutlookAddIn.dll"
+          $v = [System.Reflection.AssemblyName]::GetAssemblyName($dll).Version
+          echo "full=$v" >> $env:GITHUB_OUTPUT
+          echo "short=$($v.Major).$($v.Minor).$($v.Build)" >> $env:GITHUB_OUTPUT
+        shell: pwsh
+
+      - name: Build MSI
+        run: |
+          $buildOutput = "src\NcTalkOutlookAddIn\bin\Release\"
+          dotnet build installer\NcConnectorOutlookInstaller.wixproj `
+            -c Release `
+            /p:BuildOutputDir="$((Resolve-Path $buildOutput).Path)\" `
+            /p:ProductVersion=${{ steps.version.outputs.short }} `
+            /p:AssemblyVersion=${{ steps.version.outputs.full }} `
+            /p:SuppressValidation=true
+        shell: pwsh
+
+      - name: Upload MSI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: NCConnectorForOutlook-${{ steps.version.outputs.short }}
+          path: installer\bin\Release\NCConnectorForOutlook.msi
