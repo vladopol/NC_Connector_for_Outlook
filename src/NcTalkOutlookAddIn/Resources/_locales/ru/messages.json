@@ -642,7 +642,7 @@
     "message": "Сначала введите URL сервера."
   },
   "compose_sharing_title": {
-    "message": "Добавить общий доступ Nextcloud"
+    "message": "Вложение через Nextcloud"
   },
   "options_sharing_base_label": {
     "message": "Базовый каталог"
