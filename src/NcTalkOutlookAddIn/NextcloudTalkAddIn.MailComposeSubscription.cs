@@ -99,6 +99,7 @@ namespace NcTalkOutlookAddIn
             private readonly List<SeparatePasswordDispatchEntry> _passwordDispatchQueue = new List<SeparatePasswordDispatchEntry>();
             private bool _attachmentSuppressed;
             private bool _attachmentPromptOpen;
+            private bool _keepAttachmentBypass;
             private bool _beforeAddShareFlowRunning;
             private bool _sendPending;
             private DateTime _sendPendingAtUtc;

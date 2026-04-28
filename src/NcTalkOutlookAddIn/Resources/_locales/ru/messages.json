@@ -855,7 +855,7 @@
     "message": "Пароль"
   },
   "sharing_html_expire_label": {
-    "message": "Срок действия до"
+    "message": "Ссылка действует до"
   },
   "sharing_html_permissions_label": {
     "message": "Ваши права"
