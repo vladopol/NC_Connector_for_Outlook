@@ -1274,16 +1274,16 @@
     "message": "Неизвестное вложение"
   },
   "sharing_attachment_prompt_keep_attachment": {
-    "message": "Всё равно отправить как вложение"
+    "message": "Отправить как вложение"
   },
   "sharing_attachment_prompt_reason": {
     "message": "Общий размер вложений составляет $1 и превышает установленный лимит $2. Последнее добавленное: \"$3\" ($4)."
   },
   "sharing_attachment_prompt_remove_last": {
-    "message": "Удалить последние выбранные вложения"
+    "message": "Отменить добавление вложения"
   },
   "sharing_attachment_prompt_share": {
-    "message": "Поделиться через NC Connector"
+    "message": "Отправить через Nextcloud"
   },
   "sharing_attachment_prompt_title": {
     "message": "Превышен лимит вложений"
