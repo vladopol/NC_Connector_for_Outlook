@@ -211,11 +211,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return;
             }
-            if (TryInsertHtmlIntoMailBody(mail, html))
-            {
-                DiagnosticsLogger.Log(LogCategories.Core, "Inserted HTML block into mail (HTMLBody primary).");
-                return;
-            }
 
             IDataObject previousClipboard = null;
             bool restoreClipboard = false;
@@ -231,13 +226,14 @@ namespace NcTalkOutlookAddIn.Controllers
                 previousClipboard = null;
                 restoreClipboard = false;
             }
+            bool wordPasteSucceeded = false;
             try
             {
                 Clipboard.SetText(html, TextDataFormat.Html);
                 if (TryPasteClipboardIntoMailInspector(mail))
                 {
                     DiagnosticsLogger.Log(LogCategories.Core, "Inserted HTML block into mail (WordEditor).");
-                    return;
+                    wordPasteSucceeded = true;
                 }
             }
             catch (Exception ex)
@@ -257,6 +253,16 @@ namespace NcTalkOutlookAddIn.Controllers
                         DiagnosticsLogger.LogException(LogCategories.Core, "Failed to restore clipboard after HTML insertion.", ex);
                     }
                 }
+            }
+            if (wordPasteSucceeded)
+            {
+                return;
+            }
+
+            if (TryInsertHtmlIntoMailBody(mail, html))
+            {
+                DiagnosticsLogger.Log(LogCategories.Core, "Inserted HTML block into mail (HTMLBody fallback).");
+                return;
             }
 
             DiagnosticsLogger.Log(LogCategories.Core, "Failed to insert HTML into mail: all insertion paths exhausted.");
