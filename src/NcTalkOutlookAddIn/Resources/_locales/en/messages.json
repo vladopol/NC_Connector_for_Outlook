@@ -876,7 +876,7 @@
     "message": "Password"
   },
   "sharing_html_expire_label": {
-    "message": "Validity period"
+    "message": "Valid until"
   },
   "sharing_html_permissions_label": {
     "message": "Your permissions"
