@@ -123,71 +123,33 @@ namespace NcTalkOutlookAddIn.UI
                 return;
             }
             int outerPadding = ScaleLogical(16);
-            int verticalGap = ScaleLogical(14);
+            int buttonSpacing = ScaleLogical(8);
+            int gapAfterLabel = ScaleLogical(14);
             int bottomPadding = ScaleLogical(12);
+            int buttonWidth = Math.Max(ScaleLogical(260), ClientSize.Width - outerPadding * 2);
+            int buttonHeight = ScaleLogical(28);
 
-            _reasonLabel.MaximumSize = new Size(Math.Max(ScaleLogical(240), ClientSize.Width - (outerPadding * 2)), 0);
+            _reasonLabel.MaximumSize = new Size(Math.Max(ScaleLogical(240), ClientSize.Width - outerPadding * 2), 0);
             _reasonLabel.Location = new Point(outerPadding, outerPadding);
 
-            var buttons = new[] { _removeButton, _shareButton, _keepButton };
-            int requiredClientWidth = FooterButtonLayoutHelper.LayoutCentered(
-                this,
-                buttons,
-                FooterButtonLayoutHelper.DefaultHorizontalPadding,
-                FooterButtonLayoutHelper.DefaultBottomPadding,
-                FooterButtonLayoutHelper.DefaultSpacing,
-                true);
-            if (ensureClientSize && requiredClientWidth > ClientSize.Width)
-            {
-                _layoutAdjustingClientSize = true;
-                try
-                {
-                    ClientSize = new Size(requiredClientWidth, ClientSize.Height);
-                }
-                finally
-                {
-                    _layoutAdjustingClientSize = false;
-                }
+            int buttonX = (ClientSize.Width - buttonWidth) / 2;
+            int y = _reasonLabel.Bottom + gapAfterLabel;
 
-                _reasonLabel.MaximumSize = new Size(Math.Max(ScaleLogical(240), ClientSize.Width - (outerPadding * 2)), 0);
-                _reasonLabel.Location = new Point(outerPadding, outerPadding);
-                FooterButtonLayoutHelper.LayoutCentered(
-                    this,
-                    buttons,
-                    FooterButtonLayoutHelper.DefaultHorizontalPadding,
-                    FooterButtonLayoutHelper.DefaultBottomPadding,
-                    FooterButtonLayoutHelper.DefaultSpacing,
-                    true);
-            }
-            int buttonsTop = Math.Min(_removeButton.Top, Math.Min(_shareButton.Top, _keepButton.Top));
-            int requiredHeight = _reasonLabel.Bottom + verticalGap + _removeButton.Height + bottomPadding;
-            if (ensureClientSize && requiredHeight > ClientSize.Height)
+            foreach (var btn in new[] { _removeButton, _shareButton, _keepButton })
             {
-                _layoutAdjustingClientSize = true;
-                try
-                {
-                    ClientSize = new Size(ClientSize.Width, requiredHeight);
-                }
-                finally
-                {
-                    _layoutAdjustingClientSize = false;
-                }
+                btn.SetBounds(buttonX, y, buttonWidth, buttonHeight);
+                y += buttonHeight + buttonSpacing;
+            }
 
-                FooterButtonLayoutHelper.LayoutCentered(
-                    this,
-                    buttons,
-                    FooterButtonLayoutHelper.DefaultHorizontalPadding,
-                    FooterButtonLayoutHelper.DefaultBottomPadding,
-                    FooterButtonLayoutHelper.DefaultSpacing,
-                    true);
-                buttonsTop = Math.Min(_removeButton.Top, Math.Min(_shareButton.Top, _keepButton.Top));
-            }
-            int maxReasonBottom = buttonsTop - verticalGap;
-            if (_reasonLabel.Bottom > maxReasonBottom)
+            if (ensureClientSize)
             {
-                _reasonLabel.MaximumSize = new Size(
-                    Math.Max(ScaleLogical(240), ClientSize.Width - (outerPadding * 2)),
-                    Math.Max(ScaleLogical(40), maxReasonBottom - _reasonLabel.Top));
+                int requiredHeight = y - buttonSpacing + bottomPadding;
+                if (requiredHeight != ClientSize.Height)
+                {
+                    _layoutAdjustingClientSize = true;
+                    try { ClientSize = new Size(ClientSize.Width, requiredHeight); }
+                    finally { _layoutAdjustingClientSize = false; }
+                }
             }
         }
 
