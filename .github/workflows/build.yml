@@ -24,7 +24,7 @@ jobs:
       - name: Add WiX HTTP extension
         run: wix extension add WixToolset.Http.wixext/6.0.2
 
-      - name: Locate Extensibility.dll
+      - name: Register Extensibility.dll in GAC
         run: |
           $candidates = @(
             "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\PublicAssemblies\Extensibility.dll",
@@ -35,14 +35,12 @@ jobs:
           if (-not $ext) {
             $ext = Get-ChildItem "C:\Program Files\Microsoft Visual Studio" -Recurse -Filter "Extensibility.dll" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
           }
-          if ($ext) {
-            Write-Host "Found: $ext"
-            New-Item -ItemType Directory -Force "src\NcTalkOutlookAddIn\bin\Release" | Out-Null
-            Copy-Item $ext "src\NcTalkOutlookAddIn\bin\Release\Extensibility.dll" -Force
-          } else {
-            Write-Error "Extensibility.dll not found"
-            exit 1
-          }
+          if (-not $ext) { Write-Error "Extensibility.dll not found"; exit 1 }
+          Write-Host "Found: $ext"
+          $gacutil = Get-ChildItem "C:\Program Files (x86)\Microsoft SDKs" -Recurse -Filter "gacutil.exe" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
+          if (-not $gacutil) { Write-Error "gacutil.exe not found"; exit 1 }
+          Write-Host "gacutil: $gacutil"
+          & $gacutil /i $ext
         shell: pwsh
 
       - name: Build solution
