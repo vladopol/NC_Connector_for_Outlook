@@ -663,7 +663,7 @@
     "message": "Please enter the server URL first."
   },
   "compose_sharing_title": {
-    "message": "Add Nextcloud share"
+    "message": "Attachment via Nextcloud"
   },
   "options_sharing_base_label": {
     "message": "Base directory"
