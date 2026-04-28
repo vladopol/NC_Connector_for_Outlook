@@ -164,6 +164,7 @@ namespace NcTalkOutlookAddIn
                     }
                     else
                     {
+                        _keepAttachmentBypass = true;
                         LogFileLink(
                             "Compose before-attachment-add threshold decision (composeKey="
                             + _composeKey
@@ -323,6 +324,12 @@ namespace NcTalkOutlookAddIn
                     SizeFormatting.FormatMegabytes((long)settings.ThresholdMb * 1024L * 1024L),
                     string.IsNullOrWhiteSpace(lastAdded.Name) ? Strings.AttachmentPromptLastUnknown : lastAdded.Name,
                     SizeFormatting.FormatMegabytes(lastAdded.SizeBytes));
+                if (_keepAttachmentBypass)
+                {
+                    _keepAttachmentBypass = false;
+                    LogFileLink("Compose attachment prompt skipped (composeKey=" + _composeKey + ", reason=keep_attachment_bypass).");
+                    return;
+                }
                 if (_attachmentPromptOpen)
                 {
                     LogFileLink("Compose attachment prompt skipped (composeKey=" + _composeKey + ", reason=prompt_already_open).");
