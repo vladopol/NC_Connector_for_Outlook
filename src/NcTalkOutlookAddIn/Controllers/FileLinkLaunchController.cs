@@ -89,9 +89,11 @@ namespace NcTalkOutlookAddIn.Controllers
                         composeSubscription.ArmShareCleanup(wizard.Result);
                     }
                     string html;
+                    string plainText;
                     try
                     {
                         html = FileLinkHtmlBuilder.Build(wizard.Result, wizard.RequestSnapshot, languageOverride, policyStatus);
+                        plainText = FileLinkHtmlBuilder.BuildPlainText(wizard.Result, wizard.RequestSnapshot, languageOverride, policyStatus);
                     }
                     catch (Exception ex)
                     {
@@ -130,7 +132,14 @@ namespace NcTalkOutlookAddIn.Controllers
                             passwordOnlyHtml);
                     }
 
-                    _owner.InsertHtmlIntoMail(mail, html);
+                    if (!string.IsNullOrWhiteSpace(plainText))
+                    {
+                        _owner.InsertTextIntoMail(mail, plainText, html);
+                    }
+                    else
+                    {
+                        _owner.InsertHtmlIntoMail(mail, html);
+                    }
                     return true;
                 }
             }

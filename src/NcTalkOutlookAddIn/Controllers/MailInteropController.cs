@@ -206,68 +206,44 @@ namespace NcTalkOutlookAddIn.Controllers
             }
         }
 
-        internal void InsertHtmlIntoMail(Outlook.MailItem mail, string html)
-        {            if (mail == null || string.IsNullOrWhiteSpace(html))
+        internal void InsertTextIntoMail(Outlook.MailItem mail, string plainText, string htmlFallback)
+        {
+            if (mail == null || string.IsNullOrWhiteSpace(plainText))
             {
                 return;
             }
-
-            IDataObject previousClipboard = null;
-            bool restoreClipboard = false;
-
-            try
+            if (TryInsertTextIntoMailWordEditor(mail, plainText))
             {
-                previousClipboard = Clipboard.GetDataObject();
-                restoreClipboard = previousClipboard != null;
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read clipboard data object.", ex);
-                previousClipboard = null;
-                restoreClipboard = false;
-            }
-            bool wordPasteSucceeded = false;
-            try
-            {
-                Clipboard.SetText(html, TextDataFormat.Html);
-                if (TryPasteClipboardIntoMailInspector(mail))
-                {
-                    DiagnosticsLogger.Log(LogCategories.Core, "Inserted HTML block into mail (WordEditor).");
-                    wordPasteSucceeded = true;
-                }
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.Log(LogCategories.Core, "Failed to insert HTML via WordEditor: " + ex.Message);
-            }
-            finally
-            {
-                if (restoreClipboard)
-                {
-                    try
-                    {
-                        Clipboard.SetDataObject(previousClipboard);
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to restore clipboard after HTML insertion.", ex);
-                    }
-                }
-            }
-            if (wordPasteSucceeded)
-            {
+                DiagnosticsLogger.Log(LogCategories.Core, "Inserted file link text into mail (WordEditor TypeText).");
                 return;
             }
-
-            if (TryInsertHtmlIntoMailBody(mail, html))
+            if (!string.IsNullOrWhiteSpace(htmlFallback) && TryInsertHtmlIntoMailBody(mail, htmlFallback))
             {
-                DiagnosticsLogger.Log(LogCategories.Core, "Inserted HTML block into mail (HTMLBody fallback).");
+                DiagnosticsLogger.Log(LogCategories.Core, "Inserted file link text into mail (HTMLBody fallback).");
                 return;
             }
-
-            DiagnosticsLogger.Log(LogCategories.Core, "Failed to insert HTML into mail: all insertion paths exhausted.");
+            DiagnosticsLogger.Log(LogCategories.Core, "Failed to insert file link text into mail: all insertion paths exhausted.");
             MessageBox.Show(
                 string.Format(CultureInfo.CurrentCulture, Strings.ErrorInsertHtmlFailed, "all insertion paths exhausted"),
+                Strings.DialogTitle,
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+        }
+
+        internal void InsertHtmlIntoMail(Outlook.MailItem mail, string html)
+        {
+            if (mail == null || string.IsNullOrWhiteSpace(html))
+            {
+                return;
+            }
+            if (TryInsertHtmlIntoMailBody(mail, html))
+            {
+                DiagnosticsLogger.Log(LogCategories.Core, "Inserted HTML block into mail (HTMLBody).");
+                return;
+            }
+            DiagnosticsLogger.Log(LogCategories.Core, "Failed to insert HTML into mail: HTMLBody insertion failed.");
+            MessageBox.Show(
+                string.Format(CultureInfo.CurrentCulture, Strings.ErrorInsertHtmlFailed, "HTMLBody insertion failed"),
                 Strings.DialogTitle,
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
@@ -305,7 +281,7 @@ namespace NcTalkOutlookAddIn.Controllers
             }
         }
 
-        private static bool TryPasteClipboardIntoMailInspector(Outlook.MailItem mail)
+        private static bool TryInsertTextIntoMailWordEditor(Outlook.MailItem mail, string text)
         {
             Outlook.Inspector inspector = null;
             object wordEditor = null;
@@ -318,7 +294,7 @@ namespace NcTalkOutlookAddIn.Controllers
             }
             catch (Exception ex)
             {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to access MailItem.GetInspector for HTML paste.", ex);
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to access MailItem.GetInspector for text insert.", ex);
                 inspector = null;
             }
             if (inspector == null)
@@ -331,7 +307,7 @@ namespace NcTalkOutlookAddIn.Controllers
             }
             catch (Exception ex)
             {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to access Inspector.WordEditor for HTML paste.", ex);
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to access Inspector.WordEditor for text insert.", ex);
                 wordEditor = null;
             }
             if (wordEditor == null)
@@ -340,72 +316,43 @@ namespace NcTalkOutlookAddIn.Controllers
             }
             try
             {
-                application = wordEditor.GetType().InvokeMember("Application", BindingFlags.GetProperty, null, wordEditor, null);                if (application == null)
+                application = wordEditor.GetType().InvokeMember("Application", BindingFlags.GetProperty, null, wordEditor, null);
+                if (application == null)
+                {
+                    return false;
+                }
+                selection = application.GetType().InvokeMember("Selection", BindingFlags.GetProperty, null, application, null);
+                if (selection == null)
                 {
                     return false;
                 }
 
-                selection = application.GetType().InvokeMember("Selection", BindingFlags.GetProperty, null, application, null);                if (selection == null)
-                {
-                    return false;
-                }
-
-                // Insert near the top so we are reliably above the signature block.
                 try
                 {
-                    // wdStory = 6
+                    // wdStory = 6: move to start of document, above any signature block
                     selection.GetType().InvokeMember("HomeKey", BindingFlags.InvokeMethod, null, selection, new object[] { 6, 0 });
                     selection.GetType().InvokeMember("TypeParagraph", BindingFlags.InvokeMethod, null, selection, null);
                     selection.GetType().InvokeMember("TypeParagraph", BindingFlags.InvokeMethod, null, selection, null);
                 }
                 catch (Exception ex)
                 {
-                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to move cursor in Word editor before pasting HTML (best-effort).", ex);
+                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to move cursor before text insert (best-effort).", ex);
                 }
 
-                int pasteStart = 0;
-                try
+                string[] lines = text.Replace("\r\n", "\n").Replace("\r", "\n").Split('\n');
+                for (int i = 0; i < lines.Length; i++)
                 {
-                    object startVal = selection.GetType().InvokeMember("Start", BindingFlags.GetProperty, null, selection, null);
-                    if (startVal != null)
+                    if (lines[i].Length > 0)
                     {
-                        int.TryParse(startVal.ToString(), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out pasteStart);
+                        selection.GetType().InvokeMember("TypeText", BindingFlags.InvokeMethod, null, selection, new object[] { lines[i] });
                     }
+                    selection.GetType().InvokeMember("TypeParagraph", BindingFlags.InvokeMethod, null, selection, null);
                 }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read selection start before paste (best-effort).", ex);
-                }
-
-                selection.GetType().InvokeMember("Paste", BindingFlags.InvokeMethod, null, selection, null);
-
-                // Clear character formatting on the pasted range so the text
-                // inherits the email's default paragraph style instead of
-                // carrying over font/size from the HTML clipboard fragment.
-                try
-                {
-                    object endVal = selection.GetType().InvokeMember("End", BindingFlags.GetProperty, null, selection, null);
-                    int pasteEnd = pasteStart;
-                    if (endVal != null)
-                    {
-                        int.TryParse(endVal.ToString(), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out pasteEnd);
-                    }
-                    if (pasteEnd > pasteStart)
-                    {
-                        selection.GetType().InvokeMember("SetRange", BindingFlags.InvokeMethod, null, selection, new object[] { pasteStart, pasteEnd });
-                        selection.GetType().InvokeMember("ClearCharacterAllFormatting", BindingFlags.InvokeMethod, null, selection, null);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to clear character formatting after HTML paste (best-effort).", ex);
-                }
-
                 return true;
             }
             catch (Exception ex)
             {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to paste HTML into Word editor.", ex);
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to insert text into Word editor.", ex);
                 return false;
             }
             finally
