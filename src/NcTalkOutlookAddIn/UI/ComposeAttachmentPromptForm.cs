@@ -32,8 +32,8 @@ namespace NcTalkOutlookAddIn.UI
         {
             Text = Strings.AttachmentPromptTitle;
             FormBorderStyle = FormBorderStyle.FixedDialog;
-            StartPosition = FormStartPosition.CenterParent;
-            ClientSize = new Size(540, 210);
+            StartPosition = FormStartPosition.CenterScreen;
+            ClientSize = new Size(480, 210);
             AutoScaleMode = AutoScaleMode.Dpi;
             AutoScaleDimensions = new SizeF(96f, 96f);
             MaximizeBox = false;
@@ -41,7 +41,7 @@ namespace NcTalkOutlookAddIn.UI
             ControlBox = false;
             ShowInTaskbar = false;
             Icon = BrandingAssets.GetAppIcon(32);
-            MinimumSize = new Size(ScaleLogical(520), ScaleLogical(190));
+            MinimumSize = new Size(ScaleLogical(320), ScaleLogical(160));
 
             _reasonLabel.AutoSize = true;
             _reasonLabel.MaximumSize = new Size(ClientSize.Width - ScaleLogical(32), 0);
@@ -126,13 +126,23 @@ namespace NcTalkOutlookAddIn.UI
             int buttonSpacing = ScaleLogical(8);
             int gapAfterLabel = ScaleLogical(14);
             int bottomPadding = ScaleLogical(12);
-            int buttonWidth = Math.Max(ScaleLogical(260), ClientSize.Width - outerPadding * 2);
             int buttonHeight = ScaleLogical(28);
 
-            _reasonLabel.MaximumSize = new Size(Math.Max(ScaleLogical(240), ClientSize.Width - outerPadding * 2), 0);
+            // Size all buttons to the widest label + padding
+            int buttonWidth = ScaleLogical(120);
+            foreach (var btn in new[] { _removeButton, _shareButton, _keepButton })
+            {
+                Size s = TextRenderer.MeasureText(btn.Text, btn.Font ?? Font);
+                int w = s.Width + ScaleLogical(48);
+                if (w > buttonWidth) buttonWidth = w;
+            }
+
+            int clientWidth = Math.Max(buttonWidth + outerPadding * 2, ClientSize.Width);
+
+            _reasonLabel.MaximumSize = new Size(Math.Max(ScaleLogical(240), clientWidth - outerPadding * 2), 0);
             _reasonLabel.Location = new Point(outerPadding, outerPadding);
 
-            int buttonX = (ClientSize.Width - buttonWidth) / 2;
+            int buttonX = (clientWidth - buttonWidth) / 2;
             int y = _reasonLabel.Bottom + gapAfterLabel;
 
             foreach (var btn in new[] { _removeButton, _shareButton, _keepButton })
@@ -144,10 +154,12 @@ namespace NcTalkOutlookAddIn.UI
             if (ensureClientSize)
             {
                 int requiredHeight = y - buttonSpacing + bottomPadding;
-                if (requiredHeight != ClientSize.Height)
+                int newW = clientWidth;
+                int newH = requiredHeight;
+                if (newW != ClientSize.Width || newH != ClientSize.Height)
                 {
                     _layoutAdjustingClientSize = true;
-                    try { ClientSize = new Size(ClientSize.Width, requiredHeight); }
+                    try { ClientSize = new Size(newW, newH); }
                     finally { _layoutAdjustingClientSize = false; }
                 }
             }
