@@ -12,7 +12,8 @@ namespace NcTalkOutlookAddIn.UI
     internal enum ComposeAttachmentPromptDecision
     {
         Share,
-        RemoveLast
+        RemoveLast,
+        KeepAttachment
     }
 
         // Two-action prompt for threshold-based compose attachment automation.
@@ -22,6 +23,7 @@ namespace NcTalkOutlookAddIn.UI
         private readonly Label _reasonLabel = new Label();
         private readonly Button _shareButton = new Button();
         private readonly Button _removeButton = new Button();
+        private readonly Button _keepButton = new Button();
         private bool _layoutAdjustingClientSize;
 
         private ComposeAttachmentPromptDecision _decision = ComposeAttachmentPromptDecision.RemoveLast;
@@ -70,6 +72,17 @@ namespace NcTalkOutlookAddIn.UI
             };
             Controls.Add(_shareButton);
 
+            _keepButton.Text = Strings.AttachmentPromptKeepAttachment;
+            int ignoredKeepMinWidth;
+            FooterButtonLayoutHelper.ApplyButtonSize(_keepButton, out ignoredKeepMinWidth);
+            _keepButton.Click += (s, e) =>
+            {
+                _decision = ComposeAttachmentPromptDecision.KeepAttachment;
+                DialogResult = DialogResult.OK;
+                Close();
+            };
+            Controls.Add(_keepButton);
+
             AcceptButton = _shareButton;
             CancelButton = _removeButton;
 
@@ -116,7 +129,7 @@ namespace NcTalkOutlookAddIn.UI
             _reasonLabel.MaximumSize = new Size(Math.Max(ScaleLogical(240), ClientSize.Width - (outerPadding * 2)), 0);
             _reasonLabel.Location = new Point(outerPadding, outerPadding);
 
-            var buttons = new[] { _removeButton, _shareButton };
+            var buttons = new[] { _removeButton, _shareButton, _keepButton };
             int requiredClientWidth = FooterButtonLayoutHelper.LayoutCentered(
                 this,
                 buttons,
@@ -146,7 +159,7 @@ namespace NcTalkOutlookAddIn.UI
                     FooterButtonLayoutHelper.DefaultSpacing,
                     true);
             }
-            int buttonsTop = Math.Min(_removeButton.Top, _shareButton.Top);
+            int buttonsTop = Math.Min(_removeButton.Top, Math.Min(_shareButton.Top, _keepButton.Top));
             int requiredHeight = _reasonLabel.Bottom + verticalGap + _removeButton.Height + bottomPadding;
             if (ensureClientSize && requiredHeight > ClientSize.Height)
             {
@@ -167,7 +180,7 @@ namespace NcTalkOutlookAddIn.UI
                     FooterButtonLayoutHelper.DefaultBottomPadding,
                     FooterButtonLayoutHelper.DefaultSpacing,
                     true);
-                buttonsTop = Math.Min(_removeButton.Top, _shareButton.Top);
+                buttonsTop = Math.Min(_removeButton.Top, Math.Min(_shareButton.Top, _keepButton.Top));
             }
             int maxReasonBottom = buttonsTop - verticalGap;
             if (_reasonLabel.Bottom > maxReasonBottom)

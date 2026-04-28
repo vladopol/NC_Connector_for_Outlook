@@ -359,6 +359,15 @@ namespace NcTalkOutlookAddIn
                     return;
                 }
 
+                if (decision == ComposeAttachmentPromptDecision.KeepAttachment)
+                {
+                    LogFileLink(
+                        "Compose attachment threshold decision (composeKey="
+                        + _composeKey
+                        + ", decision=keep_attachment).");
+                    return;
+                }
+
                 LogFileLink(
                     "Compose attachment threshold decision (composeKey="
                     + _composeKey

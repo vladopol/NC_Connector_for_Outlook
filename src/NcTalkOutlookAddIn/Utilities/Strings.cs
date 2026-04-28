@@ -916,6 +916,7 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string AttachmentPromptShare { get { return Get("sharing_attachment_prompt_share", "Share with NC Connector"); } }
         internal static string AttachmentPromptRemoveLast { get { return Get("sharing_attachment_prompt_remove_last", "Remove last selected attachments"); } }
         internal static string AttachmentPromptLastUnknown { get { return Get("sharing_attachment_prompt_last_unknown", "Unknown attachment"); } }
+        internal static string AttachmentPromptKeepAttachment { get { return Get("sharing_attachment_prompt_keep_attachment", "Send as attachment anyway"); } }
 
         internal static string SharingHtmlPasswordSeparateHint { get { return Get("sharing_html_password_separate_hint", "The password will be sent in a separate email."); } }
         internal static string SharingHtmlPasswordMailIntro { get { return Get("sharing_html_password_mail_intro", "Here is your password for the shared link."); } }

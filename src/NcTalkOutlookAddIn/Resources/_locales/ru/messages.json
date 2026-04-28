@@ -1273,6 +1273,9 @@
   "sharing_attachment_prompt_last_unknown": {
     "message": "Неизвестное вложение"
   },
+  "sharing_attachment_prompt_keep_attachment": {
+    "message": "Всё равно отправить как вложение"
+  },
   "sharing_attachment_prompt_reason": {
     "message": "Общий размер вложений составляет $1 и превышает установленный лимит $2. Последнее добавленное: \"$3\" ($4)."
   },

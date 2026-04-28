@@ -876,13 +876,13 @@
     "message": "Password"
   },
   "sharing_html_expire_label": {
-    "message": "Expiration date"
+    "message": "Validity period"
   },
   "sharing_html_permissions_label": {
     "message": "Your permissions"
   },
   "sharing_html_download_label": {
-    "message": "Download link"
+    "message": "Download link:"
   },
   "sharing_html_footer": {
     "message": "$1 is a solution for secure email and file exchange."
@@ -1293,6 +1293,9 @@
   },
   "sharing_attachment_prompt_last_unknown": {
     "message": "Unknown attachment"
+  },
+  "sharing_attachment_prompt_keep_attachment": {
+    "message": "Send as attachment anyway"
   },
   "sharing_attachment_prompt_reason": {
     "message": "The total attachment size is $1 and exceeds the configured limit of $2. Last added: \"$3\" ($4)."
