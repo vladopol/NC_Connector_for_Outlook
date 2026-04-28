@@ -1295,16 +1295,16 @@
     "message": "Unknown attachment"
   },
   "sharing_attachment_prompt_keep_attachment": {
-    "message": "Send as attachment anyway"
+    "message": "Send as attachment"
   },
   "sharing_attachment_prompt_reason": {
     "message": "The total attachment size is $1 and exceeds the configured limit of $2. Last added: \"$3\" ($4)."
   },
   "sharing_attachment_prompt_remove_last": {
-    "message": "Remove last selected attachments"
+    "message": "Cancel adding attachment"
   },
   "sharing_attachment_prompt_share": {
-    "message": "Share with NC Connector"
+    "message": "Send via Nextcloud"
   },
   "sharing_attachment_prompt_title": {
     "message": "Attachment limit exceeded"
