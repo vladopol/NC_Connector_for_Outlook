@@ -178,10 +178,6 @@ namespace NcTalkOutlookAddIn.UI
             _tabControl.TabPages.Add(_generalTab);
             _tabControl.TabPages.Add(_fileLinkTab);
             _tabControl.TabPages.Add(_talkTab);
-            _tabControl.TabPages.Add(_ifbTab);
-            _tabControl.TabPages.Add(_advancedTab);
-            _tabControl.TabPages.Add(_debugTab);
-            _tabControl.TabPages.Add(_aboutTab);
             _tabControl.SelectedIndexChanged += OnSelectedTabChanged;
             Controls.Add(_tabControl);
             InitializePolicyWarningPanel();
