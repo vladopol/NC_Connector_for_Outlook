@@ -331,8 +331,6 @@ namespace NcTalkOutlookAddIn.Controllers
                 {
                     // wdStory = 6: move to start of document, above any signature block
                     selection.GetType().InvokeMember("HomeKey", BindingFlags.InvokeMethod, null, selection, new object[] { 6, 0 });
-                    selection.GetType().InvokeMember("TypeParagraph", BindingFlags.InvokeMethod, null, selection, null);
-                    selection.GetType().InvokeMember("TypeParagraph", BindingFlags.InvokeMethod, null, selection, null);
                 }
                 catch (Exception ex)
                 {
@@ -342,9 +340,52 @@ namespace NcTalkOutlookAddIn.Controllers
                 string[] lines = text.Replace("\r\n", "\n").Replace("\r", "\n").Split('\n');
                 for (int i = 0; i < lines.Length; i++)
                 {
-                    if (lines[i].Length > 0)
+                    string line = lines[i];
+                    if (line.Length > 0)
                     {
-                        selection.GetType().InvokeMember("TypeText", BindingFlags.InvokeMethod, null, selection, new object[] { lines[i] });
+                        bool isUrl = line.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+                                  || line.StartsWith("http://", StringComparison.OrdinalIgnoreCase);
+                        if (isUrl)
+                        {
+                            int linkStart = 0;
+                            try
+                            {
+                                object sv = selection.GetType().InvokeMember("Start", BindingFlags.GetProperty, null, selection, null);
+                                if (sv != null)
+                                {
+                                    int.TryParse(sv.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out linkStart);
+                                }
+                            }
+                            catch { }
+
+                            selection.GetType().InvokeMember("TypeText", BindingFlags.InvokeMethod, null, selection, new object[] { line });
+
+                            try
+                            {
+                                object ev = selection.GetType().InvokeMember("Start", BindingFlags.GetProperty, null, selection, null);
+                                int linkEnd = linkStart;
+                                if (ev != null)
+                                {
+                                    int.TryParse(ev.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out linkEnd);
+                                }
+                                if (linkEnd > linkStart)
+                                {
+                                    object linkRange = wordEditor.GetType().InvokeMember("Range", BindingFlags.InvokeMethod, null, wordEditor, new object[] { linkStart, linkEnd });
+                                    object hyperlinks = wordEditor.GetType().InvokeMember("Hyperlinks", BindingFlags.GetProperty, null, wordEditor, null);
+                                    hyperlinks.GetType().InvokeMember("Add", BindingFlags.InvokeMethod, null, hyperlinks, new object[] { linkRange, line });
+                                    ComInteropScope.TryRelease(hyperlinks, LogCategories.Core, "Failed to release Word hyperlinks COM object.");
+                                    ComInteropScope.TryRelease(linkRange, LogCategories.Core, "Failed to release Word link range COM object.");
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to add hyperlink for URL line (best-effort).", ex);
+                            }
+                        }
+                        else
+                        {
+                            selection.GetType().InvokeMember("TypeText", BindingFlags.InvokeMethod, null, selection, new object[] { line });
+                        }
                     }
                     selection.GetType().InvokeMember("TypeParagraph", BindingFlags.InvokeMethod, null, selection, null);
                 }
