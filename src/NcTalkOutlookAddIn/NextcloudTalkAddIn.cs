@@ -430,6 +430,11 @@ namespace NcTalkOutlookAddIn
             return _mailInteropController.ResolveActiveInspectorIdentityKey();
         }
 
+        internal void InsertTextIntoMail(Outlook.MailItem mail, string plainText, string htmlFallback)
+        {
+            _mailInteropController.InsertTextIntoMail(mail, plainText, htmlFallback);
+        }
+
         internal void InsertHtmlIntoMail(Outlook.MailItem mail, string html)
         {
             _mailInteropController.InsertHtmlIntoMail(mail, html);
