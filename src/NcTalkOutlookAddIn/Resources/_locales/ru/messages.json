@@ -18,7 +18,7 @@
     "message": "Очистить"
   },
   "ui_insert_button_label": {
-    "message": "Вставить ссылку Talk"
+    "message": "Добавить комнату в Nextcloud Talk"
   },
   "ui_create_heading": {
     "message": "Создать публичную беседу"
@@ -1103,7 +1103,7 @@
     "message": "Не удалось обновить описание комнаты: $1"
   },
   "outlook_ribbon_group_label": {
-    "message": "NC Connector"
+    "message": "Nextcloud"
   },
   "outlook_ribbon_talk_screentip": {
     "message": "Создать разговор Nextcloud Talk"
@@ -1112,7 +1112,7 @@
     "message": "Создаёт разговор Nextcloud Talk для этой встречи."
   },
   "outlook_ribbon_tab_label": {
-    "message": "NC Connector"
+    "message": "Nextcloud"
   },
   "outlook_ribbon_config_group": {
     "message": "Конфигурация"
