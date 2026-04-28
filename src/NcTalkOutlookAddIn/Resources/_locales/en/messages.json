@@ -18,7 +18,7 @@
     "message": "Clear"
   },
   "ui_insert_button_label": {
-    "message": "Insert Talk link"
+    "message": "Add room in Nextcloud Talk"
   },
   "ui_create_heading": {
     "message": "Create Public Conversation"
@@ -1124,7 +1124,7 @@
     "message": "Room description could not be updated: $1"
   },
   "outlook_ribbon_group_label": {
-    "message": "NC Connector"
+    "message": "Nextcloud"
   },
   "outlook_ribbon_talk_screentip": {
     "message": "Create a Nextcloud Talk conversation"
@@ -1133,7 +1133,7 @@
     "message": "Creates a Nextcloud Talk conversation for this appointment."
   },
   "outlook_ribbon_tab_label": {
-    "message": "NC Connector"
+    "message": "Nextcloud"
   },
   "outlook_ribbon_config_group": {
     "message": "Configuration"
