@@ -15,7 +15,7 @@ namespace NcTalkOutlookAddIn.Settings
         internal const int DefaultIfbPort = 7777;
         internal const int MinIfbPort = 1024;
         internal const int MaxIfbPort = 49151;
-        internal const string DefaultFileLinkBasePath = "NC Connector";
+        internal const string DefaultFileLinkBasePath = "Outlook";
 
         public AddinSettings()
         {
@@ -41,10 +41,10 @@ namespace NcTalkOutlookAddIn.Settings
             SharingDefaultPermDelete = false;
             SharingDefaultPasswordEnabled = true;
             SharingDefaultPasswordSeparateEnabled = false;
-            SharingDefaultExpireDays = 7;
+            SharingDefaultExpireDays = 30;
             SharingAttachmentsAlwaysConnector = false;
             SharingAttachmentsOfferAboveEnabled = true;
-            SharingAttachmentsOfferAboveMb = 20;
+            SharingAttachmentsOfferAboveMb = 25;
             ShareBlockLang = "default";
             EventDescriptionLang = "default";
             TalkDefaultLobbyEnabled = true;
