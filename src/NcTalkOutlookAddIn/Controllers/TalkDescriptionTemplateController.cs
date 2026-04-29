@@ -59,24 +59,16 @@ namespace NcTalkOutlookAddIn.Controllers
             return html.TrimEnd() + Environment.NewLine + block;
         }
 
-        internal static string BuildInitialRoomDescription(string password, string languageOverride, string invitationTemplate)
+        internal static string BuildInitialRoomDescription(string appointmentBody)
         {
-            string normalizedLanguage = NormalizeTalkDescriptionLanguage(languageOverride);
-            if (string.Equals(normalizedLanguage, "custom", StringComparison.OrdinalIgnoreCase)
-                && !string.IsNullOrWhiteSpace(invitationTemplate))
-            {
-                return RenderTalkInvitationTemplate(invitationTemplate, string.Empty, password);
-            }
-            if (string.IsNullOrWhiteSpace(password))
+            if (string.IsNullOrWhiteSpace(appointmentBody))
             {
                 return string.Empty;
             }
-            if (string.Equals(normalizedLanguage, "custom", StringComparison.OrdinalIgnoreCase))
-            {
-                normalizedLanguage = "default";
-            }
-            string passwordLineFormat = Strings.GetInLanguage(normalizedLanguage, "ui_description_password_line", "Password: {0}");
-            return string.Format(CultureInfo.InvariantCulture, passwordLineFormat, password.Trim());
+            string trimmed = appointmentBody.Trim();
+            // Nextcloud Talk description field has a practical limit around 500 chars
+            const int maxLength = 500;
+            return trimmed.Length > maxLength ? trimmed.Substring(0, maxLength).TrimEnd() : trimmed;
         }
 
                 // Outlook appointment bodies are plain text. Convert backend HTML/text
