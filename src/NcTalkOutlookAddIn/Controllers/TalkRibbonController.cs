@@ -124,24 +124,10 @@ namespace NcTalkOutlookAddIn.Controllers
                     settings.EventDescriptionLang);
                 string descriptionType = NextcloudTalkAddIn.ResolveTalkEventDescriptionType(policyStatus);
                 string invitationTemplate = NextcloudTalkAddIn.ResolveTalkInvitationTemplate(policyStatus);
-                string initialDescription;
-                try
-                {
-                    initialDescription = TalkDescriptionTemplateController.BuildInitialRoomDescription(
-                        dialog.TalkPassword,
-                        descriptionLanguage,
-                        invitationTemplate);
-                }
-                catch (Exception ex)
-                {
-                    NextcloudTalkAddIn.LogTalkMessage("Talk invitation template rendering blocked: " + ex.Message);
-                    MessageBox.Show(
-                        string.Format(CultureInfo.CurrentCulture, Strings.ErrorCreateRoomUnexpected, ex.Message),
-                        Strings.DialogTitle,
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Error);
-                    return;
-                }
+                string appointmentBody = string.Empty;
+                try { appointmentBody = appointment.Body ?? string.Empty; }
+                catch (Exception ex) { NextcloudTalkAddIn.LogTalkMessage("Failed to read appointment body for room description: " + ex.Message); }
+                string initialDescription = TalkDescriptionTemplateController.BuildInitialRoomDescription(appointmentBody);
                 var request = new TalkRoomRequest
                 {
                     Title = dialog.TalkTitle,
