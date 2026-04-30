@@ -698,6 +698,12 @@
   "options_talk_default_password_label": {
     "message": "Imposta password"
   },
+  "options_talk_delete_room_on_event_delete_label": {
+    "message": "Elimina la stanza Talk quando elimini un evento salvato"
+  },
+  "options_talk_delete_room_on_event_delete_tooltip": {
+    "message": "Richiede metadati Talk di NC Connector e questa abilitazione esplicita. La pulizia degli appuntamenti non salvati resta attiva."
+  },
   "options_talk_default_roomtype_label": {
     "message": "Tipo di stanza"
   },

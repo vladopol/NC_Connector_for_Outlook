@@ -521,6 +521,8 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string TalkRoomGroup { get { return Get("ui_create_roomtype_label", "Room type"); } }
         internal static string TalkEventRadio { get { return Get("ui_create_mode_event", "Event conversation"); } }
         internal static string TalkStandardRadio { get { return Get("ui_create_mode_standard", "Group conversation"); } }
+        internal static string TalkDeleteRoomOnEventDeleteCheck { get { return Get("options_talk_delete_room_on_event_delete_label", "Delete Talk room when deleting a saved event"); } }
+        internal static string TooltipDeleteRoomOnEventDelete { get { return Get("options_talk_delete_room_on_event_delete_tooltip", "Requires NC Connector Talk metadata and this opt-in. Unsaved appointment cleanup remains active."); } }
         internal static string TalkModeratorGroup { get { return Get("ui_create_moderator_label", "Moderator (optional)"); } }
         internal static string TalkModeratorClear { get { return Get("ui_button_clear", "Clear"); } }
         internal static string TalkModeratorHint { get { return Get("ui_create_moderator_hint", "If provided, moderation is transferred to this user after creation and you leave the room."); } }

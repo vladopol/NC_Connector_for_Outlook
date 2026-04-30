@@ -698,6 +698,12 @@
   "options_talk_default_password_label": {
     "message": "Nastavit heslo"
   },
+  "options_talk_delete_room_on_event_delete_label": {
+    "message": "Odstranit mistnost Talk pri odstraneni ulozene udalosti"
+  },
+  "options_talk_delete_room_on_event_delete_tooltip": {
+    "message": "Vyzaduje metadata Talk z NC Connectoru a toto vyslovne povoleni. Uklid neulozenych udalosti zustava aktivni."
+  },
   "options_talk_default_roomtype_label": {
     "message": "Typ místnosti"
   },

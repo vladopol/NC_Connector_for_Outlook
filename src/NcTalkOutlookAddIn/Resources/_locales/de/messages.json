@@ -719,6 +719,12 @@
   "options_talk_default_password_label": {
     "message": "Passwort setzen"
   },
+  "options_talk_delete_room_on_event_delete_label": {
+    "message": "Talk-Raum beim Loeschen eines gespeicherten Termins loeschen"
+  },
+  "options_talk_delete_room_on_event_delete_tooltip": {
+    "message": "Erfordert NC-Connector-Talk-Metadaten und diese Zustimmung. Der Cleanup verworfener ungespeicherter Termine bleibt aktiv."
+  },
   "options_talk_default_roomtype_label": {
     "message": "Raumtyp"
   },

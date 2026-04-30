@@ -102,6 +102,7 @@ Beispiel (Auszug):
   <DebugLoggingEnabled>false</DebugLoggingEnabled>
   <LogAnonymizationEnabled>true</LogAnonymizationEnabled>
   <FileLinkBasePath>NC Connector</FileLinkBasePath>
+  <TalkDeleteRoomOnEventDelete>false</TalkDeleteRoomOnEventDelete>
 </Settings>
 ```
 
@@ -116,6 +117,12 @@ Empfehlung:
 
 - Nur Base-URL und Defaults pre-seeden.
 - Credentials entweder ueber Login Flow v2 oder per Benutzer setzen lassen (empfohlen fuer DPAPI-Kompatibilitaet).
+
+## Talk-Raum-Loeschschutz
+
+Das Loeschen eines gespeicherten Outlook-Termins entfernt den entfernten Talk-Raum nur, wenn `TalkDeleteRoomOnEventDelete` lokal aktiviert oder per Backend-Policy `talk_delete_room_on_event_delete` gesperrt/aktiviert ist. Ausserdem muss der Termin NC-Connector-Metadaten (`X-NCTALK-TOKEN`) tragen. Generische Talk-Links in `Location` oder URL-Feldern werden ignoriert.
+
+Der Cleanup fuer neu erzeugte Termine, die vor dem Speichern verworfen werden, bleibt davon unberuehrt und loescht den gerade erzeugten Raum weiterhin best effort.
 
 ## Compose-Freigabe-Lifecycle (3.0.4)
 

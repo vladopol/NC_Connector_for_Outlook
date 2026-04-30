@@ -104,6 +104,7 @@ namespace NcTalkOutlookAddIn.UI
         private readonly CheckBox _talkDefaultAddGuestsCheckBox = new CheckBox();
         private readonly CheckBox _talkDefaultLobbyCheckBox = new CheckBox();
         private readonly CheckBox _talkDefaultSearchCheckBox = new CheckBox();
+        private readonly CheckBox _talkDeleteRoomOnEventDeleteCheckBox = new CheckBox();
         private readonly Panel _talkAddressbookWarningPanel = new Panel();
         private readonly Label _talkAddressbookWarningTitleLabel = new Label();
         private readonly Label _talkAddressbookWarningTextLabel = new Label();
@@ -517,6 +518,9 @@ namespace NcTalkOutlookAddIn.UI
             _talkDefaultSearchCheckBox.Location = new Point(innerPadding, y);
             y = _talkDefaultSearchCheckBox.Bottom + rowGap;
 
+            _talkDeleteRoomOnEventDeleteCheckBox.Location = new Point(innerPadding, y);
+            y = _talkDeleteRoomOnEventDeleteCheckBox.Bottom + rowGap;
+
             if (_talkAddressbookWarningPanel.Visible)
             {
                 int warningPadding = ScaleLogical(8);
@@ -860,6 +864,11 @@ namespace NcTalkOutlookAddIn.UI
             _talkDefaultSearchCheckBox.Location = new Point(12, 156);
             _talkDefaultsGroup.Controls.Add(_talkDefaultSearchCheckBox);
 
+            _talkDeleteRoomOnEventDeleteCheckBox.Text = Strings.TalkDeleteRoomOnEventDeleteCheck;
+            _talkDeleteRoomOnEventDeleteCheckBox.AutoSize = true;
+            _talkDeleteRoomOnEventDeleteCheckBox.Location = new Point(12, 180);
+            _talkDefaultsGroup.Controls.Add(_talkDeleteRoomOnEventDeleteCheckBox);
+
             _talkAddressbookWarningPanel.Visible = false;
             _talkAddressbookWarningPanel.BackColor = Color.FromArgb(20, 176, 0, 32);
             _talkAddressbookWarningPanel.Paint += (s, e) =>
@@ -900,6 +909,7 @@ namespace NcTalkOutlookAddIn.UI
             _toolTip.SetToolTip(_talkDefaultAddGuestsCheckBox, Strings.TooltipAddGuests);
             _toolTip.SetToolTip(_talkDefaultLobbyCheckBox, Strings.TooltipLobby);
             _toolTip.SetToolTip(_talkDefaultSearchCheckBox, Strings.TooltipSearchVisible);
+            _toolTip.SetToolTip(_talkDeleteRoomOnEventDeleteCheckBox, Strings.TooltipDeleteRoomOnEventDelete);
             UpdateTalkRoomTypeTooltip();
         }
 
@@ -1164,6 +1174,7 @@ namespace NcTalkOutlookAddIn.UI
                 _talkDefaultAddGuestsCheckBox.Checked = Result.TalkDefaultAddGuests;
                 _talkDefaultLobbyCheckBox.Checked = Result.TalkDefaultLobbyEnabled;
                 _talkDefaultSearchCheckBox.Checked = Result.TalkDefaultSearchVisible;
+                _talkDeleteRoomOnEventDeleteCheckBox.Checked = Result.TalkDeleteRoomOnEventDelete;
                 SelectTalkRoomType(Result.TalkDefaultRoomType);
                 UpdateTalkRoomTypeTooltip();
                 RefreshLanguageOverrideCombos(Result.ShareBlockLang, Result.EventDescriptionLang);
@@ -1229,6 +1240,7 @@ namespace NcTalkOutlookAddIn.UI
             Result.TalkDefaultAddGuests = _talkDefaultAddGuestsCheckBox.Checked;
             Result.TalkDefaultLobbyEnabled = _talkDefaultLobbyCheckBox.Checked;
             Result.TalkDefaultSearchVisible = _talkDefaultSearchCheckBox.Checked;
+            Result.TalkDeleteRoomOnEventDelete = _talkDeleteRoomOnEventDeleteCheckBox.Checked;
             Result.TalkDefaultRoomType = GetSelectedTalkRoomType();
             Result.ShareBlockLang = GetSelectedLanguageChoice(_shareBlockLangCombo);
             Result.EventDescriptionLang = GetSelectedLanguageChoice(_eventDescriptionLangCombo);
@@ -1653,6 +1665,10 @@ namespace NcTalkOutlookAddIn.UI
             {
                 _talkDefaultSearchCheckBox.Checked = policyBool;
             }
+            if (_backendPolicyStatus.TryGetPolicyBool("talk", "talk_delete_room_on_event_delete", out policyBool))
+            {
+                _talkDeleteRoomOnEventDeleteCheckBox.Checked = policyBool;
+            }
 
             policyString = _backendPolicyStatus.GetPolicyString("talk", "talk_room_type");
             if (!string.IsNullOrWhiteSpace(policyString))
@@ -2075,6 +2091,7 @@ namespace NcTalkOutlookAddIn.UI
             bool lockTalkLang = IsPolicyLocked("talk", "language_talk_description");
             bool lockTalkUsers = IsPolicyLocked("talk", "talk_add_users");
             bool lockTalkGuests = IsPolicyLocked("talk", "talk_add_guests");
+            bool lockTalkDeleteRoomOnEventDelete = IsPolicyLocked("talk", "talk_delete_room_on_event_delete");
             bool separatePasswordAvailable = PolicyUiHelper.HasBackendSeatEntitlement(_backendPolicyStatus);
             string separatePasswordUnavailableTooltip = PolicyUiHelper.GetSeparatePasswordUnavailableTooltip(_backendPolicyStatus);
 
@@ -2104,6 +2121,7 @@ namespace NcTalkOutlookAddIn.UI
             _eventDescriptionLangCombo.Enabled = !lockTalkLang && !_isBusy;
             _talkDefaultAddUsersCheckBox.Enabled = !_talkAddressbookLockActive && !lockTalkUsers && !_isBusy;
             _talkDefaultAddGuestsCheckBox.Enabled = !_talkAddressbookLockActive && !lockTalkGuests && !_isBusy;
+            _talkDeleteRoomOnEventDeleteCheckBox.Enabled = !lockTalkDeleteRoomOnEventDelete && !_isBusy;
 
             _disabledTooltipHints.Apply(_fileLinkBaseTextBox, lockShareBase ? Strings.PolicyAdminControlledTooltip : string.Empty, lockShareBase, _fileLinkBaseHintLabel);
             _disabledTooltipHints.Apply(_sharingDefaultShareNameTextBox, lockShareName ? Strings.PolicyAdminControlledTooltip : string.Empty, lockShareName, _sharingDefaultShareNameLabel);
@@ -2122,6 +2140,7 @@ namespace NcTalkOutlookAddIn.UI
             _disabledTooltipHints.Apply(_talkDefaultPasswordCheckBox, lockTalkPassword ? Strings.PolicyAdminControlledTooltip : string.Empty, lockTalkPassword);
             _disabledTooltipHints.Apply(_talkDefaultLobbyCheckBox, lockTalkLobby ? Strings.PolicyAdminControlledTooltip : Strings.TooltipLobby, lockTalkLobby);
             _disabledTooltipHints.Apply(_talkDefaultSearchCheckBox, lockTalkSearch ? Strings.PolicyAdminControlledTooltip : Strings.TooltipSearchVisible, lockTalkSearch);
+            _disabledTooltipHints.Apply(_talkDeleteRoomOnEventDeleteCheckBox, lockTalkDeleteRoomOnEventDelete ? Strings.PolicyAdminControlledTooltip : Strings.TooltipDeleteRoomOnEventDelete, lockTalkDeleteRoomOnEventDelete);
             TalkRoomTypeOption selectedTalkRoomTypeOption = _talkDefaultRoomTypeCombo.SelectedItem as TalkRoomTypeOption;
             bool standardTalkRoomTypeSelected =
                 selectedTalkRoomTypeOption != null &&

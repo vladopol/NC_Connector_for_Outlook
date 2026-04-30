@@ -698,6 +698,12 @@
   "options_talk_default_password_label": {
     "message": "設定密碼"
   },
+  "options_talk_delete_room_on_event_delete_label": {
+    "message": "刪除已儲存事件時刪除 Talk 房間"
+  },
+  "options_talk_delete_room_on_event_delete_tooltip": {
+    "message": "需要 NC Connector Talk 中繼資料以及明確啟用此選項。未儲存約會的清理仍保持啟用。"
+  },
   "options_talk_default_roomtype_label": {
     "message": "房間類型"
   },

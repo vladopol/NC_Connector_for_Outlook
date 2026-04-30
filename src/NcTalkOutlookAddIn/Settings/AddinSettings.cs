@@ -53,6 +53,7 @@ namespace NcTalkOutlookAddIn.Settings
             TalkDefaultPasswordEnabled = true;
             TalkDefaultAddUsers = true;
             TalkDefaultAddGuests = false;
+            TalkDeleteRoomOnEventDelete = false;
         }
 
         public string ServerUrl { get; set; }
@@ -122,6 +123,8 @@ namespace NcTalkOutlookAddIn.Settings
         public bool TalkDefaultAddUsers { get; set; }
 
         public bool TalkDefaultAddGuests { get; set; }
+
+        public bool TalkDeleteRoomOnEventDelete { get; set; }
 
         public AddinSettings Clone()
         {

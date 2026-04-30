@@ -698,6 +698,12 @@
   "options_talk_default_password_label": {
     "message": "Ustaw hasło"
   },
+  "options_talk_delete_room_on_event_delete_label": {
+    "message": "Usun pokoj Talk podczas usuwania zapisanego wydarzenia"
+  },
+  "options_talk_delete_room_on_event_delete_tooltip": {
+    "message": "Wymaga metadanych Talk z NC Connectora oraz tej wyraznej zgody. Czyszczenie niezapisanych wydarzen pozostaje aktywne."
+  },
   "options_talk_default_roomtype_label": {
     "message": "Typ pokoju"
   },

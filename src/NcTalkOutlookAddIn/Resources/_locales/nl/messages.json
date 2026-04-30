@@ -698,6 +698,12 @@
   "options_talk_default_password_label": {
     "message": "Wachtwoord instellen"
   },
+  "options_talk_delete_room_on_event_delete_label": {
+    "message": "Talk-ruimte verwijderen bij het verwijderen van een opgeslagen afspraak"
+  },
+  "options_talk_delete_room_on_event_delete_tooltip": {
+    "message": "Vereist NC Connector Talk-metadata en deze expliciete opt-in. Opschonen van niet-opgeslagen afspraken blijft actief."
+  },
   "options_talk_default_roomtype_label": {
     "message": "Type ruimte"
   },
