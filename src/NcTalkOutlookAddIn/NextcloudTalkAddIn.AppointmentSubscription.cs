@@ -183,6 +183,7 @@ namespace NcTalkOutlookAddIn
 
                     _owner._talkAppointmentController.TryApplyDelegation(_appointment, _roomToken);
                 }
+                _owner.TryDirectCalDavSync(_appointment);
                 _owner.RefreshEntryBinding(this);
             }
 
