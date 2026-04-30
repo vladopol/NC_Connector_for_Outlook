@@ -135,6 +135,9 @@
     <Compile Include="Services\BackendPolicyService.cs" />
     <Compile Include="Services\OutlookAttachmentAutomationGuardService.cs" />
     <Compile Include="Services\PasswordPolicyService.cs" />
+    <Compile Include="Services\ICalBuilder.cs" />
+    <Compile Include="Services\CalDavSyncService.cs" />
+    <Compile Include="Services\CalDavCalendarSync.cs" />
     <Compile Include="UI\SettingsForm.cs" />
     <Compile Include="UI\SettingsForm.Language.cs" />
     <Compile Include="UI\SettingsTabControl.cs" />

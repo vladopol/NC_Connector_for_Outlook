@@ -45,6 +45,7 @@ namespace NcTalkOutlookAddIn
             EnsureApplicationHook();
             EnsureInspectorHook();
             ApplyIfbSettings();
+            ApplyCalDavSyncSettings();
         }
 
         private void TryApplyOfficeUiLanguage()
@@ -164,6 +165,12 @@ namespace NcTalkOutlookAddIn
                 _freeBusyManager.Dispose();
             }
             _freeBusyManager = null;
+
+            if (_calDavCalendarSync != null)
+            {
+                _calDavCalendarSync.Dispose();
+                _calDavCalendarSync = null;
+            }
 
             if (clearOutlookApplication)
             {
