@@ -1392,6 +1392,18 @@
   },
   "options_tls_selection_required": {
     "message": "Когда TLS-политика операционной системы по умолчанию отключена, включите как минимум одну версию TLS (1.2 или 1.3)."
+  },
+  "options_caldav_sync_heading": {
+    "message": "Синхронизация с Nextcloud Календарь"
+  },
+  "options_caldav_sync_enabled": {
+    "message": "Синхронизировать встречи с Nextcloud Календарь (Outlook → Nextcloud)"
+  },
+  "options_caldav_calendar_name": {
+    "message": "Название календаря:"
+  },
+  "options_caldav_default_calendar_name": {
+    "message": "Личное"
   }
 }
 

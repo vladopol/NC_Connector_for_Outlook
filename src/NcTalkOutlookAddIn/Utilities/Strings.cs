@@ -480,6 +480,7 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string GroupCalDavSync { get { return Get("options_caldav_sync_heading", "Nextcloud Calendar Sync"); } }
         internal static string CheckBoxCalDavSyncEnabled { get { return Get("options_caldav_sync_enabled", "Synchronize appointments to Nextcloud Calendar (Outlook → Nextcloud)"); } }
         internal static string LabelCalDavCalendarName { get { return Get("options_caldav_calendar_name", "Calendar name:"); } }
+        internal static string DefaultCalDavCalendarName { get { return Get("options_caldav_default_calendar_name", "personal"); } }
 
         internal static string CheckIfbEnabled { get { return Get("outlook_ifb_enabled", "Enable IFB endpoint"); } }
         internal static string LabelIfbDays { get { return Get("outlook_ifb_days_label", "Range (days):"); } }

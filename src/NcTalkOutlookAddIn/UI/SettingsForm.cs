@@ -1211,9 +1211,11 @@ namespace NcTalkOutlookAddIn.UI
                 UpdateTlsOptionsState();
                 ApplyBackendPolicyStatus("settings_init");
                 _calDavSyncCheckBox.Checked = Result.CalDavSyncEnabled;
-                _calDavCalendarNameTextBox.Text = string.IsNullOrWhiteSpace(Result.CalDavCalendarName)
-                    ? AddinSettings.DefaultCalDavCalendarName
-                    : Result.CalDavCalendarName;
+                string storedCalDavName = Result.CalDavCalendarName;
+                _calDavCalendarNameTextBox.Text = string.IsNullOrWhiteSpace(storedCalDavName)
+                    || string.Equals(storedCalDavName, AddinSettings.DefaultCalDavCalendarName, StringComparison.OrdinalIgnoreCase)
+                    ? Strings.DefaultCalDavCalendarName
+                    : storedCalDavName;
                 UpdateCalDavControlState();
                 RefreshTalkSystemAddressbookState(true, "settings_open");
             }
@@ -1277,7 +1279,7 @@ namespace NcTalkOutlookAddIn.UI
             Result.CalDavSyncEnabled = _calDavSyncCheckBox.Checked;
             string calDavName = _calDavCalendarNameTextBox.Text.Trim();
             Result.CalDavCalendarName = string.IsNullOrEmpty(calDavName)
-                ? AddinSettings.DefaultCalDavCalendarName
+                ? Strings.DefaultCalDavCalendarName
                 : calDavName;
         }
 

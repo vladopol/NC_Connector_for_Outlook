@@ -1392,6 +1392,18 @@
   },
   "sharing_password_separate_paused_tooltip": {
     "message": "Your NC Connector seat is currently paused. Please contact your Nextcloud administrator."
+  },
+  "options_caldav_sync_heading": {
+    "message": "Nextcloud Calendar Sync"
+  },
+  "options_caldav_sync_enabled": {
+    "message": "Synchronize appointments to Nextcloud Calendar (Outlook → Nextcloud)"
+  },
+  "options_caldav_calendar_name": {
+    "message": "Calendar name:"
+  },
+  "options_caldav_default_calendar_name": {
+    "message": "personal"
   }
 }
 
