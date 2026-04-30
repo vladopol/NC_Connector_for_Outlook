@@ -117,6 +117,9 @@ namespace NcTalkOutlookAddIn.UI
         private readonly CheckBox _tlsEnable12CheckBox = new CheckBox();
         private readonly CheckBox _tlsEnable13CheckBox = new CheckBox();
         private readonly Label _tlsHintLabel = new Label();
+        private readonly CheckBox _calDavSyncCheckBox = new CheckBox();
+        private readonly Label _calDavCalendarNameLabel = new Label();
+        private readonly TextBox _calDavCalendarNameTextBox = new TextBox();
 
         private readonly Label _statusLabel = new Label();
         private readonly Button _saveButton = new Button();
@@ -178,6 +181,7 @@ namespace NcTalkOutlookAddIn.UI
             _tabControl.TabPages.Add(_generalTab);
             _tabControl.TabPages.Add(_fileLinkTab);
             _tabControl.TabPages.Add(_talkTab);
+            _tabControl.TabPages.Add(_ifbTab);
             _tabControl.SelectedIndexChanged += OnSelectedTabChanged;
             Controls.Add(_tabControl);
             InitializePolicyWarningPanel();
@@ -354,6 +358,31 @@ namespace NcTalkOutlookAddIn.UI
             _appPasswordTextBox.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             _generalTab.Controls.Add(_appPasswordTextBox);
 
+            var calDavGroup = new GroupBox
+            {
+                Text = Strings.GroupCalDavSync,
+                Location = new Point(18, 275),
+                Size = new Size(440, 90),
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+            };
+            _generalTab.Controls.Add(calDavGroup);
+
+            _calDavSyncCheckBox.Text = Strings.CheckBoxCalDavSyncEnabled;
+            _calDavSyncCheckBox.Location = new Point(12, 22);
+            _calDavSyncCheckBox.AutoSize = true;
+            _calDavSyncCheckBox.CheckedChanged += (s, e) => UpdateCalDavControlState();
+            calDavGroup.Controls.Add(_calDavSyncCheckBox);
+
+            _calDavCalendarNameLabel.Text = Strings.LabelCalDavCalendarName;
+            _calDavCalendarNameLabel.Location = new Point(12, 54);
+            _calDavCalendarNameLabel.AutoSize = true;
+            calDavGroup.Controls.Add(_calDavCalendarNameLabel);
+
+            _calDavCalendarNameTextBox.Location = new Point(150, 50);
+            _calDavCalendarNameTextBox.Width = 200;
+            _calDavCalendarNameTextBox.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            calDavGroup.Controls.Add(_calDavCalendarNameTextBox);
+
             ApplyGeneralTabFieldSizing();
         }
 
@@ -369,6 +398,14 @@ namespace NcTalkOutlookAddIn.UI
             _serverUrlTextBox.Width = width;
             _usernameTextBox.Width = width;
             _appPasswordTextBox.Width = width;
+            _calDavCalendarNameTextBox.Width = Math.Max(100, width - 150);
+        }
+
+        private void UpdateCalDavControlState()
+        {
+            bool enabled = _calDavSyncCheckBox.Checked;
+            _calDavCalendarNameLabel.Enabled = enabled;
+            _calDavCalendarNameTextBox.Enabled = enabled;
         }
 
         protected override void OnShown(EventArgs e)
@@ -551,35 +588,39 @@ namespace NcTalkOutlookAddIn.UI
 
             _ifbEnabledCheckBox.Location = new Point(left, top);
 
+            // Position all labels first so we can compute the correct comboLeft from their widths.
             int daysLabelTop = _ifbEnabledCheckBox.Bottom + rowGap;
             _ifbDaysLabel.Location = new Point(left, daysLabelTop);
 
             int portLabelTop = _ifbDaysLabel.Bottom + rowGap;
             _ifbPortLabel.Location = new Point(left, portLabelTop);
 
-            int comboLeft = Math.Max(_ifbDaysLabel.Right, _ifbPortLabel.Right) + labelToComboGap;
+            int cacheLabelTop = _ifbPortLabel.Bottom + rowGap;
+            _ifbCacheHoursLabel.Location = new Point(left, cacheLabelTop);
+
+            int comboLeft = Math.Max(Math.Max(_ifbDaysLabel.Right, _ifbPortLabel.Right), _ifbCacheHoursLabel.Right) + labelToComboGap;
+
             int comboHeight = Math.Max(_ifbDaysCombo.Height, _ifbDaysCombo.PreferredHeight + ScaleLogical(2));
             _ifbDaysCombo.SetBounds(comboLeft, daysLabelTop - ScaleLogical(2), Math.Max(ScaleLogical(90), _ifbDaysCombo.Width), comboHeight);
 
             int portHeight = Math.Max(_ifbPortUpDown.Height, _ifbPortUpDown.PreferredHeight + ScaleLogical(2));
             _ifbPortUpDown.SetBounds(comboLeft, portLabelTop - ScaleLogical(2), Math.Max(ScaleLogical(110), _ifbPortUpDown.Width), portHeight);
+
+            int cacheComboHeight = Math.Max(_ifbCacheHoursCombo.Height, _ifbCacheHoursCombo.PreferredHeight + ScaleLogical(2));
+            _ifbCacheHoursCombo.SetBounds(comboLeft, cacheLabelTop - ScaleLogical(2), Math.Max(ScaleLogical(90), _ifbCacheHoursCombo.Width), cacheComboHeight);
         }
 
         private void ApplyAdvancedTabLayout()
         {
             int left = ScaleLogical(24);
             int labelToComboGap = ScaleLogical(16);
-            int comboLeft = left + Math.Max(_ifbCacheHoursLabel.PreferredSize.Width, Math.Max(_shareBlockLangLabel.PreferredSize.Width, _eventDescriptionLangLabel.PreferredSize.Width)) + labelToComboGap;
+            int comboLeft = left + Math.Max(_shareBlockLangLabel.PreferredSize.Width, _eventDescriptionLangLabel.PreferredSize.Width) + labelToComboGap;
             int rightMargin = ScaleLogical(24);
             int comboWidth = Math.Max(ScaleLogical(160), _advancedTab.ClientSize.Width - comboLeft - rightMargin);
             int rowTop = ScaleLogical(24);
             int rowGap = ScaleLogical(34);
 
-            int ifbComboHeight = Math.Max(_ifbCacheHoursCombo.Height, _ifbCacheHoursCombo.PreferredHeight + ScaleLogical(2));
-            _ifbCacheHoursLabel.Location = new Point(left, rowTop);
-            _ifbCacheHoursCombo.SetBounds(comboLeft, rowTop - ScaleLogical(2), Math.Max(ScaleLogical(90), _ifbCacheHoursCombo.Width), ifbComboHeight);
-
-            int shareLabelTop = rowTop + rowGap + ScaleLogical(12);
+            int shareLabelTop = rowTop;
             int shareComboHeight = Math.Max(_shareBlockLangCombo.Height, _shareBlockLangCombo.PreferredHeight + ScaleLogical(2));
             _shareBlockLangLabel.Location = new Point(left, shareLabelTop);
             _shareBlockLangCombo.SetBounds(comboLeft, shareLabelTop - ScaleLogical(2), comboWidth, shareComboHeight);
@@ -721,6 +762,22 @@ namespace NcTalkOutlookAddIn.UI
             _ifbPortUpDown.Maximum = AddinSettings.MaxIfbPort;
             _ifbPortUpDown.Value = AddinSettings.DefaultIfbPort;
             _ifbTab.Controls.Add(_ifbPortUpDown);
+
+            _ifbCacheHoursLabel.Text = Strings.LabelIfbCacheHours;
+            _ifbCacheHoursLabel.Location = new Point(24, 128);
+            _ifbCacheHoursLabel.AutoSize = true;
+            _ifbTab.Controls.Add(_ifbCacheHoursLabel);
+
+            _ifbCacheHoursCombo.DropDownStyle = ComboBoxStyle.DropDownList;
+            _ifbCacheHoursCombo.IntegralHeight = false;
+            _ifbCacheHoursCombo.Location = new Point(200, 126);
+            _ifbCacheHoursCombo.Width = 80;
+            _ifbCacheHoursCombo.Anchor = AnchorStyles.Top | AnchorStyles.Left;
+            for (int i = 1; i <= 24; i++)
+            {
+                _ifbCacheHoursCombo.Items.Add(i.ToString());
+            }
+            _ifbTab.Controls.Add(_ifbCacheHoursCombo);
         }
 
         private void InitializeAdvancedTab()
@@ -728,23 +785,7 @@ namespace NcTalkOutlookAddIn.UI
             _advancedTab.AutoScroll = true;
             _advancedTab.Padding = new Padding(12);
 
-            _ifbCacheHoursLabel.Text = Strings.LabelIfbCacheHours;
-            _ifbCacheHoursLabel.Location = new Point(24, 24);
-            _ifbCacheHoursLabel.AutoSize = true;
-            _advancedTab.Controls.Add(_ifbCacheHoursLabel);
-
-            _ifbCacheHoursCombo.DropDownStyle = ComboBoxStyle.DropDownList;
-            _ifbCacheHoursCombo.IntegralHeight = false;
-            _ifbCacheHoursCombo.Location = new Point(260, 22);
-            _ifbCacheHoursCombo.Width = 80;
-            _ifbCacheHoursCombo.Anchor = AnchorStyles.Top | AnchorStyles.Left;
-            for (int i = 1; i <= 24; i++)
-            {
-                _ifbCacheHoursCombo.Items.Add(i.ToString());
-            }
-            _advancedTab.Controls.Add(_ifbCacheHoursCombo);
-
-            int langTop = 70;
+            int langTop = 24;
 
             _shareBlockLangLabel.Text = Strings.AdvancedShareBlockLangLabel;
             _shareBlockLangLabel.Location = new Point(24, langTop);
@@ -1169,6 +1210,11 @@ namespace NcTalkOutlookAddIn.UI
                 UpdateSharingAttachmentOptionsState();
                 UpdateTlsOptionsState();
                 ApplyBackendPolicyStatus("settings_init");
+                _calDavSyncCheckBox.Checked = Result.CalDavSyncEnabled;
+                _calDavCalendarNameTextBox.Text = string.IsNullOrWhiteSpace(Result.CalDavCalendarName)
+                    ? AddinSettings.DefaultCalDavCalendarName
+                    : Result.CalDavCalendarName;
+                UpdateCalDavControlState();
                 RefreshTalkSystemAddressbookState(true, "settings_open");
             }
             finally
@@ -1228,6 +1274,11 @@ namespace NcTalkOutlookAddIn.UI
             Result.TalkDefaultRoomType = GetSelectedTalkRoomType();
             Result.ShareBlockLang = GetSelectedLanguageChoice(_shareBlockLangCombo);
             Result.EventDescriptionLang = GetSelectedLanguageChoice(_eventDescriptionLangCombo);
+            Result.CalDavSyncEnabled = _calDavSyncCheckBox.Checked;
+            string calDavName = _calDavCalendarNameTextBox.Text.Trim();
+            Result.CalDavCalendarName = string.IsNullOrEmpty(calDavName)
+                ? AddinSettings.DefaultCalDavCalendarName
+                : calDavName;
         }
 
         // WinForms event handlers must stay async void; keep awaited flow inside this method-level try/catch.
