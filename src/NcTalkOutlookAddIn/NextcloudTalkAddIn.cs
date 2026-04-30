@@ -532,6 +532,22 @@ namespace NcTalkOutlookAddIn
             LogCore("CalDAV calendar sync enabled (calendar=" + calendarName + ").");
         }
 
+        internal void TryDirectCalDavSync(Outlook.AppointmentItem appointment)
+        {
+            if (_calDavCalendarSync == null || appointment == null)
+                return;
+            try
+            {
+                string entryId = appointment.EntryID;
+                if (!string.IsNullOrEmpty(entryId))
+                    _calDavCalendarSync.DirectSync(appointment);
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.CalDav, "TryDirectCalDavSync failed.", ex);
+            }
+        }
+
         internal TalkService CreateTalkService()
         {
             return new TalkService(new TalkServiceConfiguration(

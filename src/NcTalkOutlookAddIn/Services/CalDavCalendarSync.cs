@@ -170,17 +170,20 @@ namespace NcTalkOutlookAddIn.Services
                     return false;
 
                 // Check both the iCal property name and the Outlook storage name.
+                // Custom=true restricts search to user-defined properties, which is more
+                // reliable than Custom=false in some Outlook builds.
                 string[] names = new[] { "X-NCTALK-TOKEN", "NcTalkRoomToken" };
                 foreach (string name in names)
                 {
                     Outlook.UserProperty prop = null;
                     try
                     {
-                        prop = props.Find(name, false);
+                        prop = props.Find(name, true);
                         if (prop != null)
                         {
                             string val = prop.Value as string;
-                            return !string.IsNullOrWhiteSpace(val);
+                            if (!string.IsNullOrWhiteSpace(val))
+                                return true;
                         }
                     }
                     catch (Exception ex)
@@ -193,6 +196,22 @@ namespace NcTalkOutlookAddIn.Services
                             ComInteropScope.TryRelease(prop, LogCategories.CalDav, "Failed to release UserProperty COM object.");
                     }
                 }
+
+                // Fallback: check Location field for Nextcloud Talk room URL pattern (/call/).
+                // UserProperties may not be accessible on a fresh Items-collection reference
+                // in some Outlook configurations, but Location is a standard MAPI field.
+                try
+                {
+                    string location = appointment.Location;
+                    if (!string.IsNullOrWhiteSpace(location)
+                        && location.IndexOf("/call/", StringComparison.OrdinalIgnoreCase) >= 0)
+                        return true;
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticsLogger.LogException(LogCategories.CalDav, "Failed to read Location for Talk token fallback.", ex);
+                }
+
                 return false;
             }
             catch (Exception ex)
@@ -205,6 +224,14 @@ namespace NcTalkOutlookAddIn.Services
                 if (props != null)
                     ComInteropScope.TryRelease(props, LogCategories.CalDav, "Failed to release UserProperties COM object.");
             }
+        }
+
+        // Called directly from AppointmentSubscription.OnWrite when an EntryID is already
+        // available (i.e. the appointment is an existing saved item being modified).
+        // Provides a reliable sync path independent of folder-level ItemAdd/ItemChange events.
+        internal void DirectSync(Outlook.AppointmentItem appointment)
+        {
+            SyncToCalDav(appointment);
         }
 
         internal static string DeriveUid(string entryId)
