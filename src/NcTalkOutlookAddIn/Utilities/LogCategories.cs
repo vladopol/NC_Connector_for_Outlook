@@ -12,6 +12,7 @@ namespace NcTalkOutlookAddIn.Utilities
         internal const string Talk = "TALK";
         internal const string FileLink = "FILELINK";
         internal const string Ifb = "IFB";
+        internal const string CalDav = "CALDAV";
     }
 }
 

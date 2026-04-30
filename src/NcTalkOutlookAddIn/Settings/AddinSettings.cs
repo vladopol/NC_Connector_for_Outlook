@@ -17,6 +17,8 @@ namespace NcTalkOutlookAddIn.Settings
         internal const int MaxIfbPort = 49151;
         internal const string DefaultFileLinkBasePath = "Outlook";
 
+        internal const string DefaultCalDavCalendarName = "personal";
+
         public AddinSettings()
         {
             ServerUrl = string.Empty;
@@ -53,6 +55,8 @@ namespace NcTalkOutlookAddIn.Settings
             TalkDefaultPasswordEnabled = true;
             TalkDefaultAddUsers = true;
             TalkDefaultAddGuests = false;
+            CalDavSyncEnabled = false;
+            CalDavCalendarName = DefaultCalDavCalendarName;
         }
 
         public string ServerUrl { get; set; }
@@ -122,6 +126,10 @@ namespace NcTalkOutlookAddIn.Settings
         public bool TalkDefaultAddUsers { get; set; }
 
         public bool TalkDefaultAddGuests { get; set; }
+
+        public bool CalDavSyncEnabled { get; set; }
+
+        public string CalDavCalendarName { get; set; }
 
         public AddinSettings Clone()
         {

@@ -42,6 +42,7 @@ namespace NcTalkOutlookAddIn
         private readonly Dictionary<string, AppointmentSubscription> _activeSubscriptions = new Dictionary<string, AppointmentSubscription>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, AppointmentSubscription> _subscriptionByToken = new Dictionary<string, AppointmentSubscription>(StringComparer.OrdinalIgnoreCase);
         private FreeBusyManager _freeBusyManager;
+        private CalDavCalendarSync _calDavCalendarSync;
         private Outlook.Inspectors _inspectors;
         private Outlook.ApplicationEvents_11_Event _applicationEvents;
         private readonly Dictionary<string, AppointmentSubscription> _subscriptionByEntryId = new Dictionary<string, AppointmentSubscription>(StringComparer.OrdinalIgnoreCase);
@@ -225,7 +226,7 @@ namespace NcTalkOutlookAddIn
                 (configuration, trigger) => FetchBackendPolicyStatus(configuration, trigger),
                 settings => ConfigureDiagnosticsLogger(settings),
                 (source, showWarning) => TryApplyTransportSecurityFromSettings(source, showWarning),
-                () => ApplyIfbSettings(),
+                () => { ApplyIfbSettings(); ApplyCalDavSyncSettings(); },
                 settings =>
                 {                    if (_settingsStorage != null)
                     {
@@ -494,6 +495,41 @@ namespace NcTalkOutlookAddIn
                 LogCore("Failed to start IFB: " + ex.Message);
                 ShowWarning(string.Format(Strings.WarningIfbStartFailed, ex.Message));
             }
+        }
+
+        internal void ApplyCalDavSyncSettings()
+        {
+            if (_currentSettings == null)
+                return;
+
+            bool enabled = _currentSettings.CalDavSyncEnabled
+                && !string.IsNullOrWhiteSpace(_currentSettings.ServerUrl)
+                && !string.IsNullOrWhiteSpace(_currentSettings.Username)
+                && !string.IsNullOrEmpty(_currentSettings.AppPassword);
+
+            if (!enabled)
+            {
+                if (_calDavCalendarSync != null)
+                {
+                    _calDavCalendarSync.Detach();
+                }
+                LogCore("CalDAV calendar sync disabled.");
+                return;
+            }
+
+            if (_calDavCalendarSync == null)
+                _calDavCalendarSync = new CalDavCalendarSync();
+
+            var configuration = new TalkServiceConfiguration(
+                _currentSettings.ServerUrl,
+                _currentSettings.Username,
+                _currentSettings.AppPassword);
+            string calendarName = string.IsNullOrWhiteSpace(_currentSettings.CalDavCalendarName)
+                ? AddinSettings.DefaultCalDavCalendarName
+                : _currentSettings.CalDavCalendarName;
+
+            _calDavCalendarSync.Attach(_outlookApplication, configuration, calendarName);
+            LogCore("CalDAV calendar sync enabled (calendar=" + calendarName + ").");
         }
 
         internal TalkService CreateTalkService()
