@@ -1403,7 +1403,7 @@
     "message": "Название календаря:"
   },
   "options_caldav_default_calendar_name": {
-    "message": "Личное"
+    "message": "personal"
   }
 }
 
