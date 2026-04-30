@@ -719,6 +719,12 @@
   "options_talk_default_password_label": {
     "message": "Set password"
   },
+  "options_talk_delete_room_on_event_delete_label": {
+    "message": "Delete Talk room when deleting a saved event"
+  },
+  "options_talk_delete_room_on_event_delete_tooltip": {
+    "message": "Requires NC Connector Talk metadata and this opt-in. Unsaved appointment cleanup remains active."
+  },
   "options_talk_default_roomtype_label": {
     "message": "Room type"
   },
