@@ -1394,7 +1394,7 @@
     "message": "Когда TLS-политика операционной системы по умолчанию отключена, включите как минимум одну версию TLS (1.2 или 1.3)."
   },
   "options_caldav_sync_heading": {
-    "message": "Синхронизация с Nextcloud Календарь"
+    "message": "Синхронизация с календарем Nextcloud"
   },
   "options_caldav_sync_enabled": {
     "message": "Синхронизировать встречи с Nextcloud Календарь (Outlook → Nextcloud)"
