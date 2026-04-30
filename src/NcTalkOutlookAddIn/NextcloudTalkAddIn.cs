@@ -11,7 +11,6 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
@@ -83,7 +82,6 @@ namespace NcTalkOutlookAddIn
         internal const string IcalDelegated = "X-NCTALK-DELEGATED";
         internal const string IcalDelegateReady = "X-NCTALK-DELEGATE-READY";
         internal const int PropertyVersionValue = 1;
-        private static readonly Regex TalkUrlTokenRegex = new Regex(@"https?://[^\s""'<>]+/call/(?<token>[A-Za-z0-9_-]+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
         public NextcloudTalkAddIn()
         {
@@ -563,54 +561,48 @@ namespace NcTalkOutlookAddIn
             }
         }
 
-        private static string ExtractTokenFromTalkUrlText(string text)
-        {
-            if (string.IsNullOrWhiteSpace(text))
-            {
-                return null;
-            }
-
-            Match match = TalkUrlTokenRegex.Match(text);
-            if (!match.Success)
-            {
-                return null;
-            }
-            string token = match.Groups["token"] != null ? match.Groups["token"].Value : null;
-            return string.IsNullOrWhiteSpace(token) ? null : token.Trim();
-        }
-
         private string ResolveRoomTokenForAppointment(Outlook.AppointmentItem appointment)
         {
-            string roomToken = TalkAppointmentController.GetUserPropertyTextPrefer(appointment, IcalToken, PropertyToken);
+            string roomToken = TalkAppointmentController.GetUserPropertyText(appointment, IcalToken);
             if (!string.IsNullOrWhiteSpace(roomToken))
             {
                 return roomToken.Trim();
             }
-            string location = null;
-            try
+
+            string legacyRoomToken = TalkAppointmentController.GetUserPropertyText(appointment, PropertyToken);
+            if (!string.IsNullOrWhiteSpace(legacyRoomToken))
             {
-                location = appointment != null ? appointment.Location : null;
+                LogTalk("Stored legacy Talk token ignored because X-NCTALK-TOKEN is missing.");
             }
-            catch (Exception ex)
+            return null;
+        }
+
+        internal bool ShouldDeleteTalkRoomOnSavedEventDelete()
+        {
+            bool localEnabled = _currentSettings != null && _currentSettings.TalkDeleteRoomOnEventDelete;
+            if (!SettingsAreComplete())
             {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read appointment location while resolving Talk token.", ex);
+                return localEnabled;
             }
-            string extracted = ExtractTokenFromTalkUrlText(location);
-            if (string.IsNullOrWhiteSpace(extracted))
+
+            var configuration = new TalkServiceConfiguration(
+                _currentSettings.ServerUrl,
+                _currentSettings.Username,
+                _currentSettings.AppPassword);
+            BackendPolicyStatus policyStatus = FetchBackendPolicyStatus(configuration, "talk_delete_room_on_event_delete");
+            if (policyStatus != null
+                && policyStatus.PolicyActive
+                && policyStatus.IsLocked("talk", "talk_delete_room_on_event_delete"))
             {
-                return null;
+                bool policyEnabled;
+                if (policyStatus.TryGetPolicyBool("talk", "talk_delete_room_on_event_delete", out policyEnabled))
+                {
+                    return policyEnabled;
+                }
+                return false;
             }
-            try
-            {
-                TalkAppointmentController.SetUserProperty(appointment, IcalToken, Outlook.OlUserPropertyType.olText, extracted);
-                TalkAppointmentController.SetUserProperty(appointment, PropertyToken, Outlook.OlUserPropertyType.olText, extracted);
-                LogTalk("Room token bootstrapped from location (token=" + extracted + ").");
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to persist bootstrapped room token.", ex);
-            }
-            return extracted;
+
+            return localEnabled;
         }
 
         private void RefreshEntryBinding(AppointmentSubscription subscription)

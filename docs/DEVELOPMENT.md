@@ -170,7 +170,7 @@ Key code locations:
    - **Write** (save): updates lobby timer on time changes, updates room description, syncs participants, applies delegation
    - If Outlook exposes the final changed start time only shortly after `Write`, a short deferred post-write verification retries the lobby update on the same opened appointment instead of broad calendar scanning.
    - **Close** (discard without saving): deletes the room to avoid orphans (best-effort)
-   - **BeforeDelete**: deletes the room (best-effort)
+   - **BeforeDelete**: deletes the room only when saved-event deletion is opted in (`TalkDeleteRoomOnEventDelete` or locked backend `talk_delete_room_on_event_delete`) and the appointment has `X-NCTALK-TOKEN`; URL/location parsing is not a deletion source
 
 #### Talk appointment-safe HTML subset (backend custom templates)
 
@@ -403,7 +403,7 @@ Primary write location:
 
 | Property | Purpose | Type / format | Example | Written | Read / used | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| `X-NCTALK-TOKEN` | Talk room token | `string` | `a1b2c3d4` | `ApplyRoomToAppointment(...)` | `EnsureSubscriptionForAppointment(...)` | Read is preferred over legacy token storage. |
+| `X-NCTALK-TOKEN` | Talk room token | `string` | `a1b2c3d4` | `ApplyRoomToAppointment(...)` | `EnsureSubscriptionForAppointment(...)` | Required for saved-event room deletion and runtime subscription; generic Talk URLs in `Location`/URL fields are ignored. |
 | `X-NCTALK-URL` | Talk room URL | `string` | `https://cloud.example.com/call/a1b2c3d4` | `ApplyRoomToAppointment(...)` | (not read by add-in) | Stored for interoperability. |
 | `X-NCTALK-LOBBY` | Lobby enabled flag | `TRUE` / `FALSE` | `TRUE` | `ApplyRoomToAppointment(...)` | `EnsureSubscriptionForAppointment(...)` | Used to decide whether lobby updates run on save. |
 | `X-NCTALK-START` | Appointment start time (epoch seconds) | `int64` as string | `1739750400` | `ApplyRoomToAppointment(...)`, `AppointmentSubscription.OnWrite(...)` | `TryReadRequiredIcalStartEpoch(...)`, `TryUpdateLobby(...)` | Authoritative lobby timer source on appointment save; updated when lobby is enabled and the start time changes. |

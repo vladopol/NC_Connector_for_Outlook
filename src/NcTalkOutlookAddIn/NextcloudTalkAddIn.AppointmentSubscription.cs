@@ -195,7 +195,7 @@ namespace NcTalkOutlookAddIn
                 }
 
                 LogTalk("BeforeDelete -> EnsureRoomDeleted (Token=" + _roomToken + ").");
-                EnsureRoomDeleted();
+                EnsureRoomDeleted(true);
             }
 
             private void OnClose(ref bool cancel)
@@ -379,7 +379,7 @@ namespace NcTalkOutlookAddIn
                 if (!saved)
                 {
                     LogTalk("Deferred OnClose cleanup deleting room (token=" + _roomToken + ").");
-                    EnsureRoomDeleted();
+                    EnsureRoomDeleted(false);
                     return;
                 }
 
@@ -519,7 +519,7 @@ namespace NcTalkOutlookAddIn
                 return false;
             }
 
-            private void EnsureRoomDeleted()
+            private void EnsureRoomDeleted(bool requireSavedEventDeleteOptIn)
             {
                 if (_roomDeleted || !_owner.IsOrganizer(_appointment))
                 {
@@ -527,6 +527,12 @@ namespace NcTalkOutlookAddIn
                     {
                         LogTalk("EnsureRoomDeleted: room already deleted (token=" + _roomToken + ").");
                     }
+                    return;
+                }
+                if (requireSavedEventDeleteOptIn && !_owner.ShouldDeleteTalkRoomOnSavedEventDelete())
+                {
+                    LogTalk("EnsureRoomDeleted skipped (saved-event delete opt-in disabled, token=" + _roomToken + ").");
+                    Dispose();
                     return;
                 }
                 string delegateId;

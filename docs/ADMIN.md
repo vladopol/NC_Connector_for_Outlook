@@ -86,6 +86,7 @@ Legacy migration on first start:
   <DebugLoggingEnabled>false</DebugLoggingEnabled>
   <LogAnonymizationEnabled>true</LogAnonymizationEnabled>
   <FileLinkBasePath>NC Connector</FileLinkBasePath>
+  <TalkDeleteRoomOnEventDelete>false</TalkDeleteRoomOnEventDelete>
 </Settings>
 ```
 
@@ -107,6 +108,7 @@ Runtime behavior:
 - checked when Talk wizard opens
 - checked when Sharing wizard opens
 - checked when Settings open or are saved
+- checked when deleting a saved Talk appointment would remove the remote Talk room
 - valid active seat => backend policy values apply and `policy_editable=false` fields are locked in the UI
 - missing backend / no seat / invalid seat => local Outlook settings remain active
 - if the backend is unreachable, Outlook falls back to the locally saved add-in settings
@@ -120,11 +122,14 @@ Runtime behavior:
 
 Central policy can currently control:
 - Talk defaults and lock state
+- saved-event Talk room deletion opt-in (`talk_delete_room_on_event_delete`)
 - Sharing defaults and lock state
 - share HTML/password templates
 - Talk description language / custom invitation template
 
 ### Talk appointment-safe HTML subset (backend templates)
+
+Saved appointment deletion is conservative by default: Outlook only removes the remote Talk room when `TalkDeleteRoomOnEventDelete` is enabled locally or locked/enabled by backend policy, and only when the appointment carries NC Connector `X-NCTALK-TOKEN` metadata. Generic Talk links in `Location` or URL fields are ignored. Cleanup for newly created appointments that are discarded before saving remains active.
 
 If backend policy/template delivery is enabled for Talk appointment descriptions (`event_description_type=html`), use this subset for robust Outlook rendering:
 

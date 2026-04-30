@@ -474,6 +474,7 @@ namespace NcTalkOutlookAddIn.Settings
             AppendElement(document, root, "TalkDefaultPasswordEnabled", settings.TalkDefaultPasswordEnabled.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "TalkDefaultAddUsers", settings.TalkDefaultAddUsers.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "TalkDefaultAddGuests", settings.TalkDefaultAddGuests.ToString(CultureInfo.InvariantCulture));
+            AppendElement(document, root, "TalkDeleteRoomOnEventDelete", settings.TalkDeleteRoomOnEventDelete.ToString(CultureInfo.InvariantCulture));
 
             var writerSettings = new XmlWriterSettings
             {
@@ -695,6 +696,13 @@ namespace NcTalkOutlookAddIn.Settings
                     if (bool.TryParse(value, out talkAddGuests))
                     {
                         settings.TalkDefaultAddGuests = talkAddGuests;
+                    }
+                    break;
+                case "TalkDeleteRoomOnEventDelete":
+                    bool talkDeleteRoomOnEventDelete;
+                    if (bool.TryParse(value, out talkDeleteRoomOnEventDelete))
+                    {
+                        settings.TalkDeleteRoomOnEventDelete = talkDeleteRoomOnEventDelete;
                     }
                     break;
                 default:
