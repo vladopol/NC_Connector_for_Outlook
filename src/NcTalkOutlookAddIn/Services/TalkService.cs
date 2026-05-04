@@ -474,15 +474,18 @@ namespace NcTalkOutlookAddIn.Services
             }
 
             object listObj = null;
-            IDictionary<string, object> ocs = NcJson.GetDictionary(parsed, "ocs");            if (ocs != null)
+            IDictionary<string, object> ocs = NcJson.GetDictionary(parsed, "ocs");
+            if (ocs != null)
             {
                 ocs.TryGetValue("data", out listObj);
             }
 
-            object[] list = listObj as object[];            if (list == null)
+            object[] list = listObj as object[];
+            if (list == null)
             {
                 // Some Talk versions wrap the list under { data: { participants: [...] } }.
-                var dataDict = listObj as IDictionary<string, object>;                if (dataDict != null)
+                var dataDict = listObj as IDictionary<string, object>;
+                if (dataDict != null)
                 {
                     object participantsObj;
                     if (dataDict.TryGetValue("participants", out participantsObj))
@@ -497,7 +500,8 @@ namespace NcTalkOutlookAddIn.Services
             }
             foreach (object entry in list)
             {
-                var dict = entry as IDictionary<string, object>;                if (dict == null)
+                var dict = entry as IDictionary<string, object>;
+                if (dict == null)
                 {
                     continue;
                 }
@@ -561,7 +565,8 @@ namespace NcTalkOutlookAddIn.Services
         }
 
         private void TryUpdateDescription(string token, string description, bool isEventConversation, string baseUrl)
-        {            if (description == null)
+        {
+            if (description == null)
             {
                 return;
             }
@@ -652,7 +657,8 @@ namespace NcTalkOutlookAddIn.Services
             });
 
             if (!response.HasHttpResponse)
-            {                if (response.TransportException != null)
+            {
+                if (response.TransportException != null)
                 {
                     HttpFailureInfo failure = response.FailureInfo ?? HttpFailureDiagnostics.Analyze(response.TransportException);
                     DiagnosticsLogger.LogException(LogCategories.Api, "HTTP connection error without HTTP response (" + HttpFailureDiagnostics.BuildLogSummary(response.TransportException, failure) + ").", response.TransportException);
@@ -663,7 +669,8 @@ namespace NcTalkOutlookAddIn.Services
             }
 
             statusCode = response.StatusCode;
-            DiagnosticsLogger.LogApi(method + " " + url + " -> " + statusCode);            if (response.JsonParseException != null)
+            DiagnosticsLogger.LogApi(method + " " + url + " -> " + statusCode);
+            if (response.JsonParseException != null)
             {
                 DiagnosticsLogger.LogException(LogCategories.Api, "Failed to parse JSON response.", response.JsonParseException);
             }
@@ -678,13 +685,15 @@ namespace NcTalkOutlookAddIn.Services
         }
 
         private static string ExtractRoomToken(IDictionary<string, object> responseData)
-        {            if (responseData == null)
+        {
+            if (responseData == null)
             {
                 return null;
             }
 
             IDictionary<string, object> ocs = NcJson.GetDictionary(responseData, "ocs");
-            IDictionary<string, object> data = NcJson.GetDictionary(ocs, "data");            if (data != null)
+            IDictionary<string, object> data = NcJson.GetDictionary(ocs, "data");
+            if (data != null)
             {
                 string token = NcJson.GetString(data, "token");
                 if (string.IsNullOrEmpty(token))
@@ -699,7 +708,8 @@ namespace NcTalkOutlookAddIn.Services
             return NcJson.GetString(responseData, "token");
         }
         private static string ExtractVersion(IDictionary<string, object> payload)
-        {            if (payload == null)
+        {
+            if (payload == null)
             {
                 return null;
             }
@@ -721,7 +731,8 @@ namespace NcTalkOutlookAddIn.Services
             }
 
             IDictionary<string, object> nextcloud = NcJson.GetDictionary(payload, "nextcloud");
-            IDictionary<string, object> system = NcJson.GetDictionary(nextcloud, "system");            if (system != null)
+            IDictionary<string, object> system = NcJson.GetDictionary(nextcloud, "system");
+            if (system != null)
             {
                 result = ComposeVersion(
                     NcJson.GetString(system, "versionstring") ?? NcJson.GetString(system, "version") ?? BuildVersionFromParts(system),
@@ -740,7 +751,8 @@ namespace NcTalkOutlookAddIn.Services
         }
 
         private static string BuildVersionFromParts(IDictionary<string, object> dictionary)
-        {            if (dictionary == null)
+        {
+            if (dictionary == null)
             {
                 return null;
             }
@@ -816,7 +828,8 @@ namespace NcTalkOutlookAddIn.Services
         }
 
         private static bool IsEventConversationDescriptionLockError(TalkServiceException ex)
-        {            if (ex == null || ex.StatusCode != HttpStatusCode.BadRequest)
+        {
+            if (ex == null || ex.StatusCode != HttpStatusCode.BadRequest)
             {
                 return false;
             }

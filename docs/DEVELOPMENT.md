@@ -167,9 +167,9 @@ Key code locations:
    - appointment HTML insert uses the HTML->RTF bridge (`MailItem.HTMLBody` -> `AppointmentItem.RTFBody`), not `AppointmentItem.HTMLBody` and not `HTMLEditor.body.innerHTML`
 6. A runtime subscription is registered for the appointment (`AppointmentSubscription` in `NextcloudTalkAddIn.AppointmentSubscription.cs`):
    - **Write** (save): updates lobby timer on time changes, updates room description, syncs participants, applies delegation
-   - If Outlook exposes the final changed start time only shortly after `Write`, a short deferred post-write verification retries the lobby update on the same opened appointment instead of broad calendar scanning.
+   - If Outlook exposes the final changed start time only shortly after `Write`, a short deferred post-write verification retries the lobby update with the newly observed start time on the same opened appointment instead of broad calendar scanning.
    - **Close** (discard without saving): deletes the room to avoid orphans (best-effort)
-   - **BeforeDelete**: deletes the room only when saved-event deletion is opted in (`TalkDeleteRoomOnEventDelete` or locked backend `talk_delete_room_on_event_delete`) and the appointment has `X-NCTALK-TOKEN`; URL/location parsing is not a deletion source
+   - **BeforeDelete**: queues room deletion in the background only when saved-event deletion is opted in (`TalkDeleteRoomOnEventDelete` or locked backend `talk_delete_room_on_event_delete`) and the appointment has `X-NCTALK-TOKEN`; URL/location parsing is not a deletion source
 
 #### Talk appointment-safe HTML subset (backend custom templates)
 
@@ -405,9 +405,9 @@ Primary write location:
 | Property | Purpose | Type / format | Example | Written | Read / used | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
 | `X-NCTALK-TOKEN` | Talk room token | `string` | `a1b2c3d4` | `ApplyRoomToAppointment(...)` | `EnsureSubscriptionForAppointment(...)` | Required for saved-event room deletion and runtime subscription; generic Talk URLs in `Location`/URL fields are ignored. |
-| `X-NCTALK-URL` | Talk room URL | `string` | `https://cloud.example.com/call/a1b2c3d4` | `ApplyRoomToAppointment(...)` | (not read by add-in) | Stored as local Outlook metadata. |
+| `X-NCTALK-URL` | Talk room URL | `string` | `https://cloud.example.com/call/a1b2c3d4` | `ApplyRoomToAppointment(...)` | `RegisterSubscription(...)` | Stored as local Outlook metadata; not used as a deletion source. |
 | `X-NCTALK-LOBBY` | Lobby enabled flag | `TRUE` / `FALSE` | `TRUE` | `ApplyRoomToAppointment(...)` | `EnsureSubscriptionForAppointment(...)` | Used to decide whether lobby updates run on save. |
-| `X-NCTALK-START` | Appointment start time (epoch seconds) | `int64` as string | `1739750400` | `ApplyRoomToAppointment(...)`, `AppointmentSubscription.OnWrite(...)` | `TryReadRequiredIcalStartEpoch(...)`, `TryUpdateLobby(...)` | Authoritative lobby timer source on appointment save; updated when lobby is enabled and the start time changes. |
+| `X-NCTALK-START` | Appointment start time (epoch seconds) | `int64` as string | `1739750400` | `ApplyRoomToAppointment(...)`, `AppointmentSubscription.OnWrite(...)` | `GetIcalStartEpochOrNull(...)`, `TryReadAppointmentStartEpoch(...)` | Local metadata for subscription state; lobby updates use the current save/deferred start epoch directly. |
 | `X-NCTALK-EVENT` | Room creation mode marker | `event` \| `standard` | `event` | `ApplyRoomToAppointment(...)` | `GetRoomType(...)` | No legacy Outlook property fallback. |
 | `X-NCTALK-OBJECTID` | Time-window identifier | `"<start>#<end>"` | `1739750400#1739754000` | `ApplyRoomToAppointment(...)` | (not read by add-in) | Stored as local Outlook metadata. |
 | `X-NCTALK-ADD-USERS` | Participant sync: internal users | `TRUE` / `FALSE` | `TRUE` | `ApplyRoomToAppointment(...)` | `TrySyncRoomParticipants(...)` | Split participant sync flag for Nextcloud users. |

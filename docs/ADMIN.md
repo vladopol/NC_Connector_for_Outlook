@@ -129,7 +129,7 @@ Central policy can currently control:
 
 ### Talk appointment-safe HTML subset (backend templates)
 
-Saved appointment deletion is conservative by default: Outlook only removes the remote Talk room when `TalkDeleteRoomOnEventDelete` is enabled locally or locked/enabled by backend policy, and only when the appointment carries NC Connector `X-NCTALK-TOKEN` metadata. Generic Talk links in `Location` or URL fields are ignored. Cleanup for newly created appointments that are discarded before saving remains active.
+Saved appointment deletion is conservative by default: Outlook only queues remote Talk room deletion when `TalkDeleteRoomOnEventDelete` is enabled locally or locked/enabled by backend policy, and only when the appointment carries NC Connector `X-NCTALK-TOKEN` metadata. Generic Talk links in `Location` or URL fields are ignored. Cleanup for newly created appointments that are discarded before saving remains active.
 
 If backend policy/template delivery is enabled for Talk appointment descriptions (`event_description_type=html`), use this subset for robust Outlook rendering:
 

@@ -216,27 +216,6 @@ namespace NcTalkOutlookAddIn.Controllers
             return true;
         }
 
-        internal bool TryReadRequiredIcalStartEpoch(Outlook.AppointmentItem appointment, string roomToken, out long startEpoch)
-        {
-            startEpoch = 0;
-            string rawValue = GetUserPropertyText(appointment, NextcloudTalkAddIn.IcalStart);
-            if (string.IsNullOrWhiteSpace(rawValue))
-            {
-                NextcloudTalkAddIn.LogTalkMessage("Lobby update blocked: X-NCTALK-START is missing (token=" + (roomToken ?? "n/a") + ").");
-                return false;
-            }
-
-            long parsed;
-            if (!long.TryParse(rawValue.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out parsed) || parsed <= 0)
-            {
-                NextcloudTalkAddIn.LogTalkMessage("Lobby update blocked: X-NCTALK-START is invalid (token=" + (roomToken ?? "n/a") + ", value='" + rawValue + "').");
-                return false;
-            }
-
-            startEpoch = parsed;
-            return true;
-        }
-
         internal static long? GetIcalStartEpochOrNull(Outlook.AppointmentItem appointment)
         {
             string rawValue = GetUserPropertyText(appointment, NextcloudTalkAddIn.IcalStart);
@@ -321,7 +300,8 @@ namespace NcTalkOutlookAddIn.Controllers
         }
 
         internal bool TrySyncRoomParticipants(Outlook.AppointmentItem appointment, string roomToken, bool isEventConversation)
-        {            if (appointment == null || string.IsNullOrWhiteSpace(roomToken) || _owner.CurrentSettings == null)
+        {
+            if (appointment == null || string.IsNullOrWhiteSpace(roomToken) || _owner.CurrentSettings == null)
             {
                 return false;
             }
@@ -430,7 +410,8 @@ namespace NcTalkOutlookAddIn.Controllers
         }
 
         internal void TryApplyDelegation(Outlook.AppointmentItem appointment, string roomToken)
-        {            if (appointment == null || string.IsNullOrWhiteSpace(roomToken) || _owner.CurrentSettings == null)
+        {
+            if (appointment == null || string.IsNullOrWhiteSpace(roomToken) || _owner.CurrentSettings == null)
             {
                 return;
             }
@@ -461,7 +442,8 @@ namespace NcTalkOutlookAddIn.Controllers
                 int attendeeId = 0;
                 for (int i = 0; i < participants.Count; i++)
                 {
-                    TalkParticipant participant = participants[i];                    if (participant == null)
+                    TalkParticipant participant = participants[i];
+                    if (participant == null)
                     {
                         continue;
                     }
@@ -511,8 +493,9 @@ namespace NcTalkOutlookAddIn.Controllers
             }
         }
 
-        internal bool TryUpdateLobby(Outlook.AppointmentItem appointment, string roomToken, bool isEventConversation)
-        {            if (appointment == null || string.IsNullOrWhiteSpace(roomToken))
+        internal bool TryUpdateLobby(Outlook.AppointmentItem appointment, string roomToken, bool isEventConversation, long startEpoch)
+        {
+            if (appointment == null || string.IsNullOrWhiteSpace(roomToken))
             {
                 return false;
             }
@@ -525,12 +508,6 @@ namespace NcTalkOutlookAddIn.Controllers
             try
             {
                 var service = _owner.CreateTalkService();
-                long startEpoch;
-                if (!TryReadRequiredIcalStartEpoch(appointment, roomToken, out startEpoch))
-                {
-                    return false;
-                }
-
                 DateTime startUtc;
                 try
                 {
@@ -582,7 +559,8 @@ namespace NcTalkOutlookAddIn.Controllers
         }
 
         internal bool TryUpdateRoomName(Outlook.AppointmentItem appointment, string roomToken, bool isEventConversation)
-        {            if (appointment == null || string.IsNullOrWhiteSpace(roomToken))
+        {
+            if (appointment == null || string.IsNullOrWhiteSpace(roomToken))
             {
                 return false;
             }
@@ -651,7 +629,8 @@ namespace NcTalkOutlookAddIn.Controllers
                 NextcloudTalkAddIn.LogTalkMessage("Description update skipped (delegation=" + delegateId + ", token=" + roomToken + ").");
                 return true;
             }
-            string description = BuildDescriptionPayload(appointment);            if (description == null)
+            string description = BuildDescriptionPayload(appointment);
+            if (description == null)
             {
                 description = string.Empty;
             }
@@ -718,7 +697,8 @@ namespace NcTalkOutlookAddIn.Controllers
         }
 
         private void PersistEventConversationTraits(Outlook.AppointmentItem appointment, string roomToken)
-        {            if (appointment == null)
+        {
+            if (appointment == null)
             {
                 return;
             }
@@ -810,7 +790,8 @@ namespace NcTalkOutlookAddIn.Controllers
         }
 
         internal static string GetUserPropertyText(Outlook.AppointmentItem appointment, string name)
-        {            if (appointment == null)
+        {
+            if (appointment == null)
             {
                 return null;
             }
@@ -827,7 +808,8 @@ namespace NcTalkOutlookAddIn.Controllers
         }
 
         internal static bool HasUserProperty(Outlook.AppointmentItem appointment, string name)
-        {            if (appointment == null)
+        {
+            if (appointment == null)
             {
                 return false;
             }
@@ -843,18 +825,21 @@ namespace NcTalkOutlookAddIn.Controllers
         }
 
         internal static bool GetUserPropertyBool(Outlook.AppointmentItem appointment, string name)
-        {            if (appointment == null)
+        {
+            if (appointment == null)
             {
                 return false;
             }
             try
             {
-                var property = appointment.UserProperties[name];                if (property == null)
+                var property = appointment.UserProperties[name];
+                if (property == null)
                 {
                     return false;
                 }
 
-                object value = property.Value;                if (value == null)
+                object value = property.Value;
+                if (value == null)
                 {
                     return false;
                 }
@@ -890,13 +875,15 @@ namespace NcTalkOutlookAddIn.Controllers
         }
 
         internal static void RemoveUserProperty(Outlook.AppointmentItem appointment, string name)
-        {            if (appointment == null)
+        {
+            if (appointment == null)
             {
                 return;
             }
             try
             {
-                var property = appointment.UserProperties[name];                if (property != null)
+                var property = appointment.UserProperties[name];
+                if (property != null)
                 {
                     property.Delete();
                 }
@@ -908,7 +895,8 @@ namespace NcTalkOutlookAddIn.Controllers
         }
 
         private static bool IsEventConversationDescriptionError(TalkServiceException ex)
-        {            if (ex == null || string.IsNullOrWhiteSpace(ex.Message))
+        {
+            if (ex == null || string.IsNullOrWhiteSpace(ex.Message))
             {
                 return false;
             }
@@ -918,7 +906,8 @@ namespace NcTalkOutlookAddIn.Controllers
         }
 
         private static bool IsMissingOrForbiddenRoomMutationError(TalkServiceException ex)
-        {            if (ex == null)
+        {
+            if (ex == null)
             {
                 return false;
             }

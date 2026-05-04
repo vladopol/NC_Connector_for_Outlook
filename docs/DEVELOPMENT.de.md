@@ -24,7 +24,7 @@ Das Add-in integriert:
 
 Diese Release-Linie ist ein gezieltes Sicherheitsupdate fuer den Talk-Termin-Cleanup:
 
-- Das Loeschen gespeicherter Termine entfernt entfernte Talk-Raeume nur noch, wenn `TalkDeleteRoomOnEventDelete` oder die gesperrte Backend-Policy `talk_delete_room_on_event_delete` es explizit aktiviert.
+- Das Loeschen gespeicherter Termine stellt die entfernte Raumloeschung nur noch dann im Hintergrund an, wenn `TalkDeleteRoomOnEventDelete` oder die gesperrte Backend-Policy `talk_delete_room_on_event_delete` es explizit aktiviert.
 - Die Runtime-Subscription-Erkennung benoetigt `X-NCTALK-TOKEN`; generische Talk-URLs in `Location` oder URL-Feldern werden nicht als Loeschquelle verwendet.
 - Der Cleanup fuer neu erzeugte Termine, die vor dem Speichern verworfen werden, bleibt aktiv und ist vom Opt-in fuer gespeicherte Termine getrennt.
 - Talk-Metadaten werden lokal in Outlook als `X-NCTALK-*` UserProperties/MAPI-Felder persistiert. Serverseitige Kalender-`.ics`-Objekte werden nicht gepatcht.
@@ -194,7 +194,7 @@ Compose-Filelink-Paritaet (3.0.4):
 - `ComposeShareLifecycleController` kapselt die eigentliche Share-Cleanup-/Passwort-Dispatch-Logik; `MailComposeSubscription` haelt nur Queue- und Eventzustand.
 - `TalkAppointmentController` kapselt Appointment-Schreib-/Sync-Pfade; `NextcloudTalkAddIn` delegiert diese Aufrufe statt die komplette Fachlogik im Root zu halten.
 - Nach Appointment-Write werden die lokalen Outlook-`X-NCTALK-*`-Metadaten aktualisiert; serverseitige CalDAV-VEVENTs werden dafuer nicht gepatcht.
-- Gespeicherte Talk-Termine loeschen den entfernten Raum nur mit Opt-in (`TalkDeleteRoomOnEventDelete` bzw. Backend-Policy `talk_delete_room_on_event_delete`) und vorhandenen `X-NCTALK-TOKEN`-Metadaten; generische Talk-URLs in `Location`/URL-Feldern werden nicht als Loeschquelle ausgewertet.
+- Gespeicherte Talk-Termine stellen die entfernte Raumloeschung nur mit Opt-in (`TalkDeleteRoomOnEventDelete` bzw. Backend-Policy `talk_delete_room_on_event_delete`) und vorhandenen `X-NCTALK-TOKEN`-Metadaten im Hintergrund an; generische Talk-URLs in `Location`/URL-Feldern werden nicht als Loeschquelle ausgewertet.
 - Der Cleanup fuer verworfene, noch nicht gespeicherte neue Termine bleibt davon getrennt aktiv.
 - Ribbon-getriggerte Flows werden im Controller-Slice gehalten (`SettingsWorkflowController`, `FileLinkLaunchController`, `TalkRibbonController`); `NextcloudTalkAddIn.cs` bleibt schlanke Delegate-/Composition-Root-Schicht.
   - Lifecycle-, Policy-/Template- und Deferred-Ensure-Logik sind in eigene Partial-Dateien ausgelagert, damit die Root-Klasse wartbar bleibt.

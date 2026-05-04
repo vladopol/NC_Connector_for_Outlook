@@ -53,7 +53,8 @@ namespace NcTalkOutlookAddIn
                 _isEventConversation = isEventConversation;
                 _lastLobbyTimer = GetIcalStartEpochOrNull(appointment);
                 _entryId = entryId;
-                _events = appointment as Outlook.ItemEvents_10_Event;                if (_events != null)
+                _events = appointment as Outlook.ItemEvents_10_Event;
+                if (_events != null)
                 {
                     _events.BeforeDelete += OnBeforeDelete;
                     _events.Write += OnWrite;
@@ -141,7 +142,7 @@ namespace NcTalkOutlookAddIn
                     else if (!_lastLobbyTimer.HasValue || currentStartEpoch != _lastLobbyTimer.Value)
                     {
                         LogTalk("Attempting lobby update during OnWrite (token=" + _roomToken + ", startEpoch=" + currentStartEpoch.ToString(CultureInfo.InvariantCulture) + ", lobbyKnown=" + effectiveLobbyKnown + ").");
-                        if (_owner._talkAppointmentController.TryUpdateLobby(_appointment, _roomToken, effectiveIsEventConversation))
+                        if (_owner._talkAppointmentController.TryUpdateLobby(_appointment, _roomToken, effectiveIsEventConversation, currentStartEpoch))
                         {
                             _lastLobbyTimer = currentStartEpoch;
                             LogTalk("Lobby update successful (token=" + _roomToken + ").");
@@ -213,8 +214,8 @@ namespace NcTalkOutlookAddIn
                     return;
                 }
 
-                LogTalk("BeforeDelete -> EnsureRoomDeleted (Token=" + _roomToken + ").");
-                EnsureRoomDeleted(true);
+                LogTalk("BeforeDelete -> queue saved-event room deletion (token=" + _roomToken + ").");
+                QueueSavedEventRoomDeletion();
             }
 
             private void OnClose(ref bool cancel)
@@ -255,12 +256,14 @@ namespace NcTalkOutlookAddIn
             }
 
             private void ScheduleDeferredWriteLobbyVerification()
-            {                if (_disposed || _roomDeleted || _appointment == null)
+            {
+                if (_disposed || _roomDeleted || _appointment == null)
                 {
                     return;
                 }
 
-                _deferredWriteLobbyAttempts = 0;                if (_deferredWriteLobbyTimer == null)
+                _deferredWriteLobbyAttempts = 0;
+                if (_deferredWriteLobbyTimer == null)
                 {
                     _deferredWriteLobbyTimer = new System.Windows.Forms.Timer();
                     _deferredWriteLobbyTimer.Interval = 750;
@@ -273,7 +276,8 @@ namespace NcTalkOutlookAddIn
             }
 
             private void OnDeferredWriteLobbyTick(object sender, EventArgs e)
-            {                if (_disposed || _roomDeleted || _appointment == null)
+            {
+                if (_disposed || _roomDeleted || _appointment == null)
                 {
                     _deferredWriteLobbyAttempts = 0;
                     StopDeferredWriteLobbyTimer();
@@ -332,7 +336,7 @@ namespace NcTalkOutlookAddIn
                 }
 
                 LogTalk("Deferred post-write lobby verification applying update (token=" + _roomToken + ", startEpoch=" + currentStartEpoch.ToString(CultureInfo.InvariantCulture) + ").");
-                if (_owner._talkAppointmentController.TryUpdateLobby(_appointment, _roomToken, effectiveIsEventConversation))
+                if (_owner._talkAppointmentController.TryUpdateLobby(_appointment, _roomToken, effectiveIsEventConversation, currentStartEpoch))
                 {
                     _lastLobbyTimer = currentStartEpoch;
                     _deferredWriteLobbyAttempts = 0;
@@ -349,7 +353,8 @@ namespace NcTalkOutlookAddIn
             }
 
             private void OnUnsavedCloseCleanupTick(object sender, EventArgs e)
-            {                if (_disposed || _roomDeleted || _appointment == null)
+            {
+                if (_disposed || _roomDeleted || _appointment == null)
                 {
                     _unsavedCloseCleanupPending = false;
                     _unsavedCloseCleanupAttempts = 0;
@@ -393,7 +398,7 @@ namespace NcTalkOutlookAddIn
                 if (!saved)
                 {
                     LogTalk("Deferred OnClose cleanup deleting room (token=" + _roomToken + ").");
-                    EnsureRoomDeleted(false);
+                    EnsureRoomDeleted();
                     return;
                 }
 
@@ -402,7 +407,8 @@ namespace NcTalkOutlookAddIn
 
             private static bool TryGetAppointmentSaved(Outlook.AppointmentItem appointment, out bool saved)
             {
-                saved = false;                if (appointment == null)
+                saved = false;
+                if (appointment == null)
                 {
                     return false;
                 }
@@ -418,7 +424,8 @@ namespace NcTalkOutlookAddIn
             }
 
             private void StopUnsavedCloseCleanupTimer()
-            {                if (_unsavedCloseCleanupTimer == null)
+            {
+                if (_unsavedCloseCleanupTimer == null)
                 {
                     return;
                 }
@@ -430,7 +437,8 @@ namespace NcTalkOutlookAddIn
             }
 
             private void StopDeferredWriteLobbyTimer()
-            {                if (_deferredWriteLobbyTimer == null)
+            {
+                if (_deferredWriteLobbyTimer == null)
                 {
                     return;
                 }
@@ -442,7 +450,8 @@ namespace NcTalkOutlookAddIn
             }
 
             private bool IsAppointmentOpenInAnyInspector(Outlook.AppointmentItem appointment)
-            {                if (appointment == null || _owner == null || _owner._inspectors == null)
+            {
+                if (appointment == null || _owner == null || _owner._inspectors == null)
                 {
                     return false;
                 }
@@ -470,13 +479,15 @@ namespace NcTalkOutlookAddIn
                     Outlook.AppointmentItem currentAppointment = null;
                     try
                     {
-                        inspector = _owner._inspectors[i];                        if (inspector == null)
+                        inspector = _owner._inspectors[i];
+                        if (inspector == null)
                         {
                             continue;
                         }
 
                         currentItem = inspector.CurrentItem;
-                        currentAppointment = currentItem as Outlook.AppointmentItem;                        if (currentAppointment == null)
+                        currentAppointment = currentItem as Outlook.AppointmentItem;
+                        if (currentAppointment == null)
                         {
                             continue;
                         }
@@ -505,7 +516,8 @@ namespace NcTalkOutlookAddIn
                     {
                     }
                     finally
-                    {                        if (currentAppointment != null && !ReferenceEquals(currentAppointment, appointment))
+                    {
+                        if (currentAppointment != null && !ReferenceEquals(currentAppointment, appointment))
                         {
                             ComInteropScope.TryRelease(
                                 currentAppointment,
@@ -533,7 +545,7 @@ namespace NcTalkOutlookAddIn
                 return false;
             }
 
-            private void EnsureRoomDeleted(bool requireSavedEventDeleteOptIn)
+            private void EnsureRoomDeleted()
             {
                 if (_roomDeleted || !_owner.IsOrganizer(_appointment))
                 {
@@ -541,12 +553,6 @@ namespace NcTalkOutlookAddIn
                     {
                         LogTalk("EnsureRoomDeleted: room already deleted (token=" + _roomToken + ").");
                     }
-                    return;
-                }
-                if (requireSavedEventDeleteOptIn && !_owner.ShouldDeleteTalkRoomOnSavedEventDelete())
-                {
-                    LogTalk("EnsureRoomDeleted skipped (saved-event delete opt-in disabled, token=" + _roomToken + ").");
-                    Dispose();
                     return;
                 }
                 string delegateId;
@@ -569,6 +575,27 @@ namespace NcTalkOutlookAddIn
                 {
                     LogTalk("EnsureRoomDeleted failed (token=" + _roomToken + ").");
                 }
+            }
+
+            private void QueueSavedEventRoomDeletion()
+            {
+                if (_roomDeleted || string.IsNullOrWhiteSpace(_roomToken))
+                {
+                    return;
+                }
+
+                string delegateId;
+                if (_owner._talkAppointmentController.IsDelegatedToOtherUser(_appointment, out delegateId))
+                {
+                    LogTalk("Saved-event room deletion skipped (delegation=" + delegateId + ", token=" + _roomToken + ").");
+                    _roomDeleted = true;
+                    Dispose();
+                    return;
+                }
+
+                _roomDeleted = true;
+                _owner.QueueSavedEventRoomDeletion(_roomToken, _isEventConversation);
+                Dispose();
             }
 
             public void Dispose()
@@ -604,7 +631,8 @@ namespace NcTalkOutlookAddIn
             }
 
             internal bool IsFor(Outlook.AppointmentItem appointment)
-            {                if (appointment == null)
+            {
+                if (appointment == null)
                 {
                     return false;
                 }
