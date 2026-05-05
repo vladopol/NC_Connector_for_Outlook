@@ -162,7 +162,7 @@ namespace NcTalkOutlookAddIn.Controllers
                 };
                 NextcloudTalkAddIn.LogTalkMessage("Room request prepared (title='" + request.Title + "', type=" + request.RoomType + ", lobby=" + request.LobbyEnabled + ", search=" + request.SearchVisible + ", passwordSet=" + (!string.IsNullOrEmpty(request.Password)) + ").");
 
-                string existingToken = TalkAppointmentController.GetUserPropertyTextPrefer(appointment, NextcloudTalkAddIn.IcalToken, NextcloudTalkAddIn.PropertyToken);
+                string existingToken = TalkAppointmentController.GetUserPropertyText(appointment, NextcloudTalkAddIn.IcalToken);
                 if (!string.IsNullOrWhiteSpace(existingToken))
                 {
                     NextcloudTalkAddIn.LogTalkMessage("Existing room found (token=" + existingToken + "), replacement requested.");
