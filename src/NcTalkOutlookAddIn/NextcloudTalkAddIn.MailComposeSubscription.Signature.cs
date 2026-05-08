@@ -159,6 +159,13 @@ namespace NcTalkOutlookAddIn
 
             private void ApplyManagedEmailSignature(string sanitizedHtml, EmailSignatureComposeKind composeKind, string reason)
             {
+                Outlook.OlBodyFormat bodyFormat = ReadMailBodyFormatForEmailSignature("apply");
+                if (bodyFormat == Outlook.OlBodyFormat.olFormatPlain)
+                {
+                    ApplyManagedPlainTextEmailSignature(sanitizedHtml, composeKind, reason);
+                    return;
+                }
+
                 if (!EnsureHtmlBodyForEmailSignature("apply"))
                 {
                     return;
@@ -209,6 +216,51 @@ namespace NcTalkOutlookAddIn
                     + ").");
             }
 
+            private void ApplyManagedPlainTextEmailSignature(string sanitizedHtml, EmailSignatureComposeKind composeKind, string reason)
+            {
+                string plainText = HtmlToPlainTextConverter.Convert(sanitizedHtml);
+                if (string.IsNullOrWhiteSpace(plainText))
+                {
+                    ClearEmailSignatureSlotWithoutInsert("plain_text_empty", composeKind);
+                    LogEmailSignature("Plain-text email signature sanitized to empty output (trigger=" + (reason ?? "n/a") + ").");
+                    return;
+                }
+
+                EmailSignaturePlainTextController.Result result = EmailSignaturePlainTextController.Apply(
+                    _owner != null ? _owner.OutlookApplication : null,
+                    _mail,
+                    _isInlineResponse,
+                    _composeKey,
+                    plainText,
+                    LogEmailSignature);
+                if (!result.Success)
+                {
+                    LogEmailSignature(
+                        "Plain-text email signature apply skipped (trigger="
+                        + (reason ?? "n/a")
+                        + ", kind="
+                        + composeKind
+                        + ", source="
+                        + (result.Source ?? "n/a")
+                        + ").");
+                    return;
+                }
+
+                _emailSignatureInitialSlotHandled = _emailSignatureInitialSlotHandled || result.InitialSlotHandled;
+                _emailSignatureManaged = result.Managed;
+
+                LogEmailSignature(
+                    "Plain-text email signature applied (trigger="
+                    + (reason ?? "n/a")
+                    + ", kind="
+                    + composeKind
+                    + ", textLength="
+                    + plainText.Length.ToString(CultureInfo.InvariantCulture)
+                    + ", source="
+                    + (result.Source ?? "n/a")
+                    + ").");
+            }
+
             private void ClearEmailSignatureSlotWithoutInsert(string reason, EmailSignatureComposeKind composeKind)
             {
                 if (_mail == null)
@@ -221,12 +273,29 @@ namespace NcTalkOutlookAddIn
                     Outlook.OlBodyFormat bodyFormat = ReadMailBodyFormatForEmailSignature("clear");
                     if (bodyFormat == Outlook.OlBodyFormat.olFormatPlain)
                     {
-                        ClearManagedEmailSignatureIfNeeded(reason);
+                        EmailSignaturePlainTextController.Result result = EmailSignaturePlainTextController.ClearInitialSlot(
+                            _owner != null ? _owner.OutlookApplication : null,
+                            _mail,
+                            _isInlineResponse,
+                            _composeKey,
+                            LogEmailSignature);
+                        if (result.Success)
+                        {
+                            _emailSignatureInitialSlotHandled = _emailSignatureInitialSlotHandled || result.InitialSlotHandled;
+                            if (result.Changed)
+                            {
+                                _emailSignatureManaged = result.Managed;
+                            }
+                        }
                         LogEmailSignature(
-                            "Email signature slot cleanup skipped in plain-text compose (reason="
+                            "Plain-text email signature slot clear completed (reason="
                             + (reason ?? "n/a")
                             + ", kind="
                             + composeKind
+                            + ", changed="
+                            + (result != null && result.Changed).ToString(CultureInfo.InvariantCulture)
+                            + ", source="
+                            + (result != null ? result.Source ?? "n/a" : "n/a")
                             + ").");
                         return;
                     }
@@ -286,6 +355,29 @@ namespace NcTalkOutlookAddIn
                 {
                     if (_mail.BodyFormat == Outlook.OlBodyFormat.olFormatPlain)
                     {
+                        if (!_emailSignatureManaged)
+                        {
+                            return;
+                        }
+
+                        EmailSignaturePlainTextController.Result result = EmailSignaturePlainTextController.ClearManaged(
+                            _owner != null ? _owner.OutlookApplication : null,
+                            _mail,
+                            _isInlineResponse,
+                            _composeKey,
+                            LogEmailSignature);
+                        if (result.Success && result.Changed)
+                        {
+                            _emailSignatureManaged = false;
+                        }
+                        LogEmailSignature(
+                            "Managed plain-text email signature clear completed (reason="
+                            + (reason ?? "n/a")
+                            + ", changed="
+                            + (result != null && result.Changed).ToString(CultureInfo.InvariantCulture)
+                            + ", source="
+                            + (result != null ? result.Source ?? "n/a" : "n/a")
+                            + ").");
                         return;
                     }
 
