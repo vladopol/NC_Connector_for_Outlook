@@ -216,6 +216,8 @@ For stable rendering in Outlook appointment bodies (Word/RTF pipeline), backend 
 2. `UI/FileLinkWizardForm.cs` collects sharing settings and the file/folder selection.
 3. `Controllers/FileLinkLaunchController.cs` prefetches backend policy status and password policy in parallel (`Task.WhenAll`) before opening the wizard.
 4. `Services/FileLinkService.cs` performs WebDAV upload, creates the public share via OCS (`label` on create), then updates mutable metadata like `note` via the documented OCS update arguments.
+   - Files up to 20 MB use a direct WebDAV `PUT`.
+   - Larger files use Nextcloud chunked upload v2 under `/remote.php/dav/uploads/<user>/<upload-id>` and are assembled with `MOVE .file` to the final DAV path.
 5. `Utilities/FileLinkHtmlBuilder.cs` generates the HTML block (header + link + password + permissions + expiration date).
    - backend-provided custom share templates are sanitized via `HtmlTemplateSanitizer` and fail closed on sanitizer errors.
 6. `NextcloudTalkAddIn.InsertHtmlIntoMail(...)` inserts the HTML into the message body (delegated to `Controllers/MailInteropController.cs`).
@@ -276,6 +278,7 @@ Sharing:
 
 - Create public share: `POST /ocs/v2.php/apps/files_sharing/api/v1/shares`
 - Upload/folder creation: `remote.php/dav/...` (WebDAV)
+- Large file upload: `MKCOL /remote.php/dav/uploads/<user>/<upload-id>`, chunk `PUT`s, then `MOVE /remote.php/dav/uploads/<user>/<upload-id>/.file` to the final file path
 
 IFB (DAV via proxy):
 
