@@ -147,6 +147,7 @@ Controller:
 
 - `src/NcTalkOutlookAddIn/Controllers/TalkAppointmentController.cs` (Talk-Termin-Lifecycle: Room-Metadaten, Lobby-/Description-/Delegation-/Teilnehmer-Sync)
 - `src/NcTalkOutlookAddIn/Controllers/ComposeShareLifecycleController.cs` (Compose-Share-Cleanup und separater Passwort-Versand inkl. Fallback)
+- `src/NcTalkOutlookAddIn/Controllers/EmailSignaturePlainTextController.cs` (Plain-Text-Signatur-Einfuegung/-Cleanup ueber Outlook-WordEditor-Signatur-Bookmarks)
 - `src/NcTalkOutlookAddIn/Controllers/TalkDescriptionTemplateController.cs` (Talk-Template-/Block-Rendering)
 - `src/NcTalkOutlookAddIn/Controllers/OutlookRecipientResolverController.cs` (SMTP- und Attendee-Aufloesung)
 - `src/NcTalkOutlookAddIn/Controllers/MailComposeSubscriptionRegistryController.cs` (Compose-Subscription-Registry)
@@ -179,6 +180,7 @@ Utilities:
 - `src/NcTalkOutlookAddIn/Utilities/ComInteropScope.cs` (zentrale COM-Release-/FinalRelease-Helfer)
 - `src/NcTalkOutlookAddIn/Utilities/PasswordGenerationHelper.cs` (zentralisiert Min-Length-Aufloesung, Server-Fallback-Generierung und gemeinsame Min-Length-Validierung fuer Talk/FileLink-Formulare)
 - `src/NcTalkOutlookAddIn/Utilities/HtmlTemplateSanitizer.cs` (zentraler Sanitizer fuer Backend-HTML-Templates bei Share/Talk, fail-closed)
+- `src/NcTalkOutlookAddIn/Utilities/HtmlToPlainTextConverter.cs` (DOM-basierte HTML-zu-Plain-Text-Ausgabe fuer Plain-Text-E-Mail-Signaturen)
 - `src/NcTalkOutlookAddIn/Utilities/NcJson.cs` (zentrale JSON-Normalisierung inkl. `PrepareJsonPayload`, Dictionary-/String-/Int-Helfer und OCS-Fehlerextraktion)
 - `src/NcTalkOutlookAddIn/Utilities/DeferredAppointmentEnsureState.cs` (gekapselter Laufzeitzustand fuer Pending-Keys und Restriction-Log-Throttling)
 - `src/NcTalkOutlookAddIn/Utilities/PictureConverter.cs` (gemeinsamer Image->IPictureDisp-Helfer fuer Ribbon-Icons)
@@ -193,13 +195,14 @@ Runtime-Vertrag:
 - Fehlende `policy.email_signature`-Unterstuetzung deaktiviert nur zentrale Signaturen und zeigt einen Backend-Update-Hinweis; Freigabe-/Talk-Policy-Domains bleiben unabhaengig.
 - Die effektive Outlook-Absenderidentitaet muss zu `policy.email_signature.user_email` passen; andere Identitaeten bleiben unberuehrt. Ein `SentOnBehalfOfName`-/Von-Override fuer Shared Mailbox- oder delegierte Exchange-Identitaeten hat Vorrang vor `SendUsingAccount` und muss auf dieselbe SMTP-Adresse aufloesbar sein. Wenn die Absenderidentitaet nicht eindeutig aufgeloest werden kann, bleibt die Signaturverarbeitung fail-closed.
 - Die lokalen Einstellungen `EmailSignatureOnCompose`, `EmailSignatureOnReply` und `EmailSignatureOnForward` koennen die Einfuegung fuer den jeweiligen Compose-Typ deaktivieren, solange das Backend den Wert nicht sperrt.
-- Fuer das passende Absenderkonto besitzt eine aktive Compose-Signatur-Policy auch bei Antworten und Weiterleitungen den initialen Signaturplatz. Beim Compose-Start erkannte Outlook-native oder Drittanbieter-Signaturen werden nur entfernt, wenn die Grenze zur zitierten Nachricht strukturell erkennbar ist; andernfalls bleiben zitierte Nachricht und Trenner erhalten.
-- Wenn die Compose-Signatur-Policy inaktiv ist oder der Absender nicht passt, entfernt NC Connector nur den eigenen markierten Signaturblock aus dem aktuellen Compose-Body. Outlook-native oder Drittanbieter-Signaturen werden nicht entfernt.
+- Fuer HTML/RTF-Compose besitzt das passende Absenderkonto auch bei Antworten und Weiterleitungen den initialen Signaturplatz. Beim Compose-Start erkannte Outlook-native oder Drittanbieter-Signaturen werden nur entfernt, wenn die Grenze zur zitierten Nachricht strukturell erkennbar ist; andernfalls bleiben zitierte Nachricht und Trenner erhalten.
+- Fuer Plain-Text-Compose bleibt Outlooks Body-Format erhalten. Das bereinigte Backend-HTML wird zu Plain Text gerendert und ueber Outlooks WordEditor-Signaturplatz (`_MailAutoSig`) oder das verwaltete NC-Connector-Word-Bookmark eingefuegt. Plain-Text-Verarbeitung parst keine Antwort-Header und schreibt nicht direkt in `MailItem.Body`.
+- Wenn die Compose-Signatur-Policy inaktiv ist oder der Absender nicht passt, entfernt NC Connector nur den eigenen markierten HTML-Signaturblock oder das eigene verwaltete Plain-Text-Word-Bookmark aus dem aktuellen Compose-Item. Outlook-native oder Drittanbieter-Signaturen werden nicht entfernt.
 - Backend-Signatur-HTML laeuft durch `HtmlTemplateSanitizer` mit derselben fail-closed Policy wie Freigabe- und Talk-Templates.
-- Die verwaltete Signatur wird als markierter HTML-Block geschrieben, damit spaetere Policy-/Sender-Aenderungen gezielt nur NC-Connector-eigene Inhalte aktualisieren oder entfernen.
+- HTML/RTF-Signaturen werden als markierte HTML-Bloecke geschrieben, damit spaetere Policy-/Sender-Aenderungen gezielt nur NC-Connector-eigene Inhalte aktualisieren oder entfernen. Plain-Text-Signaturen werden fuer die offene Compose-Session ueber das verwaltete Word-Bookmark verfolgt.
 - Signaturverarbeitung laeuft nur fuer ungesendete Outlook-Compose-Items. Das Oeffnen einer empfangenen oder bereits gesendeten Nachricht zum Lesen darf den Body nie veraendern.
-- Inline-Antworten werden ueber Outlooks `Explorer.InlineResponse`-Event verfolgt und ueber `Explorer.ActiveInlineResponseWordEditor` geschrieben; Inspector-Compose-Fenster nutzen weiter den normalen `MailItem.HTMLBody`-Pfad. Inline-Signatureinfuegung verwendet Outlooks aktive Inline-Word-Selection, damit zitierter Inhalt und eingebettete Bilder erhalten bleiben. Inline-Word-Importe verwenden ein UTF-8-BOM-HTML-Dokument, damit Nicht-ASCII-Zeichen in Signaturen erhalten bleiben.
-- Die verwaltete Signatur ersetzt den Compose-Signaturplatz vor der zitierten Nachrichtengrenze, behaelt zwei leere Absaetze ueber der Signatur fuer eigenen Text und eine leere Zeile zwischen Signatur und Antwort-/Weiterleitungs-Trenner. Reine Textmarker wie `From:` oder `Von:` werden nie als direkte Schnittposition benutzt.
+- Inline-Antworten werden ueber Outlooks `Explorer.InlineResponse`-Event verfolgt und ueber `Explorer.ActiveInlineResponseWordEditor` geschrieben; Inspector-Compose-Fenster nutzen fuer HTML/RTF `MailItem.HTMLBody` und fuer Plain Text WordEditor. Inline-Signatureinfuegung verwendet Outlooks aktive Inline-Word-Selection, damit zitierter Inhalt und eingebettete Bilder erhalten bleiben. Inline-Word-Importe verwenden ein UTF-8-BOM-HTML-Dokument, damit Nicht-ASCII-Zeichen in Signaturen erhalten bleiben.
+- Die HTML/RTF-Signatur ersetzt den Compose-Signaturplatz vor der zitierten Nachrichtengrenze, behaelt zwei leere Absaetze ueber der Signatur fuer eigenen Text und eine leere Zeile zwischen Signatur und Antwort-/Weiterleitungs-Trenner. Reine Textmarker wie `From:` oder `Von:` werden nie als direkte Schnittposition benutzt.
 
 Compose-Filelink-Paritaet (3.0.4):
 

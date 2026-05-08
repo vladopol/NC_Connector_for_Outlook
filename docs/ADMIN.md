@@ -148,9 +148,13 @@ The local settings `EmailSignatureOnCompose`, `EmailSignatureOnReply`, and `Emai
 
 If an older backend already returns Share/Talk policy but does not expose the `policy.email_signature` domain yet, only central email signatures remain disabled. Settings then shows a backend update hint; Share and Talk stay controlled by their own policy domains.
 
-When `EmailSignatureOnCompose` is enabled for the matching Outlook sender account, NC Connector owns the signature slot for that identity. If reply or forward insertion is disabled, Outlook removes the Outlook-native or third-party signature captured when the compose window opened only when the quoted-message boundary is structurally identifiable, but does not insert the backend signature. If the boundary is not structurally identifiable, NC Connector preserves Outlook's quoted message and separator. If the backend signature is inserted before a reply/forward separator, NC Connector keeps one empty line between the signature and the quoted message. If the backend signature is inactive, incomplete, compose-signature policy is disabled, or the Outlook sender account does not match the Nextcloud user email, NC Connector leaves Outlook's own signature handling untouched. It only removes/replaces a signature block that NC Connector itself inserted into the open compose window.
+When `EmailSignatureOnCompose` is enabled for the matching Outlook sender account, NC Connector owns the signature slot for that identity. In HTML/RTF compose, Outlook-native or third-party signatures captured when the compose window opened are removed only when the quoted-message boundary is structurally identifiable. If the boundary is not structurally identifiable, NC Connector preserves Outlook's quoted message and separator. If the backend signature is inserted before a reply/forward separator, NC Connector keeps one empty line between the signature and the quoted message.
 
-The backend signature HTML is sanitized with the same fail-closed template sanitizer used for sharing and Talk blocks. The backend delivers HTML only; Outlook inserts the managed signature as marked HTML so it can be updated or removed safely during the same compose session.
+Plain-text compose remains plain text. Outlook does not get switched to HTML. NC Connector converts the sanitized backend HTML to plain text and writes it through Outlook's WordEditor signature slot. It does not parse localized reply headers and does not rewrite `MailItem.Body`.
+
+If the backend signature is inactive, incomplete, compose-signature policy is disabled, or the Outlook sender account does not match the Nextcloud user email, NC Connector leaves Outlook's own signature handling untouched. It only removes/replaces a signature block or managed plain-text bookmark that NC Connector itself inserted into the open compose window.
+
+The backend signature HTML is sanitized with the same fail-closed template sanitizer used for sharing and Talk blocks. HTML/RTF signatures are inserted as marked HTML blocks; plain-text signatures are tracked with a Word bookmark for the open compose session.
 
 ### Talk appointment-safe HTML subset (backend templates)
 
