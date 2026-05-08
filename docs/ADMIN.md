@@ -176,6 +176,7 @@ If backend policy/template delivery is enabled for Talk appointment descriptions
 - Attachment automation evaluates new files both pre-add (`BeforeAttachmentAdd`) and post-add; if pre-add can resolve a local file path, NC flow can best-effort cancel host add before Outlook post-add handling.
 - In Microsoft 365 / Exchange environments with server-side message-size limits, Outlook can block large attachments before add-in events fire; in those cases automation cannot intercept and users should use the `Insert Nextcloud share` button instead.
 - In sharing wizard file-step, admins/users can add files and folders via Explorer drag & drop across the full step area (queue and action area), not only via explicit add buttons.
+- File uploads larger than 20 MB use Nextcloud chunked upload v2. This avoids long single WebDAV `PUT` requests through proxies or web servers that reject very large request bodies.
 
 ### Separate password follow-up mail
 - If `Send password separately` is enabled, the main HTML block does not contain inline password text.
