@@ -106,6 +106,7 @@ Key code locations:
 - `src/NcTalkOutlookAddIn/Controllers/TalkRibbonController.cs` — Talk ribbon flow orchestration (auth gate, wizard, room create/replace)
 - `src/NcTalkOutlookAddIn/Controllers/TalkAppointmentController.cs` — appointment lifecycle orchestration for Talk room metadata/sync
 - `src/NcTalkOutlookAddIn/Controllers/ComposeShareLifecycleController.cs` — compose share cleanup + separate-password dispatch flow
+- `src/NcTalkOutlookAddIn/Controllers/EmailSignaturePlainTextController.cs` — plain-text compose signature insertion/cleanup through Outlook WordEditor signature bookmarks
 - `src/NcTalkOutlookAddIn/Controllers/TalkDescriptionTemplateController.cs` — Talk template/body block rendering
 - `src/NcTalkOutlookAddIn/Controllers/OutlookRecipientResolverController.cs` — SMTP and attendee recipient resolution
 - `src/NcTalkOutlookAddIn/Controllers/MailComposeSubscriptionRegistryController.cs` — compose-subscription registry lifecycle
@@ -120,6 +121,7 @@ Key code locations:
 - `src/NcTalkOutlookAddIn/Settings/` — persisted settings model + storage
 - `src/NcTalkOutlookAddIn/Utilities/` — logging, theming, i18n, small shared helpers
 - `src/NcTalkOutlookAddIn/Utilities/HtmlTemplateSanitizer.cs` — centralized sanitizer for backend-provided share/talk HTML templates
+- `src/NcTalkOutlookAddIn/Utilities/HtmlToPlainTextConverter.cs` — DOM-based HTML-to-plain-text rendering for plain-text email signatures
 - `src/NcTalkOutlookAddIn/Utilities/NcJson.cs` — centralized JSON payload normalization (`PrepareJsonPayload`), dictionary/string/int helpers, and OCS error extraction
 - `src/NcTalkOutlookAddIn/Utilities/DeferredAppointmentEnsureState.cs` — encapsulated pending-key tracking + throttled logging state for deferred appointment ensure
 - `src/NcTalkOutlookAddIn/Utilities/PictureConverter.cs` — shared Image -> IPictureDisp conversion helper for ribbon icons
@@ -134,13 +136,14 @@ Runtime contract:
 - Missing `policy.email_signature` support disables only central signatures and surfaces a backend update hint; Share/Talk policy domains remain independent.
 - The effective Outlook sender identity must match `policy.email_signature.user_email`; other identities are left untouched. A `SentOnBehalfOfName`/From override for shared mailboxes or delegated Exchange identities takes precedence over `SendUsingAccount` and must resolve to the same SMTP address. If the sender identity cannot be resolved exactly, signature processing fails closed.
 - Local settings `EmailSignatureOnCompose`, `EmailSignatureOnReply`, and `EmailSignatureOnForward` can disable insertion for the corresponding compose type unless the backend locks the value.
-- For the matching sender account, enabled compose signature policy also owns the initial signature slot in replies and forwards. Outlook-native or third-party signatures captured at compose open are removed only when the quoted-message boundary is structurally identifiable; otherwise the quoted message and separator are preserved.
-- When compose signature policy is inactive or the sender does not match, NC Connector removes only its own marked signature block from the current compose body. It does not remove Outlook-native or third-party signature content.
+- For HTML/RTF compose, the matching sender account owns the initial signature slot in replies and forwards. Outlook-native or third-party signatures captured at compose open are removed only when the quoted-message boundary is structurally identifiable; otherwise the quoted message and separator are preserved.
+- For plain-text compose, Outlook's body format is preserved. The sanitized backend HTML is rendered to plain text and inserted through Outlook's WordEditor signature slot (`_MailAutoSig`) or the NC Connector managed Word bookmark. Plain-text processing does not parse reply headers and does not rewrite `MailItem.Body`.
+- When compose signature policy is inactive or the sender does not match, NC Connector removes only its own marked HTML block or managed plain-text Word bookmark from the current compose item. It does not remove Outlook-native or third-party signature content.
 - Backend signature HTML is sanitized through `HtmlTemplateSanitizer` with the same fail-closed policy used by sharing and Talk templates.
-- The managed signature is written as a marked HTML block so later policy/sender changes can update or remove only NC Connector-owned content.
+- HTML/RTF signatures are written as marked HTML blocks so later policy/sender changes can update or remove only NC Connector-owned content. Plain-text signatures are tracked with the managed Word bookmark for the open compose session.
 - Signature processing only runs for unsent Outlook compose items. Opening a received or already sent message for reading must never modify its body.
-- Inline replies are tracked through Outlook's `Explorer.InlineResponse` event and written through `Explorer.ActiveInlineResponseWordEditor`; inspector compose windows keep using the normal `MailItem.HTMLBody` path. Inline signature insertion uses Outlook's active inline Word selection so quoted content and embedded images are preserved. Inline Word imports use a UTF-8 BOM HTML document so non-ASCII signature text is preserved.
-- The managed signature replaces the compose signature slot before the quoted message boundary, keeps two empty paragraphs above the signature for the sender's own text, and keeps one empty paragraph between the signature and the reply/forward separator. Text-only header markers such as `From:` or `Von:` are never used as raw cut positions.
+- Inline replies are tracked through Outlook's `Explorer.InlineResponse` event and written through `Explorer.ActiveInlineResponseWordEditor`; inspector compose windows use `MailItem.HTMLBody` for HTML/RTF and WordEditor for plain text. Inline signature insertion uses Outlook's active inline Word selection so quoted content and embedded images are preserved. Inline Word imports use a UTF-8 BOM HTML document so non-ASCII signature text is preserved.
+- The HTML/RTF managed signature replaces the compose signature slot before the quoted message boundary, keeps two empty paragraphs above the signature for the sender's own text, and keeps one empty paragraph between the signature and the reply/forward separator. Text-only header markers such as `From:` or `Von:` are never used as raw cut positions.
 
 ## Architecture
 
