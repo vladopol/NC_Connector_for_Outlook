@@ -233,6 +233,7 @@ Compose-Filelink-Paritaet (3.0.4):
 - `FileLinkHtmlBuilder` erzeugt im Attachment-Modus reduziertes HTML mit ZIP-Link `/s/<token>/download`.
 - Custom-Share-Templates aus dem Backend werden im `FileLinkHtmlBuilder` vor der Einfuegung ueber `HtmlTemplateSanitizer` bereinigt (fail-closed).
 - `FileLinkWizardForm` akzeptiert im Datei-Schritt Explorer-Drag-and-drop fuer Dateien/Ordner ueber Queue und Aktionsbereich.
+- `FileLinkService` nutzt fuer Dateien bis 20 MB einen direkten WebDAV-`PUT`. Groessere Dateien laufen ueber Nextcloud Chunked Upload v2 unter `/remote.php/dav/uploads/<user>/<upload-id>` und werden danach per `MOVE .file` an den finalen DAV-Pfad zusammengesetzt.
 
 ### Appointment-sicheres HTML-Subset fuer Talk-Templates
 

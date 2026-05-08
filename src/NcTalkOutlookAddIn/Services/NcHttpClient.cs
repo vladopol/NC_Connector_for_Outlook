@@ -25,6 +25,7 @@ namespace NcTalkOutlookAddIn.Services
             IncludeOcsApiHeader = true;
             EnableAutomaticDecompression = true;
             ParseJson = true;
+            ContentLength = -1;
         }
 
         internal string Method { get; set; }
@@ -32,6 +33,7 @@ namespace NcTalkOutlookAddIn.Services
         internal string Payload { get; set; }
         internal byte[] PayloadBytes { get; set; }
         internal Action<Stream> BodyWriter { get; set; }
+        internal long ContentLength { get; set; }
         internal string Accept { get; set; }
         internal string ContentType { get; set; }
         internal string UserAgent { get; set; }
@@ -151,6 +153,10 @@ namespace NcTalkOutlookAddIn.Services
                         ? "application/json"
                         : options.ContentType;                    if (options.BodyWriter != null)
                     {
+                        if (options.ContentLength >= 0)
+                        {
+                            request.ContentLength = options.ContentLength;
+                        }
                         using (Stream stream = request.GetRequestStream())
                         {
                             options.BodyWriter(stream);
