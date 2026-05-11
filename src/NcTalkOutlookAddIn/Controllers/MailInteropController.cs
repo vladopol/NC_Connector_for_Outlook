@@ -17,6 +17,8 @@ namespace NcTalkOutlookAddIn.Controllers
     // Keeps COM/editor-specific behavior out of the add-in orchestration root.
     internal sealed class MailInteropController
     {
+        private const string OutlookAutoSignatureBookmarkName = "_MailAutoSig";
+        private const string OutlookOriginalMessageBookmarkName = "_MailOriginal";
         private readonly NextcloudTalkAddIn _owner;
 
         internal MailInteropController(NextcloudTalkAddIn owner)
@@ -374,6 +376,243 @@ namespace NcTalkOutlookAddIn.Controllers
             }
         }
 
+        internal bool TryWriteMailHtmlBodyPreservingSelection(Outlook.MailItem mail, string html, string composeKey, string operation)
+        {
+            if (mail == null)
+            {
+                return false;
+            }
+
+            Outlook.Inspector inspector = null;
+            object wordEditor = null;
+            object wordApplication = null;
+            object selection = null;
+            WordSelectionSnapshot snapshot = null;
+
+            try
+            {
+                inspector = mail.GetInspector;
+                if (inspector != null)
+                {
+                    wordEditor = inspector.WordEditor;
+                    if (wordEditor != null)
+                    {
+                        wordApplication = wordEditor.GetType().InvokeMember("Application", BindingFlags.GetProperty, null, wordEditor, null);
+                        if (wordApplication != null)
+                        {
+                            selection = wordApplication.GetType().InvokeMember("Selection", BindingFlags.GetProperty, null, wordApplication, null);
+                            snapshot = CaptureWordSelection(selection);
+                        }
+                    }
+                }
+
+                mail.HTMLBody = html ?? string.Empty;
+
+                if (snapshot != null && wordApplication != null)
+                {
+                    ComInteropScope.TryRelease(selection, LogCategories.Core, "Failed to release pre-write Word selection COM object.");
+                    selection = wordApplication.GetType().InvokeMember("Selection", BindingFlags.GetProperty, null, wordApplication, null);
+                    RestoreWordSelection(selection, wordEditor, snapshot);
+                }
+
+                DiagnosticsLogger.Log(
+                    LogCategories.Core,
+                    "Mail HTML body written with Word selection restore (operation="
+                    + (operation ?? "n/a")
+                    + ", composeKey="
+                    + (composeKey ?? string.Empty)
+                    + ", selectionCaptured="
+                    + (snapshot != null).ToString(CultureInfo.InvariantCulture)
+                    + ").");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(
+                    LogCategories.Core,
+                    "Failed to write mail HTML body with Word selection restore (operation="
+                    + (operation ?? "n/a")
+                    + ", composeKey="
+                    + (composeKey ?? string.Empty)
+                    + ").",
+                    ex);
+                return false;
+            }
+            finally
+            {
+                ComInteropScope.TryRelease(selection, LogCategories.Core, "Failed to release Word selection COM object after HTML body write.");
+                ComInteropScope.TryRelease(wordApplication, LogCategories.Core, "Failed to release Word application COM object after HTML body write.");
+                ComInteropScope.TryRelease(wordEditor, LogCategories.Core, "Failed to release Word editor COM object after HTML body write.");
+                ComInteropScope.TryRelease(inspector, LogCategories.Core, "Failed to release Inspector COM object after HTML body write.");
+            }
+        }
+
+        private static WordSelectionSnapshot CaptureWordSelection(object selection)
+        {
+            if (selection == null)
+            {
+                return null;
+            }
+
+            object font = null;
+            try
+            {
+                var snapshot = new WordSelectionSnapshot
+                {
+                    Start = Convert.ToInt32(selection.GetType().InvokeMember("Start", BindingFlags.GetProperty, null, selection, null), CultureInfo.InvariantCulture),
+                    End = Convert.ToInt32(selection.GetType().InvokeMember("End", BindingFlags.GetProperty, null, selection, null), CultureInfo.InvariantCulture)
+                };
+
+                font = selection.GetType().InvokeMember("Font", BindingFlags.GetProperty, null, selection, null);
+                if (font != null)
+                {
+                    snapshot.FontName = ReadWordFontProperty(font, "Name");
+                    snapshot.FontNameAscii = ReadWordFontProperty(font, "NameAscii");
+                    snapshot.FontNameOther = ReadWordFontProperty(font, "NameOther");
+                    snapshot.FontNameFarEast = ReadWordFontProperty(font, "NameFarEast");
+                    snapshot.FontSize = ReadWordFontProperty(font, "Size");
+                }
+
+                return snapshot;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to capture Word selection formatting.", ex);
+                return null;
+            }
+            finally
+            {
+                ComInteropScope.TryRelease(font, LogCategories.Core, "Failed to release captured Word font COM object.");
+            }
+        }
+
+        private static string ReadWordFontProperty(object font, string propertyName)
+        {
+            try
+            {
+                object value = font.GetType().InvokeMember(propertyName, BindingFlags.GetProperty, null, font, null);
+                return value != null ? Convert.ToString(value, CultureInfo.InvariantCulture) : null;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read Word font property (" + propertyName + ").", ex);
+                return null;
+            }
+        }
+
+        private static void RestoreWordSelection(object selection, object wordEditor, WordSelectionSnapshot snapshot)
+        {
+            if (selection == null || snapshot == null)
+            {
+                return;
+            }
+
+            object font = null;
+            try
+            {
+                int documentEnd = GetWordDocumentEnd(wordEditor);
+                int start = ClampWordPosition(snapshot.Start, documentEnd);
+                int end = ClampWordPosition(snapshot.End, documentEnd);
+                if (end < start)
+                {
+                    end = start;
+                }
+
+                selection.GetType().InvokeMember("SetRange", BindingFlags.InvokeMethod, null, selection, new object[] { start, end });
+                font = selection.GetType().InvokeMember("Font", BindingFlags.GetProperty, null, selection, null);
+                if (font != null)
+                {
+                    WriteWordFontProperty(font, "Name", snapshot.FontName);
+                    WriteWordFontProperty(font, "NameAscii", snapshot.FontNameAscii);
+                    WriteWordFontProperty(font, "NameOther", snapshot.FontNameOther);
+                    WriteWordFontProperty(font, "NameFarEast", snapshot.FontNameFarEast);
+                    WriteWordFontProperty(font, "Size", snapshot.FontSize);
+                }
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to restore Word selection formatting.", ex);
+            }
+            finally
+            {
+                ComInteropScope.TryRelease(font, LogCategories.Core, "Failed to release restored Word font COM object.");
+            }
+        }
+
+        private static int GetWordDocumentEnd(object wordEditor)
+        {
+            object content = null;
+            try
+            {
+                content = wordEditor != null ? wordEditor.GetType().InvokeMember("Content", BindingFlags.GetProperty, null, wordEditor, null) : null;
+                if (content == null)
+                {
+                    return int.MaxValue;
+                }
+
+                return Convert.ToInt32(content.GetType().InvokeMember("End", BindingFlags.GetProperty, null, content, null), CultureInfo.InvariantCulture);
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read Word document end.", ex);
+                return int.MaxValue;
+            }
+            finally
+            {
+                ComInteropScope.TryRelease(content, LogCategories.Core, "Failed to release Word content COM object.");
+            }
+        }
+
+        private static int ClampWordPosition(int value, int documentEnd)
+        {
+            if (value < 0)
+            {
+                return 0;
+            }
+
+            if (documentEnd >= 0 && value > documentEnd)
+            {
+                return documentEnd;
+            }
+
+            return value;
+        }
+
+        private static void WriteWordFontProperty(object font, string propertyName, string value)
+        {
+            if (font == null || string.IsNullOrWhiteSpace(value))
+            {
+                return;
+            }
+
+            try
+            {
+                object typedValue = value;
+                float fontSize;
+                if (string.Equals(propertyName, "Size", StringComparison.OrdinalIgnoreCase)
+                    && float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out fontSize))
+                {
+                    typedValue = fontSize;
+                }
+                font.GetType().InvokeMember(propertyName, BindingFlags.SetProperty, null, font, new[] { typedValue });
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to restore Word font property (" + propertyName + ").", ex);
+            }
+        }
+
+        private sealed class WordSelectionSnapshot
+        {
+            internal int Start;
+            internal int End;
+            internal string FontName;
+            internal string FontNameAscii;
+            internal string FontNameOther;
+            internal string FontNameFarEast;
+            internal string FontSize;
+        }
+
         internal bool TryReplaceActiveInlineResponseSignatureSlot(Outlook.MailItem mail, string html, string composeKey, string operation)
         {
             if (mail == null)
@@ -479,9 +718,55 @@ namespace NcTalkOutlookAddIn.Controllers
                 int selectionEnd = Convert.ToInt32(
                     selection.GetType().InvokeMember("End", BindingFlags.GetProperty, null, selection, null),
                     CultureInfo.InvariantCulture);
+                int originalSelectionStart = selectionStart;
+                string signatureSlotSource;
+                bool signatureSlotSelected = TrySelectInlineSignatureSlot(
+                    wordEditor,
+                    selection,
+                    out selectionStart,
+                    out selectionEnd,
+                    out signatureSlotSource);
+                if (!signatureSlotSelected)
+                {
+                    DiagnosticsLogger.Log(
+                        LogCategories.Core,
+                        "Inline response signature slot write skipped (operation="
+                        + (operation ?? "n/a")
+                        + ", composeKey="
+                        + (composeKey ?? string.Empty)
+                        + ", reason=signature_boundary_unavailable).");
+                    return false;
+                }
 
                 if (!string.IsNullOrWhiteSpace(html))
                 {
+                    int replyCursorStart = originalSelectionStart < selectionStart ? originalSelectionStart : selectionStart;
+                    if (signatureSlotSelected && selectionEnd > selectionStart)
+                    {
+                        bool deletedTable = TryDeleteContainingTableAtRange(wordEditor, selectionStart, selectionEnd);
+                        if (deletedTable)
+                        {
+                            signatureSlotSource = (signatureSlotSource ?? "mail_auto_sig") + "_table_deleted";
+                        }
+                        if (!deletedTable)
+                        {
+                            selection.GetType().InvokeMember(
+                                "Delete",
+                                BindingFlags.InvokeMethod,
+                                null,
+                                selection,
+                                null);
+                        }
+                        selection.GetType().InvokeMember(
+                            "SetRange",
+                            BindingFlags.InvokeMethod,
+                            null,
+                            selection,
+                            new object[] { selectionStart, selectionStart });
+                    }
+                    selection.GetType().InvokeMember("TypeParagraph", BindingFlags.InvokeMethod, null, selection, null);
+                    selection.GetType().InvokeMember("TypeParagraph", BindingFlags.InvokeMethod, null, selection, null);
+
                     tempHtmlPath = Path.Combine(
                         Path.GetTempPath(),
                         "nc4ol-inline-signature-" + Guid.NewGuid().ToString("N") + ".html");
@@ -492,6 +777,29 @@ namespace NcTalkOutlookAddIn.Controllers
                         null,
                         selection,
                         new object[] { tempHtmlPath, Type.Missing, false, false, false });
+                    selection.GetType().InvokeMember(
+                        "SetRange",
+                        BindingFlags.InvokeMethod,
+                        null,
+                        selection,
+                        new object[] { replyCursorStart, replyCursorStart });
+                }
+                else if (signatureSlotSelected && selectionEnd > selectionStart)
+                {
+                    bool deletedTable = TryDeleteContainingTableAtRange(wordEditor, selectionStart, selectionEnd);
+                    if (deletedTable)
+                    {
+                        signatureSlotSource = (signatureSlotSource ?? "mail_auto_sig") + "_table_deleted";
+                    }
+                    if (!deletedTable)
+                    {
+                        selection.GetType().InvokeMember(
+                            "Delete",
+                            BindingFlags.InvokeMethod,
+                            null,
+                            selection,
+                            null);
+                    }
                     selection.GetType().InvokeMember(
                         "SetRange",
                         BindingFlags.InvokeMethod,
@@ -509,6 +817,12 @@ namespace NcTalkOutlookAddIn.Controllers
                     + selectionStart.ToString(CultureInfo.InvariantCulture)
                     + ", selectionEnd="
                     + selectionEnd.ToString(CultureInfo.InvariantCulture)
+                    + ", replyCursorStart="
+                    + (string.IsNullOrWhiteSpace(html) ? "n/a" : (originalSelectionStart < selectionStart ? originalSelectionStart : selectionStart).ToString(CultureInfo.InvariantCulture))
+                    + ", signatureSlotSelected="
+                    + signatureSlotSelected.ToString(CultureInfo.InvariantCulture)
+                    + ", signatureSlotSource="
+                    + (signatureSlotSource ?? "n/a")
                     + ").");
                 return true;
             }
@@ -546,6 +860,546 @@ namespace NcTalkOutlookAddIn.Controllers
                     ComInteropScope.TryRelease(activeInlineMail, LogCategories.Core, "Failed to release ActiveInlineResponse MailItem COM object.");
                 }
                 ComInteropScope.TryRelease(explorer, LogCategories.Core, "Failed to release active Explorer COM object.");
+            }
+        }
+
+        private static bool TrySelectInlineSignatureSlot(
+            object wordEditor,
+            object selection,
+            out int selectionStart,
+            out int selectionEnd,
+            out string source)
+        {
+            selectionStart = 0;
+            selectionEnd = 0;
+            source = "none";
+            if (wordEditor == null || selection == null)
+            {
+                return false;
+            }
+
+            object bookmarks = null;
+            try
+            {
+                bookmarks = wordEditor.GetType().InvokeMember("Bookmarks", BindingFlags.GetProperty, null, wordEditor, null);
+                if (bookmarks == null)
+                {
+                    return false;
+                }
+
+                TryShowHiddenBookmarks(bookmarks);
+
+                int autoSignatureStart;
+                int autoSignatureEnd;
+                int originalStart;
+                int originalEnd;
+                bool hasAutoSignature = TryGetBookmarkRange(
+                    bookmarks,
+                    OutlookAutoSignatureBookmarkName,
+                    out autoSignatureStart,
+                    out autoSignatureEnd);
+                bool hasOriginalMessage = TryGetBookmarkRange(
+                    bookmarks,
+                    OutlookOriginalMessageBookmarkName,
+                    out originalStart,
+                    out originalEnd);
+                if (hasAutoSignature)
+                {
+                    selectionStart = autoSignatureStart;
+                    selectionEnd = autoSignatureEnd;
+                    source = "mail_auto_sig";
+
+                    int tableStart;
+                    int tableEnd;
+                    if (TryExpandRangeToContainingTable(wordEditor, selectionStart, selectionEnd, out tableStart, out tableEnd))
+                    {
+                        selectionStart = tableStart;
+                        selectionEnd = tableEnd;
+                        source = "mail_auto_sig_table";
+                    }
+
+                    if (hasOriginalMessage)
+                    {
+                        int protectedOriginalStart = Math.Max(selectionStart, originalStart - 2);
+                        if (protectedOriginalStart < selectionEnd)
+                        {
+                            selectionEnd = protectedOriginalStart;
+                            source = "mail_auto_sig_clamped_before_mail_original";
+                        }
+                        else if (protectedOriginalStart > selectionEnd)
+                        {
+                            selectionEnd = protectedOriginalStart;
+                            source = "mail_auto_sig_extended_to_mail_original_gap";
+                        }
+                    }
+                    else
+                    {
+                        int separatorStart;
+                        if (TryFindInlineQuoteSeparatorStart(wordEditor, selectionEnd, out separatorStart)
+                            && separatorStart > selectionEnd)
+                        {
+                            selectionEnd = separatorStart;
+                            source = "mail_auto_sig_extended_to_quote_separator";
+                        }
+                    }
+                }
+                else if (hasOriginalMessage)
+                {
+                    selectionStart = Math.Max(0, originalStart - 2);
+                    selectionEnd = selectionStart;
+                    source = "mail_original_insert";
+                }
+                else
+                {
+                    return false;
+                }
+
+                if (selectionEnd < selectionStart)
+                {
+                    int swap = selectionStart;
+                    selectionStart = selectionEnd;
+                    selectionEnd = swap;
+                }
+
+                selection.GetType().InvokeMember(
+                    "SetRange",
+                    BindingFlags.InvokeMethod,
+                    null,
+                    selection,
+                    new object[] { selectionStart, selectionEnd });
+                return true;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to select Outlook auto-signature bookmark for inline response.", ex);
+                return false;
+            }
+            finally
+            {
+                ComInteropScope.TryRelease(bookmarks, LogCategories.Core, "Failed to release inline signature bookmarks COM object.");
+            }
+        }
+
+        private static void TryShowHiddenBookmarks(object bookmarks)
+        {
+            if (bookmarks == null)
+            {
+                return;
+            }
+
+            try
+            {
+                bookmarks.GetType().InvokeMember(
+                    "ShowHidden",
+                    BindingFlags.SetProperty,
+                    null,
+                    bookmarks,
+                    new object[] { true });
+            }
+            catch (Exception error)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to show hidden Outlook Word bookmarks.", error);
+            }
+        }
+
+        private static bool TryGetBookmarkRange(object bookmarks, string bookmarkName, out int start, out int end)
+        {
+            start = 0;
+            end = 0;
+            if (bookmarks == null || string.IsNullOrEmpty(bookmarkName))
+            {
+                return false;
+            }
+
+            object bookmark = null;
+            object range = null;
+            try
+            {
+                object exists = bookmarks.GetType().InvokeMember(
+                    "Exists",
+                    BindingFlags.InvokeMethod,
+                    null,
+                    bookmarks,
+                    new object[] { bookmarkName });
+                if (!(exists is bool) || !(bool)exists)
+                {
+                    return false;
+                }
+
+                bookmark = bookmarks.GetType().InvokeMember(
+                    "Item",
+                    BindingFlags.InvokeMethod,
+                    null,
+                    bookmarks,
+                    new object[] { bookmarkName });
+                if (bookmark == null)
+                {
+                    return false;
+                }
+
+                range = bookmark.GetType().InvokeMember("Range", BindingFlags.GetProperty, null, bookmark, null);
+                if (range == null)
+                {
+                    return false;
+                }
+
+                start = Convert.ToInt32(
+                    range.GetType().InvokeMember("Start", BindingFlags.GetProperty, null, range, null),
+                    CultureInfo.InvariantCulture);
+                end = Convert.ToInt32(
+                    range.GetType().InvokeMember("End", BindingFlags.GetProperty, null, range, null),
+                    CultureInfo.InvariantCulture);
+                return true;
+            }
+            catch (Exception error)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read Outlook Word bookmark range (" + bookmarkName + ").", error);
+                return false;
+            }
+            finally
+            {
+                ComInteropScope.TryRelease(range, LogCategories.Core, "Failed to release inline signature bookmark range COM object.");
+                ComInteropScope.TryRelease(bookmark, LogCategories.Core, "Failed to release inline signature bookmark COM object.");
+            }
+        }
+
+        private static bool TryExpandRangeToContainingTable(object wordEditor, int start, int end, out int tableStart, out int tableEnd)
+        {
+            tableStart = 0;
+            tableEnd = 0;
+            if (wordEditor == null)
+            {
+                return false;
+            }
+
+            object range = null;
+            object tables = null;
+            object table = null;
+            object tableRange = null;
+            try
+            {
+                range = wordEditor.GetType().InvokeMember(
+                    "Range",
+                    BindingFlags.InvokeMethod,
+                    null,
+                    wordEditor,
+                    new object[] { start, Math.Max(start, end) });
+                if (range == null)
+                {
+                    return false;
+                }
+
+                tables = range.GetType().InvokeMember("Tables", BindingFlags.GetProperty, null, range, null);
+                if (tables == null)
+                {
+                    return false;
+                }
+
+                int count = Convert.ToInt32(
+                    tables.GetType().InvokeMember("Count", BindingFlags.GetProperty, null, tables, null),
+                    CultureInfo.InvariantCulture);
+                if (count <= 0)
+                {
+                    return false;
+                }
+
+                table = tables.GetType().InvokeMember("Item", BindingFlags.InvokeMethod, null, tables, new object[] { 1 });
+                if (table == null)
+                {
+                    return false;
+                }
+
+                tableRange = table.GetType().InvokeMember("Range", BindingFlags.GetProperty, null, table, null);
+                if (tableRange == null)
+                {
+                    return false;
+                }
+
+                tableStart = Convert.ToInt32(
+                    tableRange.GetType().InvokeMember("Start", BindingFlags.GetProperty, null, tableRange, null),
+                    CultureInfo.InvariantCulture);
+                tableEnd = Convert.ToInt32(
+                    tableRange.GetType().InvokeMember("End", BindingFlags.GetProperty, null, tableRange, null),
+                    CultureInfo.InvariantCulture);
+                return tableEnd > tableStart && tableStart <= start && tableEnd >= end;
+            }
+            catch (Exception error)
+            {
+                GC.KeepAlive(error);
+                return false;
+            }
+            finally
+            {
+                ComInteropScope.TryRelease(tableRange, LogCategories.Core, "Failed to release inline signature table range COM object.");
+                ComInteropScope.TryRelease(table, LogCategories.Core, "Failed to release inline signature table COM object.");
+                ComInteropScope.TryRelease(tables, LogCategories.Core, "Failed to release inline signature tables COM object.");
+                ComInteropScope.TryRelease(range, LogCategories.Core, "Failed to release inline signature range COM object.");
+            }
+        }
+
+        private static bool TryDeleteContainingTableAtRange(object wordEditor, int start, int end)
+        {
+            if (wordEditor == null)
+            {
+                return false;
+            }
+
+            object table = null;
+            try
+            {
+                table = TryGetContainingTableAtRange(wordEditor, start, end);
+                if (table == null)
+                {
+                    return false;
+                }
+
+                table.GetType().InvokeMember("Delete", BindingFlags.InvokeMethod, null, table, null);
+                return true;
+            }
+            catch (Exception error)
+            {
+                GC.KeepAlive(error);
+                return false;
+            }
+            finally
+            {
+                ComInteropScope.TryRelease(table, LogCategories.Core, "Failed to release inline signature table COM object.");
+            }
+        }
+
+        private static object TryGetContainingTableAtRange(object wordEditor, int start, int end)
+        {
+            if (wordEditor == null)
+            {
+                return null;
+            }
+
+            object range = null;
+            object tables = null;
+            object cells = null;
+            object cell = null;
+            object cellRange = null;
+            object cellTables = null;
+            try
+            {
+                range = wordEditor.GetType().InvokeMember(
+                    "Range",
+                    BindingFlags.InvokeMethod,
+                    null,
+                    wordEditor,
+                    new object[] { start, Math.Max(start + 1, end) });
+                if (range == null)
+                {
+                    return null;
+                }
+
+                tables = range.GetType().InvokeMember("Tables", BindingFlags.GetProperty, null, range, null);
+                if (tables != null
+                    && Convert.ToInt32(tables.GetType().InvokeMember("Count", BindingFlags.GetProperty, null, tables, null), CultureInfo.InvariantCulture) > 0)
+                {
+                    return tables.GetType().InvokeMember("Item", BindingFlags.InvokeMethod, null, tables, new object[] { 1 });
+                }
+
+                cells = range.GetType().InvokeMember("Cells", BindingFlags.GetProperty, null, range, null);
+                if (cells == null
+                    || Convert.ToInt32(cells.GetType().InvokeMember("Count", BindingFlags.GetProperty, null, cells, null), CultureInfo.InvariantCulture) <= 0)
+                {
+                    return null;
+                }
+
+                cell = cells.GetType().InvokeMember("Item", BindingFlags.InvokeMethod, null, cells, new object[] { 1 });
+                if (cell == null)
+                {
+                    return null;
+                }
+
+                cellRange = cell.GetType().InvokeMember("Range", BindingFlags.GetProperty, null, cell, null);
+                if (cellRange == null)
+                {
+                    return null;
+                }
+
+                cellTables = cellRange.GetType().InvokeMember("Tables", BindingFlags.GetProperty, null, cellRange, null);
+                if (cellTables == null
+                    || Convert.ToInt32(cellTables.GetType().InvokeMember("Count", BindingFlags.GetProperty, null, cellTables, null), CultureInfo.InvariantCulture) <= 0)
+                {
+                    return null;
+                }
+
+                return cellTables.GetType().InvokeMember("Item", BindingFlags.InvokeMethod, null, cellTables, new object[] { 1 });
+            }
+            catch (Exception error)
+            {
+                GC.KeepAlive(error);
+                return null;
+            }
+            finally
+            {
+                ComInteropScope.TryRelease(cellTables, LogCategories.Core, "Failed to release inline signature cell tables COM object.");
+                ComInteropScope.TryRelease(cellRange, LogCategories.Core, "Failed to release inline signature cell range COM object.");
+                ComInteropScope.TryRelease(cell, LogCategories.Core, "Failed to release inline signature cell COM object.");
+                ComInteropScope.TryRelease(cells, LogCategories.Core, "Failed to release inline signature cells COM object.");
+                ComInteropScope.TryRelease(tables, LogCategories.Core, "Failed to release inline signature tables COM object.");
+                ComInteropScope.TryRelease(range, LogCategories.Core, "Failed to release inline signature range COM object.");
+            }
+        }
+
+        private static bool TryFindInlineQuoteSeparatorStart(object wordEditor, int searchStart, out int separatorStart)
+        {
+            separatorStart = 0;
+            if (wordEditor == null)
+            {
+                return false;
+            }
+
+            object content = null;
+            object tailRange = null;
+            object paragraphs = null;
+            try
+            {
+                content = wordEditor.GetType().InvokeMember("Content", BindingFlags.GetProperty, null, wordEditor, null);
+                if (content == null)
+                {
+                    return false;
+                }
+
+                int documentEnd = Convert.ToInt32(
+                    content.GetType().InvokeMember("End", BindingFlags.GetProperty, null, content, null),
+                    CultureInfo.InvariantCulture);
+                if (documentEnd <= searchStart)
+                {
+                    return false;
+                }
+
+                tailRange = wordEditor.GetType().InvokeMember(
+                    "Range",
+                    BindingFlags.InvokeMethod,
+                    null,
+                    wordEditor,
+                    new object[] { searchStart, documentEnd });
+                paragraphs = tailRange.GetType().InvokeMember("Paragraphs", BindingFlags.GetProperty, null, tailRange, null);
+                if (paragraphs == null)
+                {
+                    return false;
+                }
+
+                int count = Convert.ToInt32(
+                    paragraphs.GetType().InvokeMember("Count", BindingFlags.GetProperty, null, paragraphs, null),
+                    CultureInfo.InvariantCulture);
+                int maxParagraphsToInspect = Math.Min(count, 80);
+                for (int i = 1; i <= maxParagraphsToInspect; i++)
+                {
+                    object paragraph = null;
+                    object paragraphRange = null;
+                    try
+                    {
+                        paragraph = paragraphs.GetType().InvokeMember("Item", BindingFlags.InvokeMethod, null, paragraphs, new object[] { i });
+                        if (paragraph == null)
+                        {
+                            continue;
+                        }
+
+                        paragraphRange = paragraph.GetType().InvokeMember("Range", BindingFlags.GetProperty, null, paragraph, null);
+                        if (paragraphRange == null)
+                        {
+                            continue;
+                        }
+
+                        int paragraphStart = Convert.ToInt32(
+                            paragraphRange.GetType().InvokeMember("Start", BindingFlags.GetProperty, null, paragraphRange, null),
+                            CultureInfo.InvariantCulture);
+                        int paragraphEnd = Convert.ToInt32(
+                            paragraphRange.GetType().InvokeMember("End", BindingFlags.GetProperty, null, paragraphRange, null),
+                            CultureInfo.InvariantCulture);
+                        if (paragraphEnd <= searchStart)
+                        {
+                            continue;
+                        }
+
+                        if (ParagraphHasVisibleBorder(paragraph))
+                        {
+                            separatorStart = Math.Max(searchStart, paragraphStart);
+                            return true;
+                        }
+                    }
+                    finally
+                    {
+                        ComInteropScope.TryRelease(paragraphRange, LogCategories.Core, "Failed to release inline quote separator paragraph range COM object.");
+                        ComInteropScope.TryRelease(paragraph, LogCategories.Core, "Failed to release inline quote separator paragraph COM object.");
+                    }
+                }
+
+                return false;
+            }
+            catch (Exception error)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to find inline reply quote separator.", error);
+                return false;
+            }
+            finally
+            {
+                ComInteropScope.TryRelease(paragraphs, LogCategories.Core, "Failed to release inline quote separator paragraphs COM object.");
+                ComInteropScope.TryRelease(tailRange, LogCategories.Core, "Failed to release inline quote separator tail range COM object.");
+                ComInteropScope.TryRelease(content, LogCategories.Core, "Failed to release inline quote separator content COM object.");
+            }
+        }
+
+        private static bool ParagraphHasVisibleBorder(object paragraph)
+        {
+            if (paragraph == null)
+            {
+                return false;
+            }
+
+            object borders = null;
+            try
+            {
+                borders = paragraph.GetType().InvokeMember("Borders", BindingFlags.GetProperty, null, paragraph, null);
+                if (borders == null)
+                {
+                    return false;
+                }
+
+                return BorderAtIndexIsVisible(borders, -1)
+                       || BorderAtIndexIsVisible(borders, -3)
+                       || BorderAtIndexIsVisible(borders, -5);
+            }
+            catch (Exception error)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to inspect inline reply paragraph borders.", error);
+                return false;
+            }
+            finally
+            {
+                ComInteropScope.TryRelease(borders, LogCategories.Core, "Failed to release inline reply paragraph borders COM object.");
+            }
+        }
+
+        private static bool BorderAtIndexIsVisible(object borders, int index)
+        {
+            object border = null;
+            try
+            {
+                border = borders.GetType().InvokeMember("Item", BindingFlags.InvokeMethod, null, borders, new object[] { index });
+                if (border == null)
+                {
+                    return false;
+                }
+
+                object lineStyle = border.GetType().InvokeMember("LineStyle", BindingFlags.GetProperty, null, border, null);
+                int value;
+                return lineStyle != null
+                       && int.TryParse(Convert.ToString(lineStyle, CultureInfo.InvariantCulture), NumberStyles.Integer, CultureInfo.InvariantCulture, out value)
+                       && value != 0;
+            }
+            catch (Exception error)
+            {
+                GC.KeepAlive(error);
+                return false;
+            }
+            finally
+            {
+                ComInteropScope.TryRelease(border, LogCategories.Core, "Failed to release inline reply border COM object.");
             }
         }
 

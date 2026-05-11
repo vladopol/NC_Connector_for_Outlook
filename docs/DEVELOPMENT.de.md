@@ -189,7 +189,7 @@ Utilities:
 
 Die Compose-Subscription prueft die Backend-Policy fuer die zentrale E-Mail-Signatur nach dem Oeffnen eines Compose-Fensters und wenn Outlook senderbezogene Eigenschaften aendert.
 
-Runtime-Vertrag:
+Runtime-Regeln:
 
 - Backend-Signatur-Einfuegung benoetigt eine aktive Backend-Policy fuer die Domain `email_signature`, einen aktiven zugewiesenen Seat, ein nicht leeres `policy.email_signature.email_signature_template` und `policy.email_signature.user_email`.
 - Fehlende `policy.email_signature`-Unterstuetzung deaktiviert nur zentrale Signaturen und zeigt einen Backend-Update-Hinweis; Freigabe-/Talk-Policy-Domains bleiben unabhaengig.
@@ -201,8 +201,10 @@ Runtime-Vertrag:
 - Backend-Signatur-HTML laeuft durch `HtmlTemplateSanitizer` mit derselben fail-closed Policy wie Freigabe- und Talk-Templates.
 - HTML/RTF-Signaturen werden als markierte HTML-Bloecke geschrieben, damit spaetere Policy-/Sender-Aenderungen gezielt nur NC-Connector-eigene Inhalte aktualisieren oder entfernen. Plain-Text-Signaturen werden fuer die offene Compose-Session ueber das verwaltete Word-Bookmark verfolgt.
 - Signaturverarbeitung laeuft nur fuer ungesendete Outlook-Compose-Items. Das Oeffnen einer empfangenen oder bereits gesendeten Nachricht zum Lesen darf den Body nie veraendern.
-- Inline-Antworten werden ueber Outlooks `Explorer.InlineResponse`-Event verfolgt und ueber `Explorer.ActiveInlineResponseWordEditor` geschrieben; Inspector-Compose-Fenster nutzen fuer HTML/RTF `MailItem.HTMLBody` und fuer Plain Text WordEditor. Inline-Signatureinfuegung verwendet Outlooks aktive Inline-Word-Selection, damit zitierter Inhalt und eingebettete Bilder erhalten bleiben. Inline-Word-Importe verwenden ein UTF-8-BOM-HTML-Dokument, damit Nicht-ASCII-Zeichen in Signaturen erhalten bleiben.
-- Die HTML/RTF-Signatur ersetzt den Compose-Signaturplatz vor der zitierten Nachrichtengrenze, behaelt zwei leere Absaetze ueber der Signatur fuer eigenen Text und eine leere Zeile zwischen Signatur und Antwort-/Weiterleitungs-Trenner. Reine Textmarker wie `From:` oder `Von:` werden nie als direkte Schnittposition benutzt.
+- Inspector-Compose-Fenster nutzen fuer HTML/RTF `MailItem.HTMLBody` und fuer Plain Text WordEditor. Der HTML/RTF-Pfad merkt sich vor dem Body-Rewrite die aktive Word-Auswahl und stellt danach die Auswahl-Schrift wieder her, damit Outlooks aktuelle Schreibschrift aktiv bleibt.
+- Inline-Antworten werden ueber Outlooks `Explorer.InlineResponse`-Event verfolgt und ueber `Explorer.ActiveInlineResponseWordEditor` geschrieben. Inline-Word-Importe verwenden ein UTF-8-BOM-HTML-Dokument, damit Nicht-ASCII-Zeichen in Signaturen erhalten bleiben.
+- Inline-HTML/RTF-Ersetzung nutzt Outlooks versteckte Word-Bookmarks `_MailAutoSig` und `_MailOriginal`. Wenn `_MailOriginal` fehlt, wird der Trenner zur zitierten Nachricht ueber Word-Absatzrahmen erkannt. Tabellenbasierte Outlook- oder Drittanbieter-Signaturen werden mit `Word.Table.Delete()` entfernt, wenn das Signatur-Bookmark in einer Tabelle liegt. Reine Textmarker wie `From:` oder `Von:` werden nie als Schnittposition benutzt.
+- Die HTML/RTF-Signatur ersetzt den Compose-Signaturplatz vor der zitierten Nachrichtengrenze, behaelt zwei leere Absaetze ueber der Signatur fuer eigenen Text und eine leere Zeile zwischen Signatur und Antwort-/Weiterleitungs-Trenner.
 
 Compose-Filelink-Paritaet (3.0.4):
 
