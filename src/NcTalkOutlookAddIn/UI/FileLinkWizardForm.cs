@@ -64,6 +64,7 @@ namespace NcTalkOutlookAddIn.UI
         private readonly ProgressBar _progressBar = new ProgressBar();
         private readonly Label _progressLabel = new Label();
         private readonly PathScrollableListView _fileListView = new PathScrollableListView();
+        private readonly ImageList _fileListRowHeightImageList = new ImageList();
         private readonly Label _basePathLabel = new Label();
         private readonly Label _shareNameLabel = new Label();
         private readonly Label _permissionsLabel = new Label();
@@ -340,6 +341,7 @@ namespace NcTalkOutlookAddIn.UI
         {
             ResetUploadProgressPump();
             _uploadProgressFlushTimer.Dispose();
+            _fileListRowHeightImageList.Dispose();
             TryCleanupUnfinalizedUploadContext("wizard_closed_without_finalize");
             base.OnFormClosed(e);
         }
@@ -843,6 +845,7 @@ namespace NcTalkOutlookAddIn.UI
             _fileListView.DrawItem += HandleFileListViewDrawItem;
             _fileListView.DrawSubItem += HandleFileListViewDrawSubItem;
             _fileListView.HorizontalWheelHandler = HandlePathColumnMouseWheel;
+            ConfigureFileListViewRowHeight();
             _fileStepContentLayout.Controls.Add(_fileListView, 0, 0);
 
             _fileStepActionPanel.FlowDirection = FlowDirection.TopDown;
@@ -2037,6 +2040,20 @@ namespace NcTalkOutlookAddIn.UI
             }
         }
 
+        private void ConfigureFileListViewRowHeight()
+        {
+            if (_fileListView == null || _fileListView.IsDisposed || _fileListView.Disposing)
+            {
+                return;
+            }
+            int rowHeight = Math.Max(ScaleLogical(30), 30);
+            _fileListRowHeightImageList.ColorDepth = ColorDepth.Depth32Bit;
+            _fileListRowHeightImageList.ImageSize = new Size(1, rowHeight);
+            _fileListRowHeightImageList.Images.Clear();
+            _fileListRowHeightImageList.Images.Add(new Bitmap(1, rowHeight));
+            _fileListView.SmallImageList = _fileListRowHeightImageList;
+        }
+
         private ProgressBar CreateProgressBar()
         {
             var bar = new ProgressBar
@@ -2363,6 +2380,7 @@ namespace NcTalkOutlookAddIn.UI
             UpdateStepHostBounds();
             LayoutCurrentStep();
             LayoutProgressPanel();
+            ConfigureFileListViewRowHeight();
             PositionProgressBars();
             Invalidate(true);
         }
@@ -2515,7 +2533,7 @@ namespace NcTalkOutlookAddIn.UI
             _uploadInProgress = uploading;
             UpdateNavigationState();
             UpdateUploadButtonState();
-            _cancelButton.Enabled = !uploading;
+            _cancelButton.Enabled = true;
         }
 
                 // Asks whether to continue without prepared uploads.

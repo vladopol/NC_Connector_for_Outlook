@@ -130,7 +130,7 @@ Key code locations:
 
 The compose subscription checks backend policy for the central email signature after a compose window opens and when Outlook changes sender-related properties.
 
-Runtime contract:
+Runtime rules:
 
 - Backend signature insertion requires an active backend policy for the `email_signature` domain, an active assigned seat, non-empty `policy.email_signature.email_signature_template`, and `policy.email_signature.user_email`.
 - Missing `policy.email_signature` support disables only central signatures and surfaces a backend update hint; Share/Talk policy domains remain independent.
@@ -142,8 +142,10 @@ Runtime contract:
 - Backend signature HTML is sanitized through `HtmlTemplateSanitizer` with the same fail-closed policy used by sharing and Talk templates.
 - HTML/RTF signatures are written as marked HTML blocks so later policy/sender changes can update or remove only NC Connector-owned content. Plain-text signatures are tracked with the managed Word bookmark for the open compose session.
 - Signature processing only runs for unsent Outlook compose items. Opening a received or already sent message for reading must never modify its body.
-- Inline replies are tracked through Outlook's `Explorer.InlineResponse` event and written through `Explorer.ActiveInlineResponseWordEditor`; inspector compose windows use `MailItem.HTMLBody` for HTML/RTF and WordEditor for plain text. Inline signature insertion uses Outlook's active inline Word selection so quoted content and embedded images are preserved. Inline Word imports use a UTF-8 BOM HTML document so non-ASCII signature text is preserved.
-- The HTML/RTF managed signature replaces the compose signature slot before the quoted message boundary, keeps two empty paragraphs above the signature for the sender's own text, and keeps one empty paragraph between the signature and the reply/forward separator. Text-only header markers such as `From:` or `Von:` are never used as raw cut positions.
+- Inspector compose windows use `MailItem.HTMLBody` for HTML/RTF and WordEditor for plain text. The HTML/RTF path captures the active Word selection before a body rewrite and restores the selection font afterwards, so Outlook's current compose font stays active.
+- Inline replies are tracked through Outlook's `Explorer.InlineResponse` event and written through `Explorer.ActiveInlineResponseWordEditor`. Inline Word imports use a UTF-8 BOM HTML document so non-ASCII signature text is preserved.
+- Inline HTML/RTF replacement uses Outlook's hidden `_MailAutoSig` and `_MailOriginal` Word bookmarks. If `_MailOriginal` is unavailable, the quoted-message separator is detected from Word paragraph borders. Table-based Outlook or third-party signatures are removed through `Word.Table.Delete()` when the signature bookmark sits inside a table. Text-only header markers such as `From:` or `Von:` are never used as cut positions.
+- The HTML/RTF managed signature replaces the compose signature slot before the quoted message boundary, keeps two empty paragraphs above the signature for the sender's own text, and keeps one empty paragraph between the signature and the reply/forward separator.
 
 ## Architecture
 
