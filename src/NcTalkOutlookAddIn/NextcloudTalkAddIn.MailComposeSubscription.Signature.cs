@@ -178,7 +178,7 @@ namespace NcTalkOutlookAddIn
                 TryGetComposeSignatureSlotBounds(existing, out slotStart, out slotEnd, out hasQuoteBoundary);
                 string managedBlock = BuildManagedSignatureBlock(sanitizedHtml, hasQuoteBoundary);
                 string inlineManagedBlock = _isInlineResponse
-                    ? BuildManagedSignatureBlock(sanitizedHtml, false)
+                    ? BuildManagedSignatureBlock(sanitizedHtml, false, true)
                     : managedBlock;
                 bool replacedManaged;
                 string updated = ReplaceManagedSignatureBlocks(existing, managedBlock, out replacedManaged);
@@ -459,6 +459,15 @@ namespace NcTalkOutlookAddIn
             {
                 if (!_isInlineResponse)
                 {
+                    if (_owner != null && _owner._mailInteropController != null)
+                    {
+                        return _owner._mailInteropController.TryWriteMailHtmlBodyPreservingSelection(
+                            _mail,
+                            html ?? string.Empty,
+                            _composeKey,
+                            operation);
+                    }
+
                     _mail.HTMLBody = html ?? string.Empty;
                     return true;
                 }
@@ -483,13 +492,17 @@ namespace NcTalkOutlookAddIn
 
             private static string BuildManagedSignatureBlock(string sanitizedHtml, bool addTrailingQuoteGap)
             {
+                return BuildManagedSignatureBlock(sanitizedHtml, true, addTrailingQuoteGap);
+            }
+
+            private static string BuildManagedSignatureBlock(string sanitizedHtml, bool addLeadingReplyGap, bool addTrailingQuoteGap)
+            {
                 string html = sanitizedHtml ?? string.Empty;
                 string hash = ComputeSignatureHash(html);
                 return ManagedSignatureStartPrefix
                        + hash
                        + " -->"
-                       + "<p style=\"margin:0;\"><br /></p>"
-                       + "<p style=\"margin:0;\"><br /></p>"
+                       + (addLeadingReplyGap ? "<p style=\"margin:0;\"><br /></p><p style=\"margin:0;\"><br /></p>" : string.Empty)
                        + "<div data-nc-connector-signature=\"true\">"
                        + html
                        + "</div>"
