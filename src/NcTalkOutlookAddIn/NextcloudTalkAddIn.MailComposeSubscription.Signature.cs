@@ -22,6 +22,8 @@ namespace NcTalkOutlookAddIn
         {
             private const string ManagedSignatureStartPrefix = "<!-- nc-connector-signature:start hash=";
             private const string ManagedSignatureEnd = "<!-- nc-connector-signature:end -->";
+            private const string ReplyComposeEditGapHtml = "<p style=\"margin:0;\"><br /></p><p style=\"margin:0;\"><br /></p>";
+            private const string ReplyComposeQuoteGapHtml = "<p style=\"margin:0;\"><br /></p>";
 
             private static readonly Regex ManagedSignatureBlockRegex = new Regex(
                 @"<!--\s*nc-connector-signature:start\b[^>]*-->.*?<!--\s*nc-connector-signature:end\s*-->",
@@ -32,7 +34,8 @@ namespace NcTalkOutlookAddIn
                 Unknown,
                 New,
                 Reply,
-                Forward
+                Forward,
+                Response
             }
 
             private void ScheduleEmailSignatureApplication(string reason)
@@ -125,6 +128,25 @@ namespace NcTalkOutlookAddIn
                 EmailSignatureComposeKind composeKind = ResolveEmailSignatureComposeKind();
                 bool shouldInsert = ShouldInsertEmailSignature(policy, composeKind);
                 bool shouldClearForeign = ShouldClearForeignEmailSignature(policy, composeKind);
+                if (DiagnosticsLogger.IsEnabled)
+                {
+                    LogEmailSignature(
+                        "Email signature decision (trigger="
+                        + (reason ?? "n/a")
+                        + ", kind="
+                        + composeKind
+                        + ", onCompose="
+                        + policy.OnCompose.ToString(CultureInfo.InvariantCulture)
+                        + ", onReply="
+                        + policy.OnReply.ToString(CultureInfo.InvariantCulture)
+                        + ", onForward="
+                        + policy.OnForward.ToString(CultureInfo.InvariantCulture)
+                        + ", shouldInsert="
+                        + shouldInsert.ToString(CultureInfo.InvariantCulture)
+                        + ", shouldClearForeign="
+                        + shouldClearForeign.ToString(CultureInfo.InvariantCulture)
+                        + ").");
+                }
                 if (!shouldInsert)
                 {
                     if (shouldClearForeign)
@@ -306,21 +328,22 @@ namespace NcTalkOutlookAddIn
                     }
 
                     string existing = _mail.HTMLBody ?? string.Empty;
+                    string clearReplacement = BuildSignatureClearBlock(composeKind);
                     bool removedManaged;
-                    string cleaned = RemoveManagedSignatureBlocks(existing, out removedManaged);
+                    string cleaned = ReplaceManagedSignatureBlocks(existing, clearReplacement, out removedManaged);
                     bool removedInitialSlot = false;
                     if (!removedManaged && !_emailSignatureInitialSlotHandled)
                     {
                         cleaned = ReplaceComposeSignatureSlot(
                             cleaned,
-                            string.Empty,
+                            clearReplacement,
                             true,
                             composeKind,
                             out removedInitialSlot);
                     }
-                    if (removedManaged || removedInitialSlot)
+                    if (removedManaged || removedInitialSlot || _isInlineResponse)
                     {
-                        if (!TryWriteEmailSignatureHtmlBody(cleaned, "clear_slot", string.Empty))
+                        if (!TryWriteEmailSignatureHtmlBody(cleaned, "clear_slot", string.Empty, true))
                         {
                             return;
                         }
@@ -455,7 +478,7 @@ namespace NcTalkOutlookAddIn
                 return removed ? ManagedSignatureBlockRegex.Replace(html, string.Empty) : html;
             }
 
-            private bool TryWriteEmailSignatureHtmlBody(string html, string operation, string inlineSignatureSlotHtml = null)
+            private bool TryWriteEmailSignatureHtmlBody(string html, string operation, string inlineSignatureSlotHtml = null, bool placeCursorAtBodyStart = false)
             {
                 if (!_isInlineResponse)
                 {
@@ -465,7 +488,8 @@ namespace NcTalkOutlookAddIn
                             _mail,
                             html ?? string.Empty,
                             _composeKey,
-                            operation);
+                            operation,
+                            placeCursorAtBodyStart);
                     }
 
                     _mail.HTMLBody = html ?? string.Empty;
@@ -502,12 +526,24 @@ namespace NcTalkOutlookAddIn
                 return ManagedSignatureStartPrefix
                        + hash
                        + " -->"
-                       + (addLeadingReplyGap ? "<p style=\"margin:0;\"><br /></p><p style=\"margin:0;\"><br /></p>" : string.Empty)
+                       + (addLeadingReplyGap ? ReplyComposeEditGapHtml : string.Empty)
                        + "<div data-nc-connector-signature=\"true\">"
                        + html
                        + "</div>"
-                       + (addTrailingQuoteGap ? "<p style=\"margin:0;\"><br /></p>" : string.Empty)
+                       + (addTrailingQuoteGap ? ReplyComposeQuoteGapHtml : string.Empty)
                        + ManagedSignatureEnd;
+            }
+
+            private static string BuildSignatureClearBlock(EmailSignatureComposeKind composeKind)
+            {
+                return IsReplyOrForwardComposeKind(composeKind) ? ReplyComposeEditGapHtml : string.Empty;
+            }
+
+            private static bool IsReplyOrForwardComposeKind(EmailSignatureComposeKind composeKind)
+            {
+                return composeKind == EmailSignatureComposeKind.Reply
+                       || composeKind == EmailSignatureComposeKind.Forward
+                       || composeKind == EmailSignatureComposeKind.Response;
             }
 
             private static string ReplaceManagedSignatureBlocks(string html, string replacement, out bool replaced)
@@ -763,19 +799,45 @@ namespace NcTalkOutlookAddIn
             private EmailSignatureComposeKind ResolveEmailSignatureComposeKind()
             {
                 int verb;
-                if (!TryReadLastVerbExecuted(out verb))
+                bool verbRead = TryReadLastVerbExecuted(out verb);
+                EmailSignatureComposeKind kind;
+                if (verbRead && TryMapLastVerbToComposeKind(verb, out kind))
                 {
-                    return EmailSignatureComposeKind.Unknown;
+                    return kind;
                 }
+
+                if (_isInlineResponse)
+                {
+                    return EmailSignatureComposeKind.Response;
+                }
+
+                if (TryResolveConversationComposeKind(out kind))
+                {
+                    return kind;
+                }
+
+                if (verbRead && verb == 0)
+                {
+                    return EmailSignatureComposeKind.New;
+                }
+
+                return EmailSignatureComposeKind.Unknown;
+            }
+
+            private static bool TryMapLastVerbToComposeKind(int verb, out EmailSignatureComposeKind kind)
+            {
                 if (verb == 102 || verb == 103)
                 {
-                    return EmailSignatureComposeKind.Reply;
+                    kind = EmailSignatureComposeKind.Reply;
+                    return true;
                 }
                 if (verb == 104)
                 {
-                    return EmailSignatureComposeKind.Forward;
+                    kind = EmailSignatureComposeKind.Forward;
+                    return true;
                 }
-                return EmailSignatureComposeKind.New;
+                kind = EmailSignatureComposeKind.Unknown;
+                return false;
             }
 
             private bool TryReadLastVerbExecuted(out int verb)
@@ -798,29 +860,123 @@ namespace NcTalkOutlookAddIn
                     verb = parsed;
                     return true;
                 }
-                catch (COMException ex)
+                catch (COMException error)
                 {
-                    uint errorCode = unchecked((uint)ex.ErrorCode);
+                    uint errorCode = unchecked((uint)error.ErrorCode);
                     if (errorCode == 0x8004010Fu)
                     {
                         if (DiagnosticsLogger.IsEnabled)
                         {
-                            LogEmailSignature("Last verb is not set; treating unsent compose as new mail.");
+                            LogEmailSignature("Last verb is not set; checking conversation index for email signature compose kind.");
                         }
                         return true;
                     }
-                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read mail last verb for email signature compose kind.", ex);
+                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read mail last verb for email signature compose kind.", error);
                     return false;
                 }
-                catch (Exception ex)
+                catch (Exception error)
                 {
-                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read mail last verb for email signature compose kind.", ex);
+                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read mail last verb for email signature compose kind.", error);
                     return false;
                 }
                 finally
                 {
                     ComInteropScope.TryRelease(accessor, LogCategories.Core, "Failed to release mail PropertyAccessor COM object.");
                 }
+            }
+
+            private bool TryResolveConversationComposeKind(out EmailSignatureComposeKind kind)
+            {
+                kind = EmailSignatureComposeKind.Unknown;
+                int byteCount;
+                if (!TryReadConversationIndexByteCount(out byteCount))
+                {
+                    return false;
+                }
+                if (byteCount > 22)
+                {
+                    kind = EmailSignatureComposeKind.Response;
+                    return true;
+                }
+                if (byteCount == 22)
+                {
+                    kind = EmailSignatureComposeKind.New;
+                    return true;
+                }
+                return false;
+            }
+
+            private bool TryReadConversationIndexByteCount(out int byteCount)
+            {
+                byteCount = 0;
+                Outlook.PropertyAccessor accessor = null;
+                try
+                {
+                    accessor = _mail.PropertyAccessor;
+                    object value = accessor.GetProperty("http://schemas.microsoft.com/mapi/proptag/0x00710102");
+                    byteCount = ResolveConversationIndexByteCount(value);
+                    return byteCount > 0;
+                }
+                catch (COMException error)
+                {
+                    uint errorCode = unchecked((uint)error.ErrorCode);
+                    if (errorCode == 0x8004010Fu)
+                    {
+                        if (DiagnosticsLogger.IsEnabled)
+                        {
+                            LogEmailSignature("Conversation index is not set for email signature compose kind.");
+                        }
+                        return false;
+                    }
+                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read conversation index for email signature compose kind.", error);
+                    return false;
+                }
+                catch (Exception error)
+                {
+                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read conversation index for email signature compose kind.", error);
+                    return false;
+                }
+                finally
+                {
+                    ComInteropScope.TryRelease(accessor, LogCategories.Core, "Failed to release mail PropertyAccessor COM object.");
+                }
+            }
+
+            private static int ResolveConversationIndexByteCount(object value)
+            {
+                if (value == null)
+                {
+                    return 0;
+                }
+
+                byte[] bytes = value as byte[];
+                if (bytes != null)
+                {
+                    return bytes.Length;
+                }
+
+                Array array = value as Array;
+                if (array != null)
+                {
+                    return array.Length;
+                }
+
+                string text = Convert.ToString(value, CultureInfo.InvariantCulture);
+                if (string.IsNullOrWhiteSpace(text))
+                {
+                    return 0;
+                }
+
+                string normalized = text.Trim();
+                if (normalized.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+                {
+                    normalized = normalized.Substring(2);
+                }
+                if (normalized.Length % 2 == 0 && Regex.IsMatch(normalized, "^[0-9A-Fa-f]+$"))
+                {
+                    return normalized.Length / 2;
+                }
+                return 0;
             }
 
             private static bool ShouldInsertEmailSignature(EmailSignaturePolicy policy, EmailSignatureComposeKind composeKind)
@@ -841,6 +997,10 @@ namespace NcTalkOutlookAddIn
                 {
                     return policy.OnForward;
                 }
+                if (composeKind == EmailSignatureComposeKind.Response)
+                {
+                    return policy.OnReply && policy.OnForward;
+                }
                 return false;
             }
 
@@ -852,7 +1012,8 @@ namespace NcTalkOutlookAddIn
                 }
                 return composeKind == EmailSignatureComposeKind.New
                        || composeKind == EmailSignatureComposeKind.Reply
-                       || composeKind == EmailSignatureComposeKind.Forward;
+                       || composeKind == EmailSignatureComposeKind.Forward
+                       || composeKind == EmailSignatureComposeKind.Response;
             }
 
             private string ResolveCurrentSenderEmail()

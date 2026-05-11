@@ -534,7 +534,7 @@ namespace NcTalkOutlookAddIn.Controllers
             }
         }
 
-        internal bool TryWriteMailHtmlBodyPreservingSelection(Outlook.MailItem mail, string html, string composeKey, string operation)
+        internal bool TryWriteMailHtmlBodyPreservingSelection(Outlook.MailItem mail, string html, string composeKey, string operation, bool placeCursorAtBodyStart = false)
         {
             if (mail == null)
             {
@@ -566,11 +566,21 @@ namespace NcTalkOutlookAddIn.Controllers
 
                 mail.HTMLBody = html ?? string.Empty;
 
-                if (snapshot != null && wordApplication != null)
+                if (wordApplication != null && (snapshot != null || placeCursorAtBodyStart))
                 {
                     ComInteropScope.TryRelease(selection, LogCategories.Core, "Failed to release pre-write Word selection COM object.");
                     selection = wordApplication.GetType().InvokeMember("Selection", BindingFlags.GetProperty, null, wordApplication, null);
-                    RestoreWordSelection(selection, wordEditor, snapshot);
+                    if (placeCursorAtBodyStart)
+                    {
+                        if (!TryMoveWordSelectionToDocumentStart(selection, wordEditor, snapshot) && snapshot != null)
+                        {
+                            RestoreWordSelection(selection, wordEditor, snapshot);
+                        }
+                    }
+                    else if (snapshot != null)
+                    {
+                        RestoreWordSelection(selection, wordEditor, snapshot);
+                    }
                 }
 
                 DiagnosticsLogger.Log(
@@ -581,6 +591,8 @@ namespace NcTalkOutlookAddIn.Controllers
                     + (composeKey ?? string.Empty)
                     + ", selectionCaptured="
                     + (snapshot != null).ToString(CultureInfo.InvariantCulture)
+                    + ", cursorAtBodyStart="
+                    + placeCursorAtBodyStart.ToString(CultureInfo.InvariantCulture)
                     + ").");
                 return true;
             }
@@ -665,7 +677,6 @@ namespace NcTalkOutlookAddIn.Controllers
                 return;
             }
 
-            object font = null;
             try
             {
                 int documentEnd = GetWordDocumentEnd(wordEditor);
@@ -677,6 +688,45 @@ namespace NcTalkOutlookAddIn.Controllers
                 }
 
                 selection.GetType().InvokeMember("SetRange", BindingFlags.InvokeMethod, null, selection, new object[] { start, end });
+                RestoreWordSelectionFont(selection, snapshot);
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to restore Word selection formatting.", ex);
+            }
+        }
+
+        private static bool TryMoveWordSelectionToDocumentStart(object selection, object wordEditor, WordSelectionSnapshot snapshot)
+        {
+            if (selection == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                int start = GetWordDocumentStart(wordEditor, 0);
+                selection.GetType().InvokeMember("SetRange", BindingFlags.InvokeMethod, null, selection, new object[] { start, start });
+                RestoreWordSelectionFont(selection, snapshot);
+                return true;
+            }
+            catch (Exception error)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to move Word selection to body start.", error);
+                return false;
+            }
+        }
+
+        private static void RestoreWordSelectionFont(object selection, WordSelectionSnapshot snapshot)
+        {
+            if (selection == null || snapshot == null)
+            {
+                return;
+            }
+
+            object font = null;
+            try
+            {
                 font = selection.GetType().InvokeMember("Font", BindingFlags.GetProperty, null, selection, null);
                 if (font != null)
                 {
@@ -687,13 +737,37 @@ namespace NcTalkOutlookAddIn.Controllers
                     WriteWordFontProperty(font, "Size", snapshot.FontSize);
                 }
             }
-            catch (Exception ex)
+            catch (Exception error)
             {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to restore Word selection formatting.", ex);
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to restore Word selection font.", error);
             }
             finally
             {
                 ComInteropScope.TryRelease(font, LogCategories.Core, "Failed to release restored Word font COM object.");
+            }
+        }
+
+        private static int GetWordDocumentStart(object wordEditor, int fallback)
+        {
+            object content = null;
+            try
+            {
+                content = wordEditor != null ? wordEditor.GetType().InvokeMember("Content", BindingFlags.GetProperty, null, wordEditor, null) : null;
+                if (content == null)
+                {
+                    return fallback;
+                }
+
+                return Convert.ToInt32(content.GetType().InvokeMember("Start", BindingFlags.GetProperty, null, content, null), CultureInfo.InvariantCulture);
+            }
+            catch (Exception error)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read Word document start.", error);
+                return fallback;
+            }
+            finally
+            {
+                ComInteropScope.TryRelease(content, LogCategories.Core, "Failed to release Word content COM object.");
             }
         }
 
@@ -896,9 +970,10 @@ namespace NcTalkOutlookAddIn.Controllers
                     return false;
                 }
 
+                int fallbackReplyCursorStart = originalSelectionStart < selectionStart ? originalSelectionStart : selectionStart;
+                int replyCursorStart = GetWordDocumentStart(wordEditor, fallbackReplyCursorStart);
                 if (!string.IsNullOrWhiteSpace(html))
                 {
-                    int replyCursorStart = originalSelectionStart < selectionStart ? originalSelectionStart : selectionStart;
                     if (signatureSlotSelected && selectionEnd > selectionStart)
                     {
                         bool deletedTable = TryDeleteContainingTableAtRange(wordEditor, selectionStart, selectionEnd);
@@ -963,7 +1038,7 @@ namespace NcTalkOutlookAddIn.Controllers
                         BindingFlags.InvokeMethod,
                         null,
                         selection,
-                        new object[] { selectionStart, selectionStart });
+                        new object[] { replyCursorStart, replyCursorStart });
                 }
                 DiagnosticsLogger.Log(
                     LogCategories.Core,
@@ -976,7 +1051,7 @@ namespace NcTalkOutlookAddIn.Controllers
                     + ", selectionEnd="
                     + selectionEnd.ToString(CultureInfo.InvariantCulture)
                     + ", replyCursorStart="
-                    + (string.IsNullOrWhiteSpace(html) ? "n/a" : (originalSelectionStart < selectionStart ? originalSelectionStart : selectionStart).ToString(CultureInfo.InvariantCulture))
+                    + replyCursorStart.ToString(CultureInfo.InvariantCulture)
                     + ", signatureSlotSelected="
                     + signatureSlotSelected.ToString(CultureInfo.InvariantCulture)
                     + ", signatureSlotSource="
