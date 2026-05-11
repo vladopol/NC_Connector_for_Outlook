@@ -1150,6 +1150,10 @@ namespace NcTalkOutlookAddIn.UI
             internal FileLinkUploadStatus Status { get; set; }
 
             internal string RenamedTo { get; set; }
+
+            internal DateTime UploadStartedUtc { get; set; }
+
+            internal double UploadSpeedKbps { get; set; }
         }
 
         private sealed class PathScrollableListView : ListView
@@ -1911,6 +1915,30 @@ namespace NcTalkOutlookAddIn.UI
                 Math.Max(0, e.Bounds.Width - 6),
                 Math.Max(0, e.Bounds.Height - 2));
 
+            if (e.ColumnIndex == 2)
+            {
+                SelectionUploadState selectionState = ResolveSelectionState(e.Item);
+                if (selectionState != null && selectionState.Status == FileLinkUploadStatus.Uploading)
+                {
+                    int topPadding = ScaleLogical(2);
+                    int bottomPadding = ScaleLogical(2);
+                    int barHeight = Math.Max(ScaleLogical(6), 6);
+                    int contentHeight = Math.Max(0, e.Bounds.Height - topPadding - bottomPadding);
+                    barHeight = Math.Min(barHeight, contentHeight);
+                    int speedTop = e.Bounds.Top + topPadding + barHeight + 1;
+                    int speedBottom = e.Bounds.Bottom - bottomPadding;
+                    int speedHeight = Math.Max(0, speedBottom - speedTop);
+                    if (speedHeight > 0)
+                    {
+                        textBounds = new Rectangle(
+                            e.Bounds.Left + 4,
+                            speedTop,
+                            Math.Max(0, e.Bounds.Width - 6),
+                            speedHeight);
+                    }
+                }
+            }
+
             if (e.ColumnIndex == 0)
             {
                 var state = e.Graphics.Save();
@@ -1945,6 +1973,28 @@ namespace NcTalkOutlookAddIn.UI
                 focusRect.Width = Math.Max(0, _fileListView.ClientSize.Width - focusRect.Left);
                 ControlPaint.DrawFocusRectangle(e.Graphics, focusRect, textColor, backColor);
             }
+        }
+
+        private SelectionUploadState ResolveSelectionState(ListViewItem item)
+        {
+            if (item == null)
+            {
+                return null;
+            }
+
+            var selection = item.Tag as FileLinkSelection;
+            if (selection == null)
+            {
+                return null;
+            }
+
+            SelectionUploadState selectionState;
+            if (_selectionStates.TryGetValue(selection, out selectionState))
+            {
+                return selectionState;
+            }
+
+            return null;
         }
 
         private void ApplyQueueRowStyle(SelectionUploadState state, Color backgroundColor, Color textColor)
@@ -2035,6 +2085,8 @@ namespace NcTalkOutlookAddIn.UI
                 state.UploadedBytes = 0;
                 state.Status = FileLinkUploadStatus.Pending;
                 state.RenamedTo = null;
+                state.UploadStartedUtc = DateTime.MinValue;
+                state.UploadSpeedKbps = 0;
                 ApplyQueueRowStyle(state, _themePalette.InputBackground, _themePalette.Text);
                 DisposeStateProgressBar(state);
                 if (state.Item.SubItems.Count >= 3)
@@ -2248,10 +2300,34 @@ namespace NcTalkOutlookAddIn.UI
             }
             int left = statusLeft + 4;
             int width = Math.Max(12, statusWidth - 8);
-            int top = bounds.Top + 3;
-            int height = Math.Max(6, bounds.Height - 6);
+            int topPadding = ScaleLogical(2);
+            int bottomPadding = ScaleLogical(2);
+            int top = bounds.Top + topPadding;
+            int maxHeight = Math.Max(2, bounds.Height - topPadding - bottomPadding);
+            int height = Math.Min(Math.Max(ScaleLogical(6), 6), maxHeight);
             state.ProgressBar.SetBounds(left, top, width, height);
             state.ProgressBar.Visible = state.Status == FileLinkUploadStatus.Uploading;
+        }
+
+        private string FormatUploadSpeedKbps(double speedKbps)
+        {
+            double normalizedSpeed = speedKbps;
+            if (double.IsNaN(normalizedSpeed) || double.IsInfinity(normalizedSpeed) || normalizedSpeed < 0)
+            {
+                normalizedSpeed = 0;
+            }
+
+            long rounded = (long)Math.Round(normalizedSpeed, MidpointRounding.AwayFromZero);
+            string value = rounded.ToString("N0", CultureInfo.CurrentCulture);
+            string format = Strings.FileLinkWizardStatusSpeedKbpsFormat;
+            try
+            {
+                return string.Format(CultureInfo.CurrentCulture, format, value);
+            }
+            catch (FormatException)
+            {
+                return value + " KB/s";
+            }
         }
 
         private bool TryGetListViewItemBounds(int index, out Rectangle bounds)
@@ -2354,6 +2430,8 @@ namespace NcTalkOutlookAddIn.UI
                     state.TotalBytes = 0;
                     state.UploadedBytes = 0;
                     state.Status = FileLinkUploadStatus.Pending;
+                    state.UploadStartedUtc = DateTime.MinValue;
+                    state.UploadSpeedKbps = 0;
                     DisposeStateProgressBar(state);
                     if (state.Item.SubItems.Count >= 3)
                     {
@@ -2386,6 +2464,8 @@ namespace NcTalkOutlookAddIn.UI
                 foreach (var state in _selectionStates.Values)
                 {
                     state.Status = FileLinkUploadStatus.Failed;
+                    state.UploadStartedUtc = DateTime.MinValue;
+                    state.UploadSpeedKbps = 0;
                     ApplyQueueRowStyle(state, _themePalette.InputBackground, _themePalette.Text);
                     DisposeStateProgressBar(state);
                     if (state.Item.SubItems.Count >= 3)
@@ -2692,6 +2772,14 @@ namespace NcTalkOutlookAddIn.UI
                 {
                     state.ProgressBar = CreateProgressBar();
                 }
+                if (state.UploadStartedUtc == DateTime.MinValue)
+                {
+                    state.UploadStartedUtc = DateTime.UtcNow;
+                }
+                double elapsedSeconds = Math.Max(0.001, (DateTime.UtcNow - state.UploadStartedUtc).TotalSeconds);
+                state.UploadSpeedKbps = state.UploadedBytes > 0
+                    ? state.UploadedBytes / 1024d / elapsedSeconds
+                    : 0;
                 if (state.ProgressBar != null)
                 {
                     state.ProgressBar.Visible = true;
@@ -2699,7 +2787,7 @@ namespace NcTalkOutlookAddIn.UI
                 }
                 if (state.Item.SubItems.Count >= 3)
                 {
-                    state.Item.SubItems[2].Text = percent.ToString(CultureInfo.InvariantCulture) + "%";
+                    state.Item.SubItems[2].Text = FormatUploadSpeedKbps(state.UploadSpeedKbps);
                     state.Item.SubItems[2].ForeColor = ActiveQueueItemText;
                 }
 
@@ -2714,6 +2802,8 @@ namespace NcTalkOutlookAddIn.UI
                 EnsureUploadItemVisible(state.Item, false);
                 ApplyQueueRowStyle(state, _themePalette.InputBackground, _themePalette.Text);
                 DisposeStateProgressBar(state);
+                state.UploadStartedUtc = DateTime.MinValue;
+                state.UploadSpeedKbps = 0;
                 string statusText = Strings.FileLinkWizardStatusSuccess;
                 if (!string.IsNullOrEmpty(state.RenamedTo))
                 {
@@ -2734,6 +2824,8 @@ namespace NcTalkOutlookAddIn.UI
                 EnsureUploadItemVisible(state.Item, false);
                 ApplyQueueRowStyle(state, _themePalette.InputBackground, _themePalette.Text);
                 DisposeStateProgressBar(state);
+                state.UploadStartedUtc = DateTime.MinValue;
+                state.UploadSpeedKbps = 0;
                 string message = string.IsNullOrWhiteSpace(progress.Message) ? string.Empty : " (" + progress.Message + ")";
                 if (state.Item.SubItems.Count >= 3)
                 {

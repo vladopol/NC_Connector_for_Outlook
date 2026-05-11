@@ -959,6 +959,9 @@
   "sharing_status_uploading_bulk": {
     "message": "ファイルをアップロード中..."
   },
+  "sharing_status_speed_kbps": {
+    "message": "$1 KB/s"
+  },
   "sharing_message_invalid_share_name": {
     "message": "共有名を入力してください。"
   },
