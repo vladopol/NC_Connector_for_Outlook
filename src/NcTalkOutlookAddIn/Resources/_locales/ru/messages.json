@@ -959,6 +959,9 @@
   "sharing_status_uploading_bulk": {
     "message": "Загрузка файлов..."
   },
+  "sharing_status_speed_kbps": {
+    "message": "$1 KB/s"
+  },
   "sharing_message_invalid_share_name": {
     "message": "Пожалуйста, введите название общего доступа."
   },

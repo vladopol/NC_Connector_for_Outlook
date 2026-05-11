@@ -959,6 +959,9 @@
   "sharing_status_uploading_bulk": {
     "message": "Przesyłanie plików..."
   },
+  "sharing_status_speed_kbps": {
+    "message": "$1 KB/s"
+  },
   "sharing_message_invalid_share_name": {
     "message": "Wpisz nazwę udostępnienia."
   },

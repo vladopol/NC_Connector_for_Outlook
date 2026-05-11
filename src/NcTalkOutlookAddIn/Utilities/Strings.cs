@@ -910,6 +910,7 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string FileLinkWizardStatusSuccess { get { return Get("sharing_status_done_row", "Done"); } }
         internal static string FileLinkWizardStatusError { get { return Get("sharing_status_error_row", "Error"); } }
         internal static string FileLinkWizardStatusCancelled { get { return Get("outlook_sharing_status_cancelled", "Cancelled"); } }
+        internal static string FileLinkWizardStatusSpeedKbpsFormat { get { return Get("sharing_status_speed_kbps", "$1 KB/s"); } }
         internal static string FileLinkWizardUploadCancelledMessage { get { return Get("outlook_sharing_upload_cancelled", "Upload was cancelled."); } }
         internal static string FileLinkWizardUploadFailed { get { return Get("outlook_sharing_upload_failed", "Upload failed."); } }
         internal static string FileLinkWizardUploadFailedFormat { get { return Get("outlook_sharing_upload_failed_format", "Upload failed: {0}"); } }
