@@ -136,6 +136,7 @@ Runtime rules:
 - Missing `policy.email_signature` support disables only central signatures and surfaces a backend update hint; Share/Talk policy domains remain independent.
 - The effective Outlook sender identity must match `policy.email_signature.user_email`; other identities are left untouched. A `SentOnBehalfOfName`/From override for shared mailboxes or delegated Exchange identities takes precedence over `SendUsingAccount` and must resolve to the same SMTP address. If the sender identity cannot be resolved exactly, signature processing fails closed.
 - Local settings `EmailSignatureOnCompose`, `EmailSignatureOnReply`, and `EmailSignatureOnForward` can disable insertion for the corresponding compose type unless the backend locks the value.
+- If compose insertion is active but reply or forward insertion is off, the matching sender still clears the initial local signature slot for that reply/forward and inserts no backend signature.
 - For HTML/RTF compose, the matching sender account owns the initial signature slot in replies and forwards. Outlook-native or third-party signatures captured at compose open are removed only when the quoted-message boundary is structurally identifiable; otherwise the quoted message and separator are preserved.
 - For plain-text compose, Outlook's body format is preserved. The sanitized backend HTML is rendered to plain text and inserted through Outlook's WordEditor signature slot (`_MailAutoSig`) or the NC Connector managed Word bookmark. Plain-text processing does not parse reply headers and does not rewrite `MailItem.Body`.
 - When compose signature policy is inactive or the sender does not match, NC Connector removes only its own marked HTML block or managed plain-text Word bookmark from the current compose item. It does not remove Outlook-native or third-party signature content.
@@ -143,9 +144,11 @@ Runtime rules:
 - HTML/RTF signatures are written as marked HTML blocks so later policy/sender changes can update or remove only NC Connector-owned content. Plain-text signatures are tracked with the managed Word bookmark for the open compose session.
 - Signature processing only runs for unsent Outlook compose items. Opening a received or already sent message for reading must never modify its body.
 - Inspector compose windows use `MailItem.HTMLBody` for HTML/RTF and WordEditor for plain text. The HTML/RTF path captures the active Word selection before a body rewrite and restores the selection font afterwards, so Outlook's current compose font stays active.
-- Inline replies are tracked through Outlook's `Explorer.InlineResponse` event and written through `Explorer.ActiveInlineResponseWordEditor`. Inline Word imports use a UTF-8 BOM HTML document so non-ASCII signature text is preserved.
+- Inline replies/forwards are tracked through Outlook's `Explorer.InlineResponse` event and written through `Explorer.ActiveInlineResponseWordEditor`. Inline Word imports use a UTF-8 BOM HTML document so non-ASCII signature text is preserved.
+- Reply/forward detection uses `PR_LAST_VERB_EXECUTED` first. If Outlook has not set it yet, popped-out replies/forwards use `PR_CONVERSATION_INDEX`; inline replies/forwards are treated as a response because they arrive through `Explorer.InlineResponse`.
 - Inline HTML/RTF replacement uses Outlook's hidden `_MailAutoSig` and `_MailOriginal` Word bookmarks. If `_MailOriginal` is unavailable, the quoted-message separator is detected from Word paragraph borders. Table-based Outlook or third-party signatures are removed through `Word.Table.Delete()` when the signature bookmark sits inside a table. Text-only header markers such as `From:` or `Von:` are never used as cut positions.
 - The HTML/RTF managed signature replaces the compose signature slot before the quoted message boundary, keeps two empty paragraphs above the signature for the sender's own text, and keeps one empty paragraph between the signature and the reply/forward separator.
+- Clear-only replies and forwards keep an empty reply area before the quote and move the Word cursor back to that area after removing the local signature slot.
 
 ## Architecture
 
