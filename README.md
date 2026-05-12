@@ -114,7 +114,7 @@ Option `Custom` is only shown when the NC Connector backend endpoint exists. It 
 ## Installation and updates
 
 1. Close Outlook.
-2. Run the latest MSI (for example `NCConnectorForOutlook-3.0.4.msi`) and confirm the UAC prompt (administrator rights are required). The setup configures URLACL and all required registry keys for IFB.
+2. Run the latest MSI (for example `NCConnectorForOutlook-3.1.0.msi`) and confirm the UAC prompt (administrator rights are required). The setup configures URLACL and all required registry keys for IFB.
 3. Start Outlook and click **NC Connector → Settings** in the ribbon.
 4. Choose the login mode, run the connection test, and save. If the test succeeds, IFB is active automatically.
 5. Verify the filelink base directory and enable debug logging if needed.
@@ -122,7 +122,7 @@ Option `Custom` is only shown when the NC Connector backend endpoint exists. It 
 
 Updates are applied by installing a MSI package over the existing installation (same, older, or newer version). Personal settings are kept and migrated to profile-based XML files (`settings_<OutlookProfile>.xml`) under `%LOCALAPPDATA%\NC4OL`. Uninstall removes the add-in, stops the IFB listener, and resets the registry values.
 
-### Release 3.0.4 operational notes
+### Release 3.1.0 operational notes
 
 - Runtime artifacts are consolidated in `%LOCALAPPDATA%\NC4OL`:
   - settings files (`settings_<OutlookProfile>.xml`)
@@ -131,16 +131,19 @@ Updates are applied by installing a MSI package over the existing installation (
 - The local IFB listener port is now configurable in `Settings -> IFB`; diagnostics and manual URLACL checks should use the effective configured port instead of assuming `7777`.
 - Legacy INI settings from older builds are migrated on first start and removed after successful migration.
 - TLS mode can be switched live in Settings (`OS default`, `TLS 1.2`, `TLS 1.3`, or `TLS 1.2 + 1.3`) and is applied immediately to runtime networking.
-- Settings connectivity operations (connection test and login flow) now force a fresh HTTP/TLS handshake, so TLS-mode checks are deterministic and not masked by pooled keep-alive sockets.
+- Settings connectivity operations (connection test and login flow) force a fresh HTTP/TLS handshake, so TLS-mode checks are not masked by pooled keep-alive sockets.
+- Backend-managed email signatures apply only when the Outlook sender identity matches the Nextcloud user email from policy. Other Outlook accounts and their local signatures are left untouched.
+- Inline replies and forwards expose the `Insert Nextcloud share` action on the Message tab and keep write space above the inserted share block.
+- Large file uploads use Nextcloud chunked WebDAV upload v2 and show per-file upload speed in the sharing wizard.
 - Attachment-mode compose shares arm server-side cleanup immediately after share creation and clear cleanup only after confirmed successful mail send.
-- If separate password mail is enabled, the main mail hides inline password information and password follow-up dispatch is triggered only after confirmed successful primary send. This feature is only available with backend endpoint + active assigned seat.
+- If separate password mail is enabled, the main mail hides inline password information and password follow-up dispatch is triggered only after confirmed successful primary send. The follow-up mail keeps the captured sender identity, receives the backend signature when policy and sender match, and opens a manual fallback draft if automatic send fails. This feature is only available with backend endpoint + active assigned seat.
 - Saved Talk appointment deletion is opt-in: generic Talk URLs in appointment fields are ignored, while cleanup for discarded unsaved appointments remains active.
 - Outlook Talk metadata is local-only. The add-in does not patch server-side calendar `.ics` objects for Talk metadata.
 
 ## Troubleshooting
 
 - **Debug log**: enable it in the *Debug* tab for verbose traces. Log file format: `%LOCALAPPDATA%\NC4OL\addin-runtime.log_YYYYMMDD`. With debug enabled, attachment pre-add decisions/fallback reasons are included. Runtime exceptions are written there even when debug logging is disabled. The `Anonymize logs` switch is enabled by default.
-- **Add-in not visible**: installation must be run with admin rights. Check `HKLM\Software\Microsoft\Office\Outlook\Addins\NcTalkOutlook.AddIn` and optionally run a repair from an elevated prompt: `msiexec /i "NCConnectorForOutlook-3.0.4.msi" ADDLOCAL=ALL`.
+- **Add-in not visible**: installation must be run with admin rights. Check `HKLM\Software\Microsoft\Office\Outlook\Addins\NcTalkOutlook.AddIn` and optionally run a repair from an elevated prompt: `msiexec /i "NCConnectorForOutlook-3.1.0.msi" ADDLOCAL=ALL`.
 - **Test IFB**: use the configured IFB port from `Settings -> IFB` (default `7777`): `powershell -Command "Invoke-WebRequest http://127.0.0.1:<ifb-port>/nc-ifb/freebusy/<mail>.vfb -UseBasicParsing"`. If behavior differs, verify the registry under `HKCU\Software\Microsoft\Office\<Version>\Outlook\Options\Calendar`.
 - **Check TLS/proxy**: `powershell -Command "Test-NetConnection <your-domain> -Port 443"`. If you see SSL warnings, verify certificates/proxy settings. You can switch TLS mode at runtime in `Settings -> Advanced -> Transport security (TLS)` (`OS default` or forced TLS versions like 1.2/1.3). Connection test/login flow use fresh handshakes, so TLS mode changes are evaluated directly. If secure-channel errors still occur, check certificate trust, TLS-inspecting proxies, DNS, and machine TLS/Schannel policy before considering machine-wide registry/GPO overrides.
 - **Attachment automation does not trigger for large files**: In Microsoft 365 / Exchange environments, Outlook can block attachments before add-in events fire (for example due to server-side size limits). In those cases, use the **`Insert Nextcloud share`** button.

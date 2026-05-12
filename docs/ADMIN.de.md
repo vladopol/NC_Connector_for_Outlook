@@ -8,7 +8,7 @@ Dieses Dokument beschreibt Installation, Rollout und Betrieb des **NC Connector 
 - [Updates / Upgrade-Verhalten](#updates--upgrade-verhalten)
 - [Dateien & Registry](#dateien--registry)
 - [Einstellungen (Profil-XML)](#einstellungen-profil-xml)
-- [Compose-Freigabe-Lifecycle (3.0.4)](#compose-freigabe-lifecycle-304)
+- [Compose-Freigabe-Lifecycle (3.1.0)](#compose-freigabe-lifecycle-310)
 - [Talk-Termin-Templates (HTML) — Outlook-sicheres Subset](#talk-termin-templates-html--outlook-sicheres-subset)
 - [Internet Free/Busy Gateway (IFB)](#internet-freebusy-gateway-ifb)
 - [Systemadressbuch erforderlich fuer Benutzersuche und Moderator-Auswahl](#systemadressbuch-erforderlich-fuer-benutzersuche-und-moderator-auswahl)
@@ -23,7 +23,7 @@ Dieses Dokument beschreibt Installation, Rollout und Betrieb des **NC Connector 
 Beispiel (silent):
 
 ```powershell
-msiexec /i "NCConnectorForOutlook-3.0.4.msi" /qn /norestart
+msiexec /i "NCConnectorForOutlook-3.1.0.msi" /qn /norestart
 ```
 
 Danach Outlook starten. Im Ribbon erscheint der Tab **NC Connector** (Kalender/Termin + E-Mail).
@@ -151,7 +151,7 @@ Wenn die Backend-Signatur inaktiv oder unvollstaendig ist, die Compose-Signatur-
 
 Die Backend-Signatur wird als HTML geliefert und mit demselben fail-closed Sanitizer bereinigt wie Freigabe- und Talk-Templates. HTML/RTF-Signaturen werden als markierter HTML-Block eingefuegt; Plain-Text-Signaturen werden fuer die offene Compose-Session ueber ein Word-Bookmark verfolgt.
 
-## Compose-Freigabe-Lifecycle (3.0.4)
+## Compose-Freigabe-Lifecycle (3.1.0)
 
 ### Attachment-Automatisierung und Cleanup-Regeln
 - Der Button `Nextcloud Freigabe hinzufuegen` ist auch in Outlook-Inline-Antworten/-Weiterleitungen im Tab Nachricht verfuegbar und nutzt denselben Wizard-Pfad wie Mail-Compose-Inspectoren.

@@ -21,14 +21,16 @@ Das Add-in integriert:
 - **Zentrale Backend-E-Mail-Signaturen** fuer passende Outlook-Absenderkonten
 - **IFB (Internet Free/Busy)** als lokaler HTTP-Proxy zu Nextcloud
 
-## Release 3.0.4 Delta-Ueberblick
+## Release 3.1.0 Delta-Ueberblick
 
-Diese Release-Linie ist ein gezieltes Sicherheitsupdate fuer den Talk-Termin-Cleanup:
+Diese Release-Linie erweitert Compose-Unterstuetzung und zentrale Backend-Signaturen:
 
-- Das Loeschen gespeicherter Termine stellt die entfernte Raumloeschung nur noch dann im Hintergrund an, wenn `TalkDeleteRoomOnEventDelete` oder die gesperrte Backend-Policy `talk_delete_room_on_event_delete` es explizit aktiviert.
-- Die Runtime-Subscription-Erkennung benoetigt `X-NCTALK-TOKEN`; generische Talk-URLs in `Location` oder URL-Feldern werden nicht als Loeschquelle verwendet.
-- Der Cleanup fuer neu erzeugte Termine, die vor dem Speichern verworfen werden, bleibt aktiv und ist vom Opt-in fuer gespeicherte Termine getrennt.
-- Talk-Metadaten werden lokal in Outlook als `X-NCTALK-*` UserProperties/MAPI-Felder persistiert. Serverseitige Kalender-`.ics`-Objekte werden nicht gepatcht.
+- Backend-gesteuerte E-Mail-Signaturen gelten fuer passende Outlook-Absenderidentitaeten in HTML/RTF und Plain Text, auch bei Antworten und Weiterleitungen.
+- Nextcloud-Freigaben koennen aus Inline-Antworten/-Weiterleitungen eingefuegt werden und laufen ueber WordEditor, damit zitierte Inhalte erhalten bleiben.
+- Plain-Text-Freigabebloecke werden eingefuegt, ohne `MailItem.Body` direkt umzuschreiben.
+- Grosse Dateien nutzen Nextcloud Chunked WebDAV Upload v2; der Freigabe-Wizard zeigt Uploadgeschwindigkeit pro Datei.
+- Separate Passwort-Follow-up-Mails behalten die Absenderidentitaet des Original-Compose, bekommen bei Policy-/Absender-Match die Backend-Signatur und oeffnen bei Auto-Send-Fehler weiterhin einen manuellen Fallback-Entwurf.
+- Talk-Raumloeschung fuer gespeicherte Termine bleibt Opt-in; Talk-Cleanup-Metadaten bleiben lokal in Outlook.
 
 ## Voraussetzungen
 
@@ -45,7 +47,7 @@ Auf manchen Build-Systemen fehlen die .NET Framework Reference Assemblies für 4
 Beispiel:
 
 ```powershell
-cd "C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-3.0.4"
+cd "C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-3.1.0"
 
 # Optional: Reference Assemblies lokal holen (nur wenn nötig)
 nuget install Microsoft.NETFramework.ReferenceAssemblies.net472 -OutputDirectory packages
@@ -58,7 +60,7 @@ $env:FrameworkPathOverride = "$PWD\packages\Microsoft.NETFramework.ReferenceAsse
 Der empfohlene Build läuft immer über `build.ps1`:
 
 ```powershell
-cd "C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-3.0.4"
+cd "C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-3.1.0"
 $env:FrameworkPathOverride = "$PWD\packages\Microsoft.NETFramework.ReferenceAssemblies.net472\build\.NETFramework\v4.7.2"
 .\build.ps1 -Configuration Release
 ```
@@ -211,7 +213,7 @@ Runtime-Regeln:
 - Die HTML/RTF-Signatur ersetzt den Compose-Signaturplatz vor der zitierten Nachrichtengrenze, behaelt zwei leere Absaetze ueber der Signatur fuer eigenen Text und eine leere Zeile zwischen Signatur und Antwort-/Weiterleitungs-Trenner.
 - Beim reinen Entfernen der Signatur in Antworten/Weiterleitungen bleibt oberhalb des Zitats ein leerer Schreibbereich erhalten; der Word-Cursor wird dorthin zurueckgesetzt.
 
-Compose-Filelink-Paritaet (3.0.4):
+Compose-Filelink-Paritaet (3.1.0):
 
 - Der FileLink-Ribbon-Einstieg ist im Mail-Inspector und im Explorer-Tab `Nachricht` fuer Inline-Antworten/-Weiterleitungen sichtbar. Beide Einstiege laufen ueber denselben `FileLinkLaunchController`.
 - Inline-Antworten/-Weiterleitungen fuegen das gerenderte Freigabe-HTML ueber `Explorer.ActiveInlineResponseWordEditor` ein; der Inline-Pfad schreibt nicht direkt in `MailItem.HTMLBody` und behaelt zwei leere Absaetze ueber dem Freigabeblock fuer eigenen Text.
