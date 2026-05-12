@@ -43,6 +43,7 @@ namespace NcTalkOutlookAddIn
 
                 CapturePasswordDispatchRecipients();
                 CapturePasswordDispatchSender();
+                SchedulePostSendGraceCheckIfNeeded();
                 LogFileLink(
                     "Compose send state updated (composeKey="
                     + _composeKey
@@ -50,6 +51,29 @@ namespace NcTalkOutlookAddIn
                     + _sendPending.ToString(CultureInfo.InvariantCulture)
                     + ", cleanupArmedCount="
                     + _cleanupEntries.Count.ToString(CultureInfo.InvariantCulture)
+                    + ").");
+            }
+
+            private void SchedulePostSendGraceCheckIfNeeded()
+            {
+                if (_cleanupEntries.Count == 0 && _passwordDispatchQueue.Count == 0)
+                {
+                    return;
+                }
+
+                _awaitingGraceCloseResolution = true;
+                _cleanupGraceTimer.Interval = ComposeShareCleanupSendGraceMs;
+                _cleanupGraceTimer.Start();
+
+                LogFileLink(
+                    "Compose post-send cleanup check scheduled (composeKey="
+                    + _composeKey
+                    + ", delayMs="
+                    + ComposeShareCleanupSendGraceMs.ToString(CultureInfo.InvariantCulture)
+                    + ", cleanupArmedCount="
+                    + _cleanupEntries.Count.ToString(CultureInfo.InvariantCulture)
+                    + ", passwordQueued="
+                    + _passwordDispatchQueue.Count.ToString(CultureInfo.InvariantCulture)
                     + ").");
             }
 
