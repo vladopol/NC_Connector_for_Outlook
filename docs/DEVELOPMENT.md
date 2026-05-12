@@ -26,14 +26,16 @@ The add-in connects Outlook classic to a Nextcloud server and provides:
 - **Central backend email signatures** for matching Outlook sender accounts
 - **Internet Free/Busy (IFB)** via a local HTTP endpoint that proxies requests to Nextcloud
 
-## Release 3.0.4 delta summary
+## Release 3.1.0 delta summary
 
-This release is a targeted safety update for Talk appointment cleanup:
+This release expands Outlook compose support and central backend signatures:
 
-- Saved appointment deletion no longer deletes remote Talk rooms unless `TalkDeleteRoomOnEventDelete` or locked backend policy `talk_delete_room_on_event_delete` explicitly enables it.
-- Runtime subscription detection now requires `X-NCTALK-TOKEN`; generic Talk URLs in `Location` or URL fields are not used as a deletion source.
-- Cleanup for newly created appointments that are discarded before saving remains active and separate from the saved-event opt-in.
-- Talk metadata is persisted locally as Outlook `X-NCTALK-*` UserProperties/MAPI fields. The add-in does not patch server-side calendar `.ics` objects.
+- Backend-managed email signatures apply to matching Outlook sender identities in HTML/RTF and plain-text compose, including replies and forwards.
+- Nextcloud share insertion is available from inline replies/forwards and uses WordEditor insertion so quoted content stays intact.
+- Plain-text share blocks are inserted without rewriting `MailItem.Body`.
+- Large files use Nextcloud chunked WebDAV upload v2 and the sharing wizard shows per-file upload speed.
+- Separate password follow-up mails keep the original sender identity, receive the backend signature when policy and sender match, and still open a manual fallback draft if auto-send fails.
+- Talk room deletion for saved appointments remains opt-in and Talk cleanup metadata stays local to Outlook.
 
 ## Quick start
 
@@ -48,7 +50,7 @@ This release is a targeted safety update for Talk appointment cleanup:
 ### Build MSI (recommended)
 
 ```powershell
-cd "C:\\path\\to\\nc4ol-3.0.4"
+cd "C:\\path\\to\\nc4ol-3.1.0"
 
 # Optional: reference assemblies (only if needed)
 nuget install Microsoft.NETFramework.ReferenceAssemblies.net472 -OutputDirectory packages
