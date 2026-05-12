@@ -319,6 +319,7 @@ namespace NcTalkOutlookAddIn.Controllers
                 fallback.Subject = BuildSeparatePasswordMailSubject(dispatch);
                 ApplySeparatePasswordSender(fallback, dispatch, composeKey);
                 ApplySeparatePasswordBody(fallback, dispatch);
+                ApplySeparatePasswordBackendSignature(fallback, dispatch, composeKey);
                 fallback.Display(false);
                 NextcloudTalkAddIn.LogFileLinkMessage(
                     "Separate password mail manual fallback opened (composeKey="
