@@ -189,6 +189,10 @@ namespace NcTalkOutlookAddIn
                     return;
                 }
                 string propertyName = string.IsNullOrWhiteSpace(name) ? string.Empty : name.Trim();
+                if (IsEmailSignaturePropertyChange(propertyName))
+                {
+                    ScheduleEmailSignatureApplication("property_" + propertyName);
+                }
                 if (propertyName.IndexOf("Attach", StringComparison.OrdinalIgnoreCase) < 0
                     && !string.Equals(propertyName, "HasAttachment", StringComparison.OrdinalIgnoreCase))
                 {
@@ -397,7 +401,7 @@ namespace NcTalkOutlookAddIn
                         _owner._currentSettings.ServerUrl,
                         _owner._currentSettings.Username,
                         _owner._currentSettings.AppPassword);
-                    BackendPolicyStatus policyStatus = _owner.FetchBackendPolicyStatus(configuration, "compose_attachment_evaluate");                    if (policyStatus != null && policyStatus.PolicyActive)
+                    BackendPolicyStatus policyStatus = _owner.FetchBackendPolicyStatus(configuration, "compose_attachment_evaluate");                    if (policyStatus != null && policyStatus.IsDomainActive("share"))
                     {
                         bool policyBool;
                         int policyInt;

@@ -23,17 +23,19 @@ The add-in connects Outlook classic to a Nextcloud server and provides:
 
 - **Nextcloud Talk** from calendar appointments (room creation, lobby, participant sync, moderator delegation)
 - **Nextcloud sharing** from the mail compose window (upload + link share + HTML block insertion)
+- **Central backend email signatures** for matching Outlook sender accounts
 - **Internet Free/Busy (IFB)** via a local HTTP endpoint that proxies requests to Nextcloud
 
-## Release 3.0.4 delta summary
+## Release 3.1.0 delta summary
 
-This release adds one functional runtime feature and otherwise focuses on consolidation plus a few targeted fixes:
+This release expands Outlook compose support and central backend signatures:
 
-- The local IFB listener port is now configurable in settings and runtime, so diagnostics and manual admin checks must use the effective configured port instead of assuming `7777`.
-- Runtime API logging and JSON/request serialization now run through shared helpers; new HTTP/OCS code should stay on those centralized paths instead of adding ad-hoc request or payload handling.
-- Talk appointment handling no longer keeps the dead HTML read fallback path; the active render/update path should remain single-source and explicit.
-- Password notification cleanup continues to require UI-context marshaling; follow-up changes should preserve that captured-context disposal behavior.
-- Talk/Sharing wording was refreshed across all supported locales, and the Talk help URL / block-marker handling was tightened.
+- Backend-managed email signatures apply to matching Outlook sender identities in HTML/RTF and plain-text compose, including replies and forwards.
+- Nextcloud share insertion is available from inline replies/forwards and uses WordEditor insertion so quoted content stays intact.
+- Plain-text share blocks are inserted without rewriting `MailItem.Body`.
+- Large files use Nextcloud chunked WebDAV upload v2 and the sharing wizard shows per-file upload speed.
+- Separate password follow-up mails keep the original sender identity, receive the backend signature when policy and sender match, and still open a manual fallback draft if auto-send fails.
+- Talk room deletion for saved appointments remains opt-in and Talk cleanup metadata stays local to Outlook.
 
 ## Quick start
 
@@ -48,7 +50,7 @@ This release adds one functional runtime feature and otherwise focuses on consol
 ### Build MSI (recommended)
 
 ```powershell
-cd "C:\\path\\to\\nc4ol-3.0.4"
+cd "C:\\path\\to\\nc4ol-3.1.0"
 
 # Optional: reference assemblies (only if needed)
 nuget install Microsoft.NETFramework.ReferenceAssemblies.net472 -OutputDirectory packages
@@ -75,6 +77,7 @@ Output:
 3. Ribbon:
    - Calendar/appointment: **NC Connector → Insert Talk link**
    - Mail compose: **NC Connector → Insert Nextcloud share**
+   - Inline reply/forward: **Message → NC Connector → Insert Nextcloud share**
 4. Open **NC Connector → Settings** and configure server URL + credentials.
 
 ## Repository structure
@@ -98,6 +101,7 @@ Key code locations:
 - `src/NcTalkOutlookAddIn/NextcloudTalkAddIn.SubscriptionEnsure.cs` — deferred appointment-subscription ensure and Outlook event-restriction handling
 - `src/NcTalkOutlookAddIn/NextcloudTalkAddIn.MailComposeSubscription.cs` — compose subscription core state + lifecycle entry points (`Dispose`, identity, shared helpers)
 - `src/NcTalkOutlookAddIn/NextcloudTalkAddIn.MailComposeSubscription.AttachmentFlow.cs` — compose attachment interception/evaluation/share-launch flow
+- `src/NcTalkOutlookAddIn/NextcloudTalkAddIn.MailComposeSubscription.Signature.cs` — backend email-signature policy application for the matching Outlook sender account
 - `src/NcTalkOutlookAddIn/NextcloudTalkAddIn.MailComposeSubscription.SendCleanup.cs` — send/close cleanup lifecycle + separate-password dispatch handling
 - `src/NcTalkOutlookAddIn/NextcloudTalkAddIn.AppointmentSubscription.cs` — appointment runtime subscription lifecycle
 - `src/NcTalkOutlookAddIn/Controllers/SettingsWorkflowController.cs` — settings open/save/revert orchestration
@@ -105,6 +109,7 @@ Key code locations:
 - `src/NcTalkOutlookAddIn/Controllers/TalkRibbonController.cs` — Talk ribbon flow orchestration (auth gate, wizard, room create/replace)
 - `src/NcTalkOutlookAddIn/Controllers/TalkAppointmentController.cs` — appointment lifecycle orchestration for Talk room metadata/sync
 - `src/NcTalkOutlookAddIn/Controllers/ComposeShareLifecycleController.cs` — compose share cleanup + separate-password dispatch flow
+- `src/NcTalkOutlookAddIn/Controllers/EmailSignaturePlainTextController.cs` — plain-text compose signature insertion/cleanup through Outlook WordEditor signature bookmarks
 - `src/NcTalkOutlookAddIn/Controllers/TalkDescriptionTemplateController.cs` — Talk template/body block rendering
 - `src/NcTalkOutlookAddIn/Controllers/OutlookRecipientResolverController.cs` — SMTP and attendee recipient resolution
 - `src/NcTalkOutlookAddIn/Controllers/MailComposeSubscriptionRegistryController.cs` — compose-subscription registry lifecycle
@@ -113,14 +118,41 @@ Key code locations:
 - `src/NcTalkOutlookAddIn/Services/` — Nextcloud HTTP integrations (Talk, sharing, IFB, login flow)
   - `Services/NcHttpClient.cs` is the shared request executor for auth headers, OCS headers, timeout/decompression, and optional fresh-connection mode.
   - All runtime HTTP calls (Talk, share/DAV, IFB, login flow, moderator avatar fetch) are routed through `NcHttpClient`.
+  - `Services/EmailSignaturePolicyService.cs` resolves backend email-signature policy values against local settings and lock state.
 - `src/NcTalkOutlookAddIn/UI/` — WinForms dialogs and wizards
   - `UI/ScaledForm.cs` is the shared DPI-scaling base for forms that use logical pixel layout helpers.
 - `src/NcTalkOutlookAddIn/Settings/` — persisted settings model + storage
 - `src/NcTalkOutlookAddIn/Utilities/` — logging, theming, i18n, small shared helpers
 - `src/NcTalkOutlookAddIn/Utilities/HtmlTemplateSanitizer.cs` — centralized sanitizer for backend-provided share/talk HTML templates
+- `src/NcTalkOutlookAddIn/Utilities/HtmlToPlainTextConverter.cs` — DOM-based HTML-to-plain-text rendering for plain-text email signatures
 - `src/NcTalkOutlookAddIn/Utilities/NcJson.cs` — centralized JSON payload normalization (`PrepareJsonPayload`), dictionary/string/int helpers, and OCS error extraction
 - `src/NcTalkOutlookAddIn/Utilities/DeferredAppointmentEnsureState.cs` — encapsulated pending-key tracking + throttled logging state for deferred appointment ensure
 - `src/NcTalkOutlookAddIn/Utilities/PictureConverter.cs` — shared Image -> IPictureDisp conversion helper for ribbon icons
+
+#### Central email signature flow (mail compose)
+
+The compose subscription checks backend policy for the central email signature after a compose window opens and when Outlook changes sender-related properties.
+
+Runtime rules:
+
+- Backend signature insertion requires an active backend policy for the `email_signature` domain, an active assigned seat, non-empty `policy.email_signature.email_signature_template`, and `policy.email_signature.user_email`.
+- Missing `policy.email_signature` support disables only central signatures and surfaces a backend update hint; Share/Talk policy domains remain independent.
+- The effective Outlook sender identity must match `policy.email_signature.user_email`; other identities are left untouched. A `SentOnBehalfOfName`/From override for shared mailboxes or delegated Exchange identities takes precedence over `SendUsingAccount` and must resolve to the same SMTP address. If the sender identity cannot be resolved exactly, signature processing fails closed.
+- Local settings `EmailSignatureOnCompose`, `EmailSignatureOnReply`, and `EmailSignatureOnForward` can disable insertion for the corresponding compose type unless the backend locks the value.
+- If compose insertion is active but reply or forward insertion is off, the matching sender still clears the initial local signature slot for that reply/forward and inserts no backend signature.
+- For HTML/RTF compose, the matching sender account owns the initial signature slot in replies and forwards. Outlook-native or third-party signatures captured at compose open are removed only when the quoted-message boundary is structurally identifiable; otherwise the quoted message and separator are preserved.
+- For plain-text compose, Outlook's body format is preserved. The sanitized backend HTML is rendered to plain text and inserted through Outlook's WordEditor signature slot (`_MailAutoSig`) or the NC Connector managed Word bookmark. Plain-text processing does not parse reply headers and does not rewrite `MailItem.Body`.
+- When compose signature policy is inactive or the sender does not match, NC Connector removes only its own marked HTML block or managed plain-text Word bookmark from the current compose item. It does not remove Outlook-native or third-party signature content.
+- Backend signature HTML is sanitized through `HtmlTemplateSanitizer` with the same fail-closed policy used by sharing and Talk templates.
+- HTML/RTF signatures are written as marked HTML blocks so later policy/sender changes can update or remove only NC Connector-owned content. Plain-text signatures are tracked with the managed Word bookmark for the open compose session.
+- Signature processing only runs for unsent Outlook compose items. Opening a received or already sent message for reading must never modify its body.
+- Separate password follow-up mails are generated without a compose inspector. Before auto-send they reuse the `email_signature` policy as a new mail and append the backend signature only when the sender captured from the original compose item matches `policy.email_signature.user_email`.
+- Inspector compose windows use `MailItem.HTMLBody` for HTML/RTF and WordEditor for plain text. The HTML/RTF path captures the active Word selection before a body rewrite and restores the selection font afterwards, so Outlook's current compose font stays active.
+- Inline replies/forwards are tracked through Outlook's `Explorer.InlineResponse` event and written through `Explorer.ActiveInlineResponseWordEditor`. Inline Word imports use a UTF-8 BOM HTML document so non-ASCII signature text is preserved.
+- Reply/forward detection uses `PR_LAST_VERB_EXECUTED` first. If Outlook has not set it yet, popped-out replies/forwards use `PR_CONVERSATION_INDEX`; inline replies/forwards are treated as a response because they arrive through `Explorer.InlineResponse`.
+- Inline HTML/RTF replacement uses Outlook's hidden `_MailAutoSig` and `_MailOriginal` Word bookmarks. If `_MailOriginal` is unavailable, the quoted-message separator is detected from Word paragraph borders. Table-based Outlook or third-party signatures are removed through `Word.Table.Delete()` when the signature bookmark sits inside a table. Text-only header markers such as `From:` or `Von:` are never used as cut positions.
+- The HTML/RTF managed signature replaces the compose signature slot before the quoted message boundary, keeps two empty paragraphs above the signature for the sender's own text, and keeps one empty paragraph between the signature and the reply/forward separator.
+- Clear-only replies and forwards keep an empty reply area before the quote and move the Word cursor back to that area after removing the local signature slot.
 
 ## Architecture
 
@@ -168,9 +200,9 @@ Key code locations:
    - appointment HTML insert uses the HTML->RTF bridge (`MailItem.HTMLBody` -> `AppointmentItem.RTFBody`), not `AppointmentItem.HTMLBody` and not `HTMLEditor.body.innerHTML`
 6. A runtime subscription is registered for the appointment (`AppointmentSubscription` in `NextcloudTalkAddIn.AppointmentSubscription.cs`):
    - **Write** (save): updates lobby timer on time changes, updates room description, syncs participants, applies delegation
-   - If Outlook exposes the final changed start time only shortly after `Write`, a short deferred post-write verification retries the lobby update on the same opened appointment instead of broad calendar scanning.
+   - If Outlook exposes the final changed start time only shortly after `Write`, a short deferred post-write verification retries the lobby update with the newly observed start time on the same opened appointment instead of broad calendar scanning.
    - **Close** (discard without saving): deletes the room to avoid orphans (best-effort)
-   - **BeforeDelete**: deletes the room (best-effort)
+   - **BeforeDelete**: queues room deletion in the background only when saved-event deletion is opted in (`TalkDeleteRoomOnEventDelete` or locked backend `talk_delete_room_on_event_delete`) and the appointment has `X-NCTALK-TOKEN`; URL/location parsing is not a deletion source
 
 #### Talk appointment-safe HTML subset (backend custom templates)
 
@@ -193,12 +225,17 @@ For stable rendering in Outlook appointment bodies (Word/RTF pipeline), backend 
 2. `UI/FileLinkWizardForm.cs` collects sharing settings and the file/folder selection.
 3. `Controllers/FileLinkLaunchController.cs` prefetches backend policy status and password policy in parallel (`Task.WhenAll`) before opening the wizard.
 4. `Services/FileLinkService.cs` performs WebDAV upload, creates the public share via OCS (`label` on create), then updates mutable metadata like `note` via the documented OCS update arguments.
+   - Files up to 20 MB use a direct WebDAV `PUT`.
+   - Larger files use Nextcloud chunked upload v2 under `/remote.php/dav/uploads/<user>/<upload-id>` and are assembled with `MOVE .file` to the final DAV path.
 5. `Utilities/FileLinkHtmlBuilder.cs` generates the HTML block (header + link + password + permissions + expiration date).
    - backend-provided custom share templates are sanitized via `HtmlTemplateSanitizer` and fail closed on sanitizer errors.
-6. `NextcloudTalkAddIn.InsertHtmlIntoMail(...)` inserts the HTML into the message body (delegated to `Controllers/MailInteropController.cs`).
+   - plain-text compose keeps `MailItem.BodyFormat=olFormatPlain`; the share block is rendered as a framed text block with `#` separators and inserted through Outlook WordEditor. Inline replies/forwards keep two empty paragraphs above the block for the sender's own text. `MailItem.Body` is not rewritten.
+6. `NextcloudTalkAddIn.InsertHtmlIntoMail(...)` / `InsertPlainTextIntoMail(...)` insert the rendered block into the message body (delegated to `Controllers/MailInteropController.cs`).
 
 Compose runtime parity additions in `NextcloudTalkAddIn.cs` (`MailComposeSubscription`) with lifecycle logic delegated to `Controllers/ComposeShareLifecycleController`:
 
+- The FileLink ribbon entry is exposed in mail inspectors and in the Explorer inline reply/forward `Message` tab. Both entries call the same `FileLinkLaunchController` path.
+- Inline replies/forwards insert the rendered share HTML through `Explorer.ActiveInlineResponseWordEditor`; the inline path does not rewrite `MailItem.HTMLBody` and keeps two empty paragraphs above the share block for the sender's own text.
 - Debounced attachment evaluation (`ComposeAttachmentEvalDebounceMs`) after compose attachment changes.
 - Attachment automation modes:
   - always route attachments into NC sharing flow, or
@@ -223,7 +260,8 @@ Compose runtime parity additions in `NextcloudTalkAddIn.cs` (`MailComposeSubscri
 - Separate password-mail dispatch:
   - queue password-only HTML after share creation
   - capture recipients on send
-  - dispatch only after successful primary send
+  - capture the sender account on send and apply it to the follow-up mail before signature/body dispatch
+  - dispatch only after successful primary send and keep the source compose mode for HTML vs plain-text follow-up mails
   - auto-send first, then manual fallback draft on failure.
 
 #### IFB flow
@@ -253,6 +291,7 @@ Sharing:
 
 - Create public share: `POST /ocs/v2.php/apps/files_sharing/api/v1/shares`
 - Upload/folder creation: `remote.php/dav/...` (WebDAV)
+- Large file upload: `MKCOL /remote.php/dav/uploads/<user>/<upload-id>`, chunk `PUT`s, then `MOVE /remote.php/dav/uploads/<user>/<upload-id>/.file` to the final file path
 
 IFB (DAV via proxy):
 
@@ -380,14 +419,15 @@ Note: there is currently no automated test suite in this repository. Use the smo
 
 1. Enable debug logging in Settings.
 2. Calendar: create a new appointment, insert a Talk link, save the appointment, then change start time and save again (lobby update).
-3. Calendar: add attendees, save again (participant sync).
-4. Mail: run the sharing wizard, upload 1–2 small files, insert the HTML block, and send to yourself.
-5. IFB: enable IFB, then verify the local endpoint responds:
+3. Calendar: restart Outlook, open the same appointment, change start time and save again (persistent metadata + lobby update).
+4. Calendar: add attendees, save again (participant sync).
+5. Mail: run the sharing wizard, upload 1–2 small files, insert the HTML block, and send to yourself.
+6. IFB: enable IFB, then verify the local endpoint responds:
    - `Invoke-WebRequest http://127.0.0.1:<ifb-port>/nc-ifb/ -UseBasicParsing`
 
 ## X-NCTALK-* property reference
 
-The add-in persists appointment metadata as Outlook `UserProperties`. A subset of those properties uses `X-NCTALK-*` names to enable interoperability and stable re-sync behavior.
+The add-in persists Talk appointment metadata as Outlook `UserProperties` using `X-NCTALK-*` names only. The old NC Connector-specific Outlook property names are no longer written or read.
 
 Unless stated otherwise:
 
@@ -397,25 +437,25 @@ Unless stated otherwise:
 
 Primary write location:
 
-- `src/NcTalkOutlookAddIn/NextcloudTalkAddIn.cs` → `ApplyRoomToAppointment(...)`
+- `src/NcTalkOutlookAddIn/Controllers/TalkAppointmentController.cs` -> `ApplyRoomToAppointment(...)`
+- local Outlook metadata refresh: `src/NcTalkOutlookAddIn/Controllers/TalkAppointmentController.cs` -> `PersistCoreIcalProperties(...)`
 
 ### Properties
 
 | Property | Purpose | Type / format | Example | Written | Read / used | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| `X-NCTALK-TOKEN` | Talk room token | `string` | `a1b2c3d4` | `ApplyRoomToAppointment(...)` | `EnsureSubscriptionForAppointment(...)` | Read is preferred over legacy token storage. |
-| `X-NCTALK-URL` | Talk room URL | `string` | `https://cloud.example.com/call/a1b2c3d4` | `ApplyRoomToAppointment(...)` | (not read by add-in) | Stored for interoperability. |
+| `X-NCTALK-TOKEN` | Talk room token | `string` | `a1b2c3d4` | `ApplyRoomToAppointment(...)` | `EnsureSubscriptionForAppointment(...)` | Required for saved-event room deletion and runtime subscription; generic Talk URLs in `Location`/URL fields are ignored. |
+| `X-NCTALK-URL` | Talk room URL | `string` | `https://cloud.example.com/call/a1b2c3d4` | `ApplyRoomToAppointment(...)` | `RegisterSubscription(...)` | Stored as local Outlook metadata; not used as a deletion source. |
 | `X-NCTALK-LOBBY` | Lobby enabled flag | `TRUE` / `FALSE` | `TRUE` | `ApplyRoomToAppointment(...)` | `EnsureSubscriptionForAppointment(...)` | Used to decide whether lobby updates run on save. |
-| `X-NCTALK-START` | Appointment start time (epoch seconds) | `int64` as string | `1739750400` | `ApplyRoomToAppointment(...)`, `AppointmentSubscription.OnWrite(...)` | `TryReadRequiredIcalStartEpoch(...)`, `TryUpdateLobby(...)` | Authoritative lobby timer source on appointment save; updated when lobby is enabled and the start time changes. |
-| `X-NCTALK-EVENT` | Room creation mode marker | `event` \| `standard` | `event` | `ApplyRoomToAppointment(...)` | `GetRoomType(...)` | Fallback exists via `NcTalkRoomType` user property. |
-| `X-NCTALK-OBJECTID` | Time-window identifier | `"<start>#<end>"` | `1739750400#1739754000` | `ApplyRoomToAppointment(...)` | (not read by add-in) | Stored for interoperability. |
-| `X-NCTALK-ADD-USERS` | Participant sync: internal users | `TRUE` / `FALSE` | `TRUE` | `ApplyRoomToAppointment(...)` | `TrySyncRoomParticipants(...)` | Preferred over legacy `X-NCTALK-ADD-PARTICIPANTS`. |
-| `X-NCTALK-ADD-GUESTS` | Participant sync: external emails | `TRUE` / `FALSE` | `FALSE` | `ApplyRoomToAppointment(...)` | `TrySyncRoomParticipants(...)` | Preferred over legacy `X-NCTALK-ADD-PARTICIPANTS`. |
-| `X-NCTALK-ADD-PARTICIPANTS` | Participant sync: legacy combined toggle | `TRUE` / `FALSE` | `TRUE` | `ApplyRoomToAppointment(...)` | `TrySyncRoomParticipants(...)` | Used as fallback when the split toggles are missing (older items). |
-| `X-NCTALK-DELEGATE` | Delegation target user ID | `string` | `alice` | `ApplyRoomToAppointment(...)` | `IsDelegatedToOtherUser(...)`, `IsDelegationPending(...)`, `TryApplyDelegation(...)` | Stored in parallel to the `NcTalkDelegateId` user property for backward compatibility. |
-| `X-NCTALK-DELEGATE-NAME` | Delegation target display name | `string` | `Alice Example` | `ApplyRoomToAppointment(...)` | (not read by add-in) | Stored for interoperability. |
+| `X-NCTALK-START` | Appointment start time (epoch seconds) | `int64` as string | `1739750400` | `ApplyRoomToAppointment(...)`, `AppointmentSubscription.OnWrite(...)` | `GetIcalStartEpochOrNull(...)`, `TryReadAppointmentStartEpoch(...)` | Local metadata for subscription state; lobby updates use the current save/deferred start epoch directly. |
+| `X-NCTALK-EVENT` | Room creation mode marker | `event` \| `standard` | `event` | `ApplyRoomToAppointment(...)` | `GetRoomType(...)` | No legacy Outlook property fallback. |
+| `X-NCTALK-OBJECTID` | Time-window identifier | `"<start>#<end>"` | `1739750400#1739754000` | `ApplyRoomToAppointment(...)` | (not read by add-in) | Stored as local Outlook metadata. |
+| `X-NCTALK-ADD-USERS` | Participant sync: internal users | `TRUE` / `FALSE` | `TRUE` | `ApplyRoomToAppointment(...)` | `TrySyncRoomParticipants(...)` | Split participant sync flag for Nextcloud users. |
+| `X-NCTALK-ADD-GUESTS` | Participant sync: external emails | `TRUE` / `FALSE` | `FALSE` | `ApplyRoomToAppointment(...)` | `TrySyncRoomParticipants(...)` | Split participant sync flag for guests. |
+| `X-NCTALK-DELEGATE` | Delegation target user ID | `string` | `alice` | `ApplyRoomToAppointment(...)` | `IsDelegatedToOtherUser(...)`, `IsDelegationPending(...)`, `TryApplyDelegation(...)` | No legacy Outlook property fallback. |
+| `X-NCTALK-DELEGATE-NAME` | Delegation target display name | `string` | `Alice Example` | `ApplyRoomToAppointment(...)` | (not read by add-in) | Stored as local Outlook metadata. |
 | `X-NCTALK-DELEGATED` | Delegation state marker | `TRUE` / `FALSE` | `FALSE` | `ApplyRoomToAppointment(...)`, `TryApplyDelegation(...)` | `IsDelegatedToOtherUser(...)`, `IsDelegationPending(...)` | Controls whether delegation is still pending. |
-| `X-NCTALK-DELEGATE-READY` | Delegation “ready” marker | `TRUE` | `TRUE` | `ApplyRoomToAppointment(...)` | (not read by add-in) | Reserved for interoperability; the add-in currently uses `X-NCTALK-DELEGATED` + delegate ID to detect pending delegation. |
+| `X-NCTALK-DELEGATE-READY` | Delegation “ready” marker | `TRUE` | `TRUE` | `ApplyRoomToAppointment(...)` | (not read by add-in) | Local marker retained for the Outlook delegation contract; the add-in currently uses `X-NCTALK-DELEGATED` + delegate ID to detect pending delegation. |
 
 ## Extension points
 
@@ -442,6 +482,3 @@ Primary write location:
 1. Add a property to `src/NcTalkOutlookAddIn/Utilities/Strings.cs`.
 2. Add the key to all locale files under `src/NcTalkOutlookAddIn/Resources/_locales/`.
 3. Rebuild and verify the UI.
-
-
-

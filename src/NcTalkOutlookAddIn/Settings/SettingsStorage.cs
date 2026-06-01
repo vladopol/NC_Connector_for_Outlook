@@ -476,6 +476,10 @@ namespace NcTalkOutlookAddIn.Settings
             AppendElement(document, root, "TalkDefaultAddGuests", settings.TalkDefaultAddGuests.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "CalDavSyncEnabled", settings.CalDavSyncEnabled.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "CalDavCalendarName", Safe(settings.CalDavCalendarName));
+            AppendElement(document, root, "TalkDeleteRoomOnEventDelete", settings.TalkDeleteRoomOnEventDelete.ToString(CultureInfo.InvariantCulture));
+            AppendOptionalBoolElement(document, root, "EmailSignatureOnCompose", settings.EmailSignatureOnCompose);
+            AppendOptionalBoolElement(document, root, "EmailSignatureOnReply", settings.EmailSignatureOnReply);
+            AppendOptionalBoolElement(document, root, "EmailSignatureOnForward", settings.EmailSignatureOnForward);
 
             var writerSettings = new XmlWriterSettings
             {
@@ -711,9 +715,46 @@ namespace NcTalkOutlookAddIn.Settings
                         ? AddinSettings.DefaultCalDavCalendarName
                         : value.Trim();
                     break;
+                case "TalkDeleteRoomOnEventDelete":
+                    bool talkDeleteRoomOnEventDelete;
+                    if (bool.TryParse(value, out talkDeleteRoomOnEventDelete))
+                    {
+                        settings.TalkDeleteRoomOnEventDelete = talkDeleteRoomOnEventDelete;
+                    }
+                    break;
+                case "EmailSignatureOnCompose":
+                    bool emailSignatureOnCompose;
+                    if (bool.TryParse(value, out emailSignatureOnCompose))
+                    {
+                        settings.EmailSignatureOnCompose = emailSignatureOnCompose;
+                    }
+                    break;
+                case "EmailSignatureOnReply":
+                    bool emailSignatureOnReply;
+                    if (bool.TryParse(value, out emailSignatureOnReply))
+                    {
+                        settings.EmailSignatureOnReply = emailSignatureOnReply;
+                    }
+                    break;
+                case "EmailSignatureOnForward":
+                    bool emailSignatureOnForward;
+                    if (bool.TryParse(value, out emailSignatureOnForward))
+                    {
+                        settings.EmailSignatureOnForward = emailSignatureOnForward;
+                    }
+                    break;
                 default:
                     break;
             }
+        }
+
+        private static void AppendOptionalBoolElement(XmlDocument document, XmlElement root, string name, bool? value)
+        {
+            if (!value.HasValue)
+            {
+                return;
+            }
+            AppendElement(document, root, name, value.Value.ToString(CultureInfo.InvariantCulture));
         }
 
         private static void AppendElement(XmlDocument document, XmlElement root, string name, string value)
@@ -753,4 +794,3 @@ namespace NcTalkOutlookAddIn.Settings
         }
     }
 }
-

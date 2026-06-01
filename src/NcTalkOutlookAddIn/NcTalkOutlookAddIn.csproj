@@ -90,6 +90,7 @@
     <Compile Include="NextcloudTalkAddIn.PolicyTemplates.cs" />
     <Compile Include="NextcloudTalkAddIn.MailComposeSubscription.cs" />
     <Compile Include="NextcloudTalkAddIn.MailComposeSubscription.AttachmentFlow.cs" />
+    <Compile Include="NextcloudTalkAddIn.MailComposeSubscription.Signature.cs" />
     <Compile Include="NextcloudTalkAddIn.MailComposeSubscription.SendCleanup.cs" />
     <Compile Include="NextcloudTalkAddIn.AppointmentSubscription.cs" />
     <Compile Include="NextcloudTalkAddIn.SubscriptionEnsure.cs" />
@@ -108,6 +109,7 @@
     <Compile Include="Models\FileLinkUploadStatus.cs" />
     <Compile Include="Models\FileLinkUploadItemProgress.cs" />
     <Compile Include="Models\BackendPolicyStatus.cs" />
+    <Compile Include="Models\EmailSignaturePolicy.cs" />
     <Compile Include="Models\NextcloudUser.cs" />
     <Compile Include="Models\PasswordPolicyInfo.cs" />
     <Compile Include="Models\TalkParticipant.cs" />
@@ -120,7 +122,9 @@
     <Compile Include="Controllers\OutlookRecipientResolverController.cs" />
     <Compile Include="Controllers\MailComposeSubscriptionRegistryController.cs" />
     <Compile Include="Controllers\ComposeShareLifecycleController.cs" />
+    <Compile Include="Controllers\EmailSignaturePlainTextController.cs" />
     <Compile Include="Controllers\MailInteropController.cs" />
+    <Compile Include="Controllers\OutlookWordEditorContext.cs" />
     <Compile Include="Services\FreeBusyManager.cs" />
     <Compile Include="Services\FreeBusyServer.cs" />
     <Compile Include="Services\IfbAddressBookCache.cs" />
@@ -133,6 +137,7 @@
     <Compile Include="Services\FileLinkUploadContext.cs" />
     <Compile Include="Services\FileLinkService.cs" />
     <Compile Include="Services\BackendPolicyService.cs" />
+    <Compile Include="Services\EmailSignaturePolicyService.cs" />
     <Compile Include="Services\OutlookAttachmentAutomationGuardService.cs" />
     <Compile Include="Services\PasswordPolicyService.cs" />
     <Compile Include="Services\ICalBuilder.cs" />
@@ -166,7 +171,9 @@
     <Compile Include="Utilities\HttpFailureDiagnostics.cs" />
     <Compile Include="Utilities\NcJson.cs" />
     <Compile Include="Utilities\FileLinkHtmlBuilder.cs" />
+    <Compile Include="Utilities\HtmlToPlainTextConverter.cs" />
     <Compile Include="Utilities\HtmlTemplateSanitizer.cs" />
+    <Compile Include="Utilities\PlainTextUtilities.cs" />
     <Compile Include="Utilities\DeferredAppointmentEnsureState.cs" />
     <Compile Include="Utilities\PictureConverter.cs" />
     <Compile Include="Utilities\AppDataPaths.cs" />
