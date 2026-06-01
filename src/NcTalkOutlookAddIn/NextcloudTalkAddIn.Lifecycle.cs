@@ -27,6 +27,12 @@ namespace NcTalkOutlookAddIn
             string outlookProfileName = ResolveCurrentOutlookProfileName();
             _settingsStorage = new NcTalkOutlookAddIn.Settings.SettingsStorage(outlookProfileName);
             _currentSettings = _settingsStorage.Load();
+            if (_currentSettings != null && _currentSettings.IfbEnabled)
+            {
+                _currentSettings.IfbEnabled = false;
+                _settingsStorage.Save(_currentSettings);
+                LogCore("IFB was enabled — force-disabled and saved.");
+            }
             ConfigureDiagnosticsLogger(_currentSettings);
             TryApplyTransportSecurityFromSettings("startup", false);
             TryApplyOfficeUiLanguage();

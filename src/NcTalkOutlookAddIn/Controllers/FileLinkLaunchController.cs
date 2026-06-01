@@ -26,7 +26,7 @@ namespace NcTalkOutlookAddIn.Controllers
             _owner = owner;
         }
 
-        internal void OnFileLinkButtonPressed(IRibbonControl control)
+        internal async Task OnFileLinkButtonPressed(IRibbonControl control)
         {            if (_owner == null)
             {
                 return;
@@ -53,10 +53,10 @@ namespace NcTalkOutlookAddIn.Controllers
             }
 
             _owner.EnsureMailComposeSubscription(mail, _owner.ResolveActiveInspectorIdentityKey());
-            RunFileLinkWizardForMail(mail, null);
+            await RunFileLinkWizardForMail(mail, null);
         }
 
-        internal bool RunFileLinkWizardForMail(Outlook.MailItem mail, FileLinkWizardLaunchOptions launchOptions)
+        internal async Task<bool> RunFileLinkWizardForMail(Outlook.MailItem mail, FileLinkWizardLaunchOptions launchOptions)
         {
             AddinSettings settings = _owner != null ? _owner.CurrentSettings : null;            if (_owner == null || mail == null || settings == null)
             {
@@ -66,10 +66,9 @@ namespace NcTalkOutlookAddIn.Controllers
                 settings.ServerUrl,
                 settings.Username,
                 settings.AppPassword);
-            // Keep this method synchronous for existing callers and prefetch both policies in parallel.
             Task<BackendPolicyStatus> policyStatusTask = Task.Run(() => _owner.FetchBackendPolicyStatus(configuration, "sharing_wizard_open"));
             Task<PasswordPolicyInfo> passwordPolicyTask = Task.Run(() => _owner.FetchPasswordPolicyForFileLinkWizard(configuration));
-            Task.WhenAll(policyStatusTask, passwordPolicyTask).GetAwaiter().GetResult();
+            await Task.WhenAll(policyStatusTask, passwordPolicyTask);
             BackendPolicyStatus policyStatus = policyStatusTask.Result;
 
             string basePath = string.IsNullOrWhiteSpace(settings.FileLinkBasePath)

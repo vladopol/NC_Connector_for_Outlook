@@ -224,13 +224,13 @@ namespace NcTalkOutlookAddIn
                 }
             }
 
-            private void OnAttachmentEvalTimerTick(object sender, EventArgs e)
+            private async void OnAttachmentEvalTimerTick(object sender, EventArgs e)
             {
                 _attachmentEvalTimer.Stop();
 
                 try
                 {
-                    EvaluateAttachmentAutomation();
+                    await EvaluateAttachmentAutomation();
                 }
                 catch (Exception ex)
                 {
@@ -241,13 +241,13 @@ namespace NcTalkOutlookAddIn
                 }
             }
 
-            private void OnBeforeAddShareTimerTick(object sender, EventArgs e)
+            private async void OnBeforeAddShareTimerTick(object sender, EventArgs e)
             {
                 _beforeAddShareTimer.Stop();
 
                 try
                 {
-                    RunQueuedBeforeAddAttachmentShareFlow();
+                    await RunQueuedBeforeAddAttachmentShareFlow();
                 }
                 catch (Exception ex)
                 {
@@ -258,7 +258,7 @@ namespace NcTalkOutlookAddIn
                 }
             }
 
-            private void EvaluateAttachmentAutomation()
+            private async Task EvaluateAttachmentAutomation()
             {
                 if (_disposed || _attachmentSuppressed)
                 {
@@ -310,7 +310,7 @@ namespace NcTalkOutlookAddIn
 
                 if (settings.AlwaysConnector)
                 {
-                    StartComposeAttachmentShareFlow("always", totalBytes, settings.ThresholdMb, lastAdded);
+                    await StartComposeAttachmentShareFlow("always", totalBytes, settings.ThresholdMb, lastAdded);
                     return;
                 }
                 if (!settings.OfferAboveEnabled || totalBytes <= settings.ThresholdBytes)
@@ -362,7 +362,7 @@ namespace NcTalkOutlookAddIn
                         + ", thresholdBytes="
                         + settings.ThresholdBytes.ToString(CultureInfo.InvariantCulture)
                         + ").");
-                    StartComposeAttachmentShareFlow("threshold", totalBytes, settings.ThresholdMb, lastAdded);
+                    await StartComposeAttachmentShareFlow("threshold", totalBytes, settings.ThresholdMb, lastAdded);
                     return;
                 }
 
@@ -546,7 +546,7 @@ namespace NcTalkOutlookAddIn
                 };
             }
 
-            private void StartComposeAttachmentShareFlow(string trigger, long totalBytes, int thresholdMb, AttachmentBatchInfo lastAdded)
+            private async Task StartComposeAttachmentShareFlow(string trigger, long totalBytes, int thresholdMb, AttachmentBatchInfo lastAdded)
             {
                 OutlookAttachmentAutomationGuardService.GuardState guardState;
                 if (_owner.TryGetAttachmentAutomationGuardState("start_flow", _composeKey, out guardState))
@@ -582,7 +582,7 @@ namespace NcTalkOutlookAddIn
                 }
                 try
                 {
-                    bool wizardAccepted = _owner.RunFileLinkWizardForMail(_mail, launchOptions);
+                    bool wizardAccepted = await _owner.RunFileLinkWizardForMail(_mail, launchOptions);
                     LogFileLink(
                         "Compose attachment flow completed (composeKey="
                         + _composeKey
@@ -822,7 +822,7 @@ namespace NcTalkOutlookAddIn
                 return string.Empty;
             }
 
-            private void StartBeforeAddAttachmentShareFlow(
+            private async void StartBeforeAddAttachmentShareFlow(
                 string trigger,
                 AttachmentBatchEntry candidate,
                 string localPath,
@@ -847,7 +847,7 @@ namespace NcTalkOutlookAddIn
 
                 try
                 {
-                    bool wizardAccepted = _owner.RunFileLinkWizardForMail(_mail, launchOptions);
+                    bool wizardAccepted = await _owner.RunFileLinkWizardForMail(_mail, launchOptions);
                     LogFileLink(
                         "Compose before-attachment-add share flow completed (composeKey="
                         + _composeKey
@@ -858,6 +858,10 @@ namespace NcTalkOutlookAddIn
                         + ", attachment="
                         + (candidate != null ? (candidate.Name ?? string.Empty) : string.Empty)
                         + ").");
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticsLogger.LogException(LogCategories.FileLink, "Before-attachment-add share flow failed (composeKey=" + _composeKey + ").", ex);
                 }
                 finally
                 {
@@ -921,7 +925,7 @@ namespace NcTalkOutlookAddIn
                 }
             }
 
-            private void RunQueuedBeforeAddAttachmentShareFlow()
+            private async Task RunQueuedBeforeAddAttachmentShareFlow()
             {
                 if (_disposed || _beforeAddShareFlowRunning || _pendingBeforeAddShareEntries.Count == 0)
                 {
@@ -973,7 +977,7 @@ namespace NcTalkOutlookAddIn
                     launchOptions.AttachmentLastName = lastName;
                     launchOptions.AttachmentLastSizeBytes = lastSize;
 
-                    bool wizardAccepted = _owner.RunFileLinkWizardForMail(_mail, launchOptions);
+                    bool wizardAccepted = await _owner.RunFileLinkWizardForMail(_mail, launchOptions);
                     LogFileLink(
                         "Compose before-attachment-add queued share flow completed (composeKey="
                         + _composeKey

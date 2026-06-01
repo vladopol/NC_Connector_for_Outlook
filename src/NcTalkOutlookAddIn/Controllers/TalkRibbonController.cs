@@ -77,10 +77,10 @@ namespace NcTalkOutlookAddIn.Controllers
 
             var addressbookCache = new IfbAddressBookCache(_owner.SettingsStorage != null ? _owner.SettingsStorage.DataDirectory : null);
             NextcloudTalkAddIn.LogTalkMessage("System address book status check requested (context=talk_click, forceRefresh=True).");
-            var talkClickAddressbookStatus = addressbookCache.GetSystemAddressbookStatus(
+            var talkClickAddressbookStatus = await Task.Run(() => addressbookCache.GetSystemAddressbookStatus(
                 configuration,
                 settings.IfbCacheHours,
-                true);
+                true));
             NextcloudTalkAddIn.LogTalkMessage(
                 "System address book status result (context=talk_click, available=" + talkClickAddressbookStatus.Available
                 + ", count=" + talkClickAddressbookStatus.Count
@@ -94,7 +94,7 @@ namespace NcTalkOutlookAddIn.Controllers
             try
             {
                 userDirectory = talkClickAddressbookStatus.Available
-                    ? addressbookCache.GetUsers(configuration, settings.IfbCacheHours, false)
+                    ? await Task.Run(() => addressbookCache.GetUsers(configuration, settings.IfbCacheHours, false))
                     : new List<NextcloudUser>();
             }
             catch (Exception ex)
