@@ -86,59 +86,6 @@ namespace NcTalkOutlookAddIn.Utilities
             return html.ToString();
         }
 
-        // Returns plain-text equivalent of Build() for Word TypeText insertion, or null if a policy HTML template is active.
-        internal static string BuildPlainText(FileLinkResult result, FileLinkRequest request, string languageOverride, BackendPolicyStatus policyStatus = null)
-        {
-            if (result == null)
-            {
-                throw new ArgumentNullException("result");
-            }
-            bool attachmentMode = request != null && request.AttachmentMode;
-            bool separatePassword = request != null
-                && request.PasswordSeparateEnabled
-                && !string.IsNullOrWhiteSpace(result.Password);
-            string effectiveLanguage = ResolveEffectiveLanguage(languageOverride, policyStatus);
-
-            string policyTemplate = ResolvePolicyTemplate(policyStatus, false, effectiveLanguage);
-            if (!string.IsNullOrWhiteSpace(policyTemplate))
-            {
-                return null;
-            }
-            if (string.Equals(effectiveLanguage, "custom", StringComparison.OrdinalIgnoreCase))
-            {
-                effectiveLanguage = "default";
-            }
-
-            string downloadLabel = Strings.GetInLanguage(effectiveLanguage, "sharing_html_download_label", "Download link");
-            string passwordLabel = Strings.GetInLanguage(effectiveLanguage, "sharing_html_password_label", "Password");
-            string expireLabel = Strings.GetInLanguage(effectiveLanguage, "sharing_html_expire_label", "Expiration date");
-            string passwordSeparateHint = Strings.GetInLanguage(effectiveLanguage, "sharing_html_password_separate_hint", "The password will be sent in a separate email.");
-
-            string downloadUrl = attachmentMode
-                ? BuildAttachmentZipDownloadUrl(result.ShareUrl, result.ShareToken)
-                : (result.ShareUrl ?? string.Empty);
-
-            var text = new StringBuilder();
-            text.Append(downloadLabel).Append("\r\n").Append(downloadUrl);
-
-            if (!string.IsNullOrEmpty(result.Password) && !separatePassword)
-            {
-                text.Append("\r\n\r\n").Append(passwordLabel).Append(": ").Append(result.Password);
-            }
-            else if (separatePassword)
-            {
-                text.Append("\r\n\r\n").Append(passwordLabel).Append(": ").Append(passwordSeparateHint);
-            }
-
-            if (result.ExpireDate.HasValue)
-            {
-                text.Append("\r\n\r\n").Append(expireLabel).Append(": ")
-                    .Append(result.ExpireDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
-            }
-
-            return text.ToString();
-        }
-
         internal static string BuildPasswordOnly(FileLinkResult result, string languageOverride, BackendPolicyStatus policyStatus = null)
         {
             if (result == null)
