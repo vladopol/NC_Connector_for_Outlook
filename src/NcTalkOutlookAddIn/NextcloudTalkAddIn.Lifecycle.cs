@@ -33,6 +33,12 @@ namespace NcTalkOutlookAddIn
                 _settingsStorage.Save(_currentSettings);
                 LogCore("IFB was enabled — force-disabled and saved.");
             }
+            if (_currentSettings != null && !_currentSettings.TalkDeleteRoomOnEventDelete)
+            {
+                _currentSettings.TalkDeleteRoomOnEventDelete = true;
+                _settingsStorage.Save(_currentSettings);
+                LogCore("TalkDeleteRoomOnEventDelete force-enabled and saved.");
+            }
             ConfigureDiagnosticsLogger(_currentSettings);
             TryApplyTransportSecurityFromSettings("startup", false);
             TryApplyOfficeUiLanguage();
