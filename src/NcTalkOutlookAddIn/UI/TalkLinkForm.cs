@@ -188,13 +188,7 @@ namespace NcTalkOutlookAddIn.UI
             _titleLabel.Text = Strings.TalkTitleLabel;
             _titleLabel.AutoSize = true;
 
-            _roomTypeComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
-            _roomTypeComboBox.Items.Add(new RoomTypeOption(TalkRoomType.EventConversation, Strings.TalkEventRadio));
-            _roomTypeComboBox.Items.Add(new RoomTypeOption(TalkRoomType.StandardRoom, Strings.TalkStandardRadio));
-            _roomTypeComboBox.SelectedIndexChanged += (s, e) => UpdateRoomTypeTooltip();
-
-            _roomTypeLabel.Text = Strings.TalkRoomGroup;
-            _roomTypeLabel.AutoSize = true;
+            // Room type selector hidden — EventConversation is always used.
 
             _passwordToggleCheckBox.Text = Strings.TalkPasswordSetCheck;
             _passwordToggleCheckBox.AutoSize = true;
@@ -213,7 +207,7 @@ namespace NcTalkOutlookAddIn.UI
             _settingsGroup.Text = Strings.TalkSettingsGroup;
 
             InitializeSettingsOptionCheckBox(_addUsersCheckBox, Strings.TalkAddUsersCheck);
-            InitializeSettingsOptionCheckBox(_addGuestsCheckBox, Strings.TalkAddGuestsCheck);
+            // AddGuests hidden — external users connect via room link and password.
             InitializeSettingsOptionCheckBox(_lobbyCheckBox, Strings.TalkLobbyCheck);
             InitializeSettingsOptionCheckBox(_searchCheckBox, Strings.TalkSearchCheck);
 
@@ -360,8 +354,6 @@ namespace NcTalkOutlookAddIn.UI
 
             Controls.Add(_titleLabel);
             Controls.Add(_titleTextBox);
-            Controls.Add(_roomTypeLabel);
-            Controls.Add(_roomTypeComboBox);
             Controls.Add(_eventSupportHintLabel);
             Controls.Add(_passwordToggleCheckBox);
             Controls.Add(_passwordLabel);
@@ -380,7 +372,6 @@ namespace NcTalkOutlookAddIn.UI
             _toolTip.InitialDelay = 250;
             _toolTip.ReshowDelay = 150;
             _toolTip.SetToolTip(_addUsersCheckBox, Strings.TooltipAddUsers);
-            _toolTip.SetToolTip(_addGuestsCheckBox, Strings.TooltipAddGuests);
             _toolTip.SetToolTip(_lobbyCheckBox, Strings.TooltipLobby);
             _toolTip.SetToolTip(_searchCheckBox, Strings.TooltipSearchVisible);
             _toolTip.SetToolTip(_moderatorTextBox, Strings.TooltipModerator);
@@ -436,11 +427,6 @@ namespace NcTalkOutlookAddIn.UI
                 _titleTextBox.SetBounds(inputX, y, inputWidth, _titleTextBox.PreferredHeight + ScaleLogical(2));
                 y = Math.Max(_titleLabel.Bottom, _titleTextBox.Bottom) + rowGap;
 
-                int roomTypeComboHeight = Math.Max(_roomTypeComboBox.PreferredHeight + ScaleLogical(2), _roomTypeComboBox.ItemHeight + ScaleLogical(8));
-                _roomTypeLabel.Location = new Point(labelX, y + Math.Max(0, (roomTypeComboHeight - _roomTypeLabel.PreferredHeight) / 2));
-                _roomTypeComboBox.SetBounds(inputX, y, inputWidth, roomTypeComboHeight);
-                y = Math.Max(_roomTypeLabel.Bottom, _roomTypeComboBox.Bottom) + rowGap;
-
                 _eventSupportHintLabel.Visible = !_eventConversationsSupported;
                 if (_eventSupportHintLabel.Visible)
                 {
@@ -494,9 +480,8 @@ namespace NcTalkOutlookAddIn.UI
                 int settingsTop = ScaleLogical(24);
                 int settingsLineGap = ScaleLogical(24);
                 _addUsersCheckBox.Location = new Point(settingsLeft, settingsTop);
-                _addGuestsCheckBox.Location = new Point(settingsLeft, settingsTop + settingsLineGap);
-                _lobbyCheckBox.Location = new Point(settingsLeft, settingsTop + (settingsLineGap * 2));
-                _searchCheckBox.Location = new Point(settingsLeft, settingsTop + (settingsLineGap * 3));
+                _lobbyCheckBox.Location = new Point(settingsLeft, settingsTop + settingsLineGap);
+                _searchCheckBox.Location = new Point(settingsLeft, settingsTop + (settingsLineGap * 2));
                 int settingsGroupHeight = _searchCheckBox.Bottom + ScaleLogical(14);
                 _settingsGroup.Height = Math.Max(ScaleLogical(108), settingsGroupHeight);
 
