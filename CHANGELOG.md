@@ -4,6 +4,29 @@ All notable changes to **NC Connector for Outlook** will be documented in this f
 
 This project follows the principles of **Keep a Changelog** and **Semantic Versioning**.
 
+## [3.1.0] - 2026-05-12
+
+### Added
+- Central backend-managed email signatures for matching Outlook sender identities.
+- Backend signatures for HTML/RTF and plain-text compose, including replies and forwards.
+- Nextcloud share insertion from inline reply and forward windows.
+- Plain-text share insertion that keeps Outlook's reply text intact.
+- Chunked Nextcloud WebDAV upload v2 for large shared files.
+- Per-file upload speed display in the Outlook sharing wizard.
+
+### Changed
+- Outlook WordEditor insertion paths now use shared helpers for inspector and inline compose windows.
+- Share, signature, and separate-password mail handling now preserve the sender identity captured from the original compose item.
+- Talk room deletion for saved appointments is controlled by an explicit opt-in policy.
+- Talk event cleanup stays local to Outlook metadata and no longer depends on generic Talk URL fallbacks.
+- Sharing wizard status rendering was adjusted so progress and speed text remain readable.
+
+### Fixed
+- Inline reply sends now dispatch queued separate password follow-up mails.
+- Separate password follow-up mails now receive the backend signature when the captured sender matches the signature policy.
+- Manual fallback drafts for separate password mails include the same backend signature handling as auto-send.
+- Talk lobby timing and saved-event cleanup were corrected for edited appointments.
+
 ## [3.0.4] - 2026-04-28
 
 ### Added
@@ -208,5 +231,4 @@ This project follows the principles of **Keep a Changelog** and **Semantic Versi
 
 ### Documentation
 - Expanded admin and developer documentation.
-
 

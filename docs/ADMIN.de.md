@@ -8,7 +8,7 @@ Dieses Dokument beschreibt Installation, Rollout und Betrieb des **NC Connector 
 - [Updates / Upgrade-Verhalten](#updates--upgrade-verhalten)
 - [Dateien & Registry](#dateien--registry)
 - [Einstellungen (Profil-XML)](#einstellungen-profil-xml)
-- [Compose-Freigabe-Lifecycle (3.0.4)](#compose-freigabe-lifecycle-304)
+- [Compose-Freigabe-Lifecycle (3.1.0)](#compose-freigabe-lifecycle-310)
 - [Talk-Termin-Templates (HTML) — Outlook-sicheres Subset](#talk-termin-templates-html--outlook-sicheres-subset)
 - [Internet Free/Busy Gateway (IFB)](#internet-freebusy-gateway-ifb)
 - [Systemadressbuch erforderlich fuer Benutzersuche und Moderator-Auswahl](#systemadressbuch-erforderlich-fuer-benutzersuche-und-moderator-auswahl)
@@ -23,7 +23,7 @@ Dieses Dokument beschreibt Installation, Rollout und Betrieb des **NC Connector 
 Beispiel (silent):
 
 ```powershell
-msiexec /i "NCConnectorForOutlook-3.0.4.msi" /qn /norestart
+msiexec /i "NCConnectorForOutlook-3.1.0.msi" /qn /norestart
 ```
 
 Danach Outlook starten. Im Ribbon erscheint der Tab **NC Connector** (Kalender/Termin + E-Mail).
@@ -102,6 +102,10 @@ Beispiel (Auszug):
   <DebugLoggingEnabled>false</DebugLoggingEnabled>
   <LogAnonymizationEnabled>true</LogAnonymizationEnabled>
   <FileLinkBasePath>NC Connector</FileLinkBasePath>
+  <TalkDeleteRoomOnEventDelete>false</TalkDeleteRoomOnEventDelete>
+  <EmailSignatureOnCompose>true</EmailSignatureOnCompose>
+  <EmailSignatureOnReply>true</EmailSignatureOnReply>
+  <EmailSignatureOnForward>true</EmailSignatureOnForward>
 </Settings>
 ```
 
@@ -117,15 +121,48 @@ Empfehlung:
 - Nur Base-URL und Defaults pre-seeden.
 - Credentials entweder ueber Login Flow v2 oder per Benutzer setzen lassen (empfohlen fuer DPAPI-Kompatibilitaet).
 
-## Compose-Freigabe-Lifecycle (3.0.4)
+## Talk-Raum-Loeschschutz
 
-### Attachment-Automatisierung und Cleanup-Vertrag
+Das Loeschen eines gespeicherten Outlook-Termins stellt die entfernte Talk-Raumloeschung nur an, wenn `TalkDeleteRoomOnEventDelete` lokal aktiviert oder per Backend-Policy `talk_delete_room_on_event_delete` gesperrt/aktiviert ist. Ausserdem muss der Termin NC-Connector-Metadaten (`X-NCTALK-TOKEN`) tragen. Generische Talk-Links in `Location` oder URL-Feldern werden ignoriert.
+
+Der Cleanup fuer neu erzeugte Termine, die vor dem Speichern verworfen werden, bleibt davon unberuehrt und loescht den gerade erzeugten Raum weiterhin best effort.
+
+## Zentrale E-Mail-Signatur
+
+Wenn das optionale NC-Connector-Backend installiert ist, kann Outlook eine zentrale HTML-Signatur aus der Backend-Policy verwenden. Das ist bewusst an den Seat-Benutzer gekoppelt:
+
+- der Backend-Endpunkt muss erreichbar sein
+- dem aktuellen Benutzer muss ein aktiver Seat zugewiesen sein
+- der Backend-Status muss `policy.email_signature` und `policy_editable.email_signature` enthalten
+- `policy.email_signature.email_signature_on_compose` muss `true` sein
+- `policy.email_signature.email_signature_template` muss HTML enthalten
+- `policy.email_signature.user_email` muss die E-Mail-Adresse des Nextcloud-Benutzers enthalten
+- die effektive Outlook-Absenderidentitaet muss genau zu dieser E-Mail-Adresse passen. Wenn Outlook einen `SentOnBehalfOfName`-/Von-Override fuer ein Shared Mailbox- oder delegiertes Exchange-Konto verwendet, muss genau dieser Override auf dieselbe SMTP-Adresse aufloesbar sein; andernfalls wird keine Backend-Signatur eingefuegt.
+
+Die lokalen Einstellungen `EmailSignatureOnCompose`, `EmailSignatureOnReply` und `EmailSignatureOnForward` steuern, ob die Backend-Signatur bei neuen Mails, Antworten und Weiterleitungen eingefuegt wird. Wenn das Backend einen Wert per `policy_editable.email_signature.<key>=false` sperrt, ist die Option im UI gesperrt und Outlook verwendet den Backend-Wert.
+
+Wenn ein aelteres Backend Freigabe-/Talk-Policy liefert, aber noch keine `policy.email_signature`-Domain kennt, bleiben nur zentrale Signaturen deaktiviert. Die Settings zeigen dann einen Backend-Update-Hinweis; Freigabe und Talk bleiben von dieser Signatur-Domain getrennt.
+
+Wichtig fuer Rollout und Support: Wenn `EmailSignatureOnCompose` fuer das passende Outlook-Absenderkonto aktiv ist, gehoert der Signaturplatz dieser Identitaet NC Connector. In HTML/RTF-Compose werden beim Oeffnen erkannte Outlook-native Signaturen oder Signaturen aus anderen Add-ins nur dann entfernt, wenn die Grenze zur zitierten Nachricht strukturell erkennbar ist. Ist diese Grenze nicht strukturell erkennbar, erhaelt NC Connector Outlooks zitierte Nachricht und den Trenner. Wird die Backend-Signatur vor einem Antwort-/Weiterleitungs-Trenner eingefuegt, behaelt NC Connector eine leere Zeile zwischen Signatur und zitierter Nachricht.
+
+Plain-Text-Compose bleibt Plain Text. Outlook wird nicht auf HTML umgestellt. NC Connector wandelt das bereinigte Backend-HTML in Plain Text um und schreibt es ueber Outlooks WordEditor-Signaturplatz. Es werden keine lokalisierten Antwort-Header geparst und `MailItem.Body` wird nicht direkt neu geschrieben.
+
+Wenn die Backend-Signatur inaktiv oder unvollstaendig ist, die Compose-Signatur-Policy ausgeschaltet wurde oder das Outlook-Absenderkonto nicht zum Nextcloud-Benutzer passt, greift NC Connector nicht in Outlooks eigene Signaturen ein. Entfernt oder ersetzt wird dann nur ein Signaturblock oder verwaltetes Plain-Text-Bookmark, den bzw. das NC Connector selbst in das geoeffnete Compose-Fenster eingefuegt hat.
+
+Die Backend-Signatur wird als HTML geliefert und mit demselben fail-closed Sanitizer bereinigt wie Freigabe- und Talk-Templates. HTML/RTF-Signaturen werden als markierter HTML-Block eingefuegt; Plain-Text-Signaturen werden fuer die offene Compose-Session ueber ein Word-Bookmark verfolgt.
+
+## Compose-Freigabe-Lifecycle (3.1.0)
+
+### Attachment-Automatisierung und Cleanup-Regeln
+- Der Button `Nextcloud Freigabe hinzufuegen` ist auch in Outlook-Inline-Antworten/-Weiterleitungen im Tab Nachricht verfuegbar und nutzt denselben Wizard-Pfad wie Mail-Compose-Inspectoren.
+- Inline-Antworten/-Weiterleitungen schreiben den Freigabeblock ueber Outlooks aktiven Inline-WordEditor. HTML/RTF-Mails behalten zwei leere Zeilen ueber dem Freigabeblock; Plain-Text-Mails bleiben Plain Text und verwenden den gerahmten `#`-Block.
 - Im Compose-Attachment-Modus werden serverseitige Artefakte direkt nach Share-Erstellung fuer Cleanup-Tracking registriert.
 - Cleanup wird erst nach bestaetigtem erfolgreichem Hauptversand wieder entfernt.
 - Wird das Compose-Fenster ohne erfolgreichen Versand geschlossen, loescht das Add-in die erzeugten Share-Ordner-Artefakte serverseitig (best effort, mit Grace-Timer fuer Send/Close-Race).
 - Die Anhangsautomatisierung wertet neue Dateien sowohl pre-add (`BeforeAttachmentAdd`) als auch post-add aus; kann pre-add ein lokaler Dateipfad aufgeloest werden, kann der NC-Flow den Host-Add best effort vor der normalen Outlook-Post-Add-Verarbeitung abbrechen.
 - In Microsoft-365-/Exchange-Umgebungen mit serverseitigen Nachrichtengroessenlimits kann Outlook grosse Anhaenge bereits vor den Add-in-Events blockieren; in diesen Faellen kann die Automatisierung technisch nicht greifen und der Benutzer soll stattdessen den Button `Nextcloud Freigabe hinzufuegen` verwenden.
 - Im Datei-Schritt des Sharing-Wizards koennen Dateien und Ordner per Explorer-Drag-and-drop im gesamten Schrittbereich (Queue + Aktionsbereich) hinzugefuegt werden, nicht nur ueber die Add-Buttons.
+- Datei-Uploads groesser als 20 MB nutzen Nextcloud Chunked Upload v2. Damit vermeiden wir lange einzelne WebDAV-`PUT`-Requests durch Proxies oder Webserver, die sehr grosse Request-Bodies ablehnen.
 
 ### Separater Passwort-Follow-up-Versand
 - Ist `Passwort separat senden` aktiv, enthaelt der Haupt-HTML-Block kein Inline-Passwort.

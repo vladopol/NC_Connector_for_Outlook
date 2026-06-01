@@ -536,6 +536,30 @@
   "options_tab_sharing": {
     "message": "Sdílení"
   },
+  "options_tab_signature": {
+    "message": "Podpis"
+  },
+  "options_signature_defaults_heading": {
+    "message": "E-mailový podpis"
+  },
+  "options_signature_identity_hint": {
+    "message": "Centrální podpis se použije pouze tehdy, když účet odesílatele v Outlooku odpovídá e-mailové adrese uživatele Nextcloud."
+  },
+  "options_signature_on_compose_label": {
+    "message": "Přidat podpis při psaní zprávy"
+  },
+  "options_signature_on_reply_label": {
+    "message": "Přidat podpis při odpovědi"
+  },
+  "options_signature_on_forward_label": {
+    "message": "Přidat podpis při přeposílání"
+  },
+  "options_signature_backend_inactive_tooltip": {
+    "message": "Centrální zásada podpisu je neaktivní nebo neúplná."
+  },
+  "options_signature_backend_update_required_tooltip": {
+    "message": "Aktualizujte prosím backend NC Connector. Tato verze backendu zatím nepodporuje centrální e-mailové podpisy."
+  },
   "options_tab_talklink": {
     "message": "Odkaz Talk"
   },
@@ -606,7 +630,7 @@
     "message": "https://nc-connector.de"
   },
   "options_about_overview_text": {
-    "message": "Více než jen odkazy na soubory\n\nNC Connector propojuje bezpečné sdílení souborů, schůzky v Talku a automatizaci příloh přímo s Thunderbirdem a Outlookem. Důležité týmové pracovní postupy tak zůstávají tam, kam patří: v poštovním a kalendářovém klientovi.\n\nCo NC Connector pokrývá\n- Sdílení souborů s heslem, datem vypršení platnosti a volitelným samostatným doručením hesla\n- Vytváření a aktualizace schůzek v Talku přímo z kalendářních událostí\n- Automatizaci příloh s jasnými pravidly místo ručních jednotlivých kroků\n- Jednotné bloky pro sdílení a pozvánky přímo v běžném pracovním postupu\n\nVolitelně s Nextcloud backendem\n- Centrální přidělování Seatů a správa zásad\n- Vlastní šablony a designy pro sdílení a pozvánky do Talku\n- Samostatné doručování hesel a centrální řízení pro organizace\n- 1 Seat = 1 uživatel Nextcloud\n\nBez backendu zůstávají add-ony přímo použitelné. S backendem přibývá centrální řízení pro týmy a organizace."
+    "message": "Více než jen odkazy na soubory\n\nNC Connector propojuje bezpečné sdílení souborů, schůzky v Talku, automatizaci příloh i centrálně spravované e-mailové podpisy přímo s Thunderbirdem a Outlookem. Důležité týmové pracovní postupy tak zůstávají tam, kam patří: v poštovním a kalendářovém klientovi.\n\nCo NC Connector pokrývá\n- Sdílení souborů s heslem, datem vypršení platnosti a volitelným samostatným doručením hesla\n- Vytváření a aktualizace schůzek v Talku přímo z kalendářních událostí\n- Automatizaci příloh s jasnými pravidly místo ručních jednotlivých kroků\n- Jednotné bloky pro sdílení a pozvánky přímo v běžném pracovním postupu\n- Centrální e-mailové podpisy pro psaní, odpovědi a přeposílání s využitím údajů profilu Nextcloud\n\nVolitelně s Nextcloud backendem\n- Centrální přidělování Seatů a správa zásad\n- Vlastní šablony a designy pro sdílení, pozvánky do Talku a e-mailové podpisy\n- Samostatné doručování hesel a centrální řízení pro organizace\n- 1 Seat = 1 uživatel Nextcloud\n\nBez backendu zůstávají add-ony přímo použitelné. S backendem přibývá centrální řízení pro týmy a organizace."
   },
   "options_about_more_info_label": {
     "message": "Vice informaci -->"
@@ -697,6 +721,12 @@
   },
   "options_talk_default_password_label": {
     "message": "Nastavit heslo"
+  },
+  "options_talk_delete_room_on_event_delete_label": {
+    "message": "Odstranit mistnost Talk pri odstraneni ulozene udalosti"
+  },
+  "options_talk_delete_room_on_event_delete_tooltip": {
+    "message": "Vyzaduje metadata Talk z NC Connectoru a toto vyslovne povoleni. Uklid neulozenych udalosti zustava aktivni."
   },
   "options_talk_default_roomtype_label": {
     "message": "Typ místnosti"
@@ -929,6 +959,9 @@
   "sharing_status_uploading_bulk": {
     "message": "Nahrávají se soubory..."
   },
+  "sharing_status_speed_kbps": {
+    "message": "$1 KB/s"
+  },
   "sharing_message_invalid_share_name": {
     "message": "Zadejte název sdílení."
   },
@@ -979,7 +1012,8 @@
   },
   "outlook_ifb_port_label": {
     "message": "Místní port IFB:"
-  },  "outlook_ifb_cache_hours_label": {
+  },
+  "outlook_ifb_cache_hours_label": {
     "message": "Mezipaměť adresáře (hodiny):"
   },
   "outlook_debug_file_label": {
@@ -1391,6 +1425,3 @@
     "message": "Když jsou výchozí zásady TLS operačního systému vypnuté, povolte alespoň jednu verzi TLS (1.2 nebo 1.3)."
   }
 }
-
-
-

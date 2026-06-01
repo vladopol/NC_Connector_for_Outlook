@@ -536,6 +536,30 @@
   "options_tab_sharing": {
     "message": "Udostępnianie"
   },
+  "options_tab_signature": {
+    "message": "Podpis"
+  },
+  "options_signature_defaults_heading": {
+    "message": "Podpis e-mail"
+  },
+  "options_signature_identity_hint": {
+    "message": "Centralny podpis jest stosowany tylko wtedy, gdy konto nadawcy w Outlooku odpowiada adresowi e-mail użytkownika Nextcloud."
+  },
+  "options_signature_on_compose_label": {
+    "message": "Dodaj podpis podczas tworzenia wiadomości"
+  },
+  "options_signature_on_reply_label": {
+    "message": "Dodaj podpis przy odpowiedzi"
+  },
+  "options_signature_on_forward_label": {
+    "message": "Dodaj podpis przy przekazywaniu"
+  },
+  "options_signature_backend_inactive_tooltip": {
+    "message": "Centralna polityka podpisu jest nieaktywna lub niekompletna."
+  },
+  "options_signature_backend_update_required_tooltip": {
+    "message": "Zaktualizuj backend NC Connector. Ta wersja backendu nie obsługuje jeszcze centralnych podpisów e-mail."
+  },
   "options_tab_talklink": {
     "message": "Link Talk"
   },
@@ -606,7 +630,7 @@
     "message": "https://nc-connector.de"
   },
   "options_about_overview_text": {
-    "message": "Więcej niż tylko linki do plików\n\nNC Connector łączy bezpieczne udostępnianie plików, spotkania Talk i automatyzację załączników bezpośrednio z Thunderbirdem i Outlookiem. Dzięki temu ważne przepływy pracy zespołu pozostają tam, gdzie powinny: w kliencie poczty i kalendarza.\n\nCo obejmuje NC Connector\n- Udostępnianie plików z hasłem, datą wygaśnięcia i opcjonalnym oddzielnym wysłaniem hasła\n- Tworzenie i aktualizowanie spotkań Talk bezpośrednio z wydarzeń kalendarza\n- Automatyzację załączników z jasnymi regułami zamiast ręcznych pojedynczych kroków\n- Spójne bloki udostępniania i zaproszeń bezpośrednio w codziennym przepływie pracy\n\nOpcjonalnie z backendem Nextcloud\n- Centralne przydzielanie Seatów i zarządzanie politykami\n- Własne szablony i projekty dla udostępnień oraz zaproszeń Talk\n- Oddzielne dostarczanie haseł i centralne sterowanie dla organizacji\n- 1 Seat = 1 użytkownik Nextcloud\n\nBez backendu dodatki pozostają od razu gotowe do użycia. Z backendem dochodzi centralne sterowanie dla zespołów i organizacji."
+    "message": "Więcej niż tylko linki do plików\n\nNC Connector łączy bezpieczne udostępnianie plików, spotkania Talk, automatyzację załączników oraz centralnie zarządzane podpisy e-mail bezpośrednio z Thunderbirdem i Outlookiem. Dzięki temu ważne przepływy pracy zespołu pozostają tam, gdzie powinny: w kliencie poczty i kalendarza.\n\nCo obejmuje NC Connector\n- Udostępnianie plików z hasłem, datą wygaśnięcia i opcjonalnym oddzielnym wysłaniem hasła\n- Tworzenie i aktualizowanie spotkań Talk bezpośrednio z wydarzeń kalendarza\n- Automatyzację załączników z jasnymi regułami zamiast ręcznych pojedynczych kroków\n- Spójne bloki udostępniania i zaproszeń bezpośrednio w codziennym przepływie pracy\n- Centralne podpisy e-mail dla pisania, odpowiedzi i przekazywania z użyciem danych profilu Nextcloud\n\nOpcjonalnie z backendem Nextcloud\n- Centralne przydzielanie Seatów i zarządzanie politykami\n- Własne szablony i projekty dla udostępnień, zaproszeń Talk oraz podpisów e-mail\n- Oddzielne dostarczanie haseł i centralne sterowanie dla organizacji\n- 1 Seat = 1 użytkownik Nextcloud\n\nBez backendu dodatki pozostają od razu gotowe do użycia. Z backendem dochodzi centralne sterowanie dla zespołów i organizacji."
   },
   "options_about_more_info_label": {
     "message": "Wiecej informacji -->"
@@ -697,6 +721,12 @@
   },
   "options_talk_default_password_label": {
     "message": "Ustaw hasło"
+  },
+  "options_talk_delete_room_on_event_delete_label": {
+    "message": "Usun pokoj Talk podczas usuwania zapisanego wydarzenia"
+  },
+  "options_talk_delete_room_on_event_delete_tooltip": {
+    "message": "Wymaga metadanych Talk z NC Connectora oraz tej wyraznej zgody. Czyszczenie niezapisanych wydarzen pozostaje aktywne."
   },
   "options_talk_default_roomtype_label": {
     "message": "Typ pokoju"
@@ -929,6 +959,9 @@
   "sharing_status_uploading_bulk": {
     "message": "Przesyłanie plików..."
   },
+  "sharing_status_speed_kbps": {
+    "message": "$1 KB/s"
+  },
   "sharing_message_invalid_share_name": {
     "message": "Wpisz nazwę udostępnienia."
   },
@@ -979,7 +1012,8 @@
   },
   "outlook_ifb_port_label": {
     "message": "Lokalny port IFB:"
-  },  "outlook_ifb_cache_hours_label": {
+  },
+  "outlook_ifb_cache_hours_label": {
     "message": "Pamięć podręczna książki adresowej (godziny):"
   },
   "outlook_debug_file_label": {
@@ -1391,6 +1425,3 @@
     "message": "Gdy domyślna polityka TLS systemu operacyjnego jest wyłączona, włącz co najmniej jedną wersję TLS (1.2 lub 1.3)."
   }
 }
-
-
-
