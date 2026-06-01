@@ -538,12 +538,7 @@ namespace NcTalkOutlookAddIn.UI
             int checkGap = ScaleLogical(6);
             int contentWidth = Math.Max(ScaleLogical(180), _talkDefaultsGroup.ClientSize.Width - (innerPadding * 2));
 
-            int comboLeft = Math.Max(ScaleLogical(180), _talkDefaultRoomTypeLabel.PreferredSize.Width + ScaleLogical(28));
-            int comboWidth = Math.Max(ScaleLogical(160), _talkDefaultsGroup.ClientSize.Width - comboLeft - ScaleLogical(12));
-            int comboHeight = Math.Max(_talkDefaultRoomTypeCombo.Height, _talkDefaultRoomTypeCombo.PreferredHeight + ScaleLogical(2));
-            _talkDefaultRoomTypeCombo.SetBounds(comboLeft, y - ScaleLogical(2), comboWidth, comboHeight);
-            _talkDefaultRoomTypeLabel.Location = new Point(innerPadding, _talkDefaultRoomTypeCombo.Top + Math.Max(0, (comboHeight - _talkDefaultRoomTypeLabel.PreferredHeight) / 2));
-            y = Math.Max(_talkDefaultRoomTypeLabel.Bottom, _talkDefaultRoomTypeCombo.Bottom) + rowGap;
+            // Room type selector hidden — EventConversation is always used for Outlook meetings.
 
             _talkDefaultPasswordCheckBox.Location = new Point(innerPadding, y);
             y = _talkDefaultPasswordCheckBox.Bottom + checkGap;
@@ -894,19 +889,7 @@ namespace NcTalkOutlookAddIn.UI
             _talkDefaultsGroup.Size = new Size(480, 248);
             _talkTab.Controls.Add(_talkDefaultsGroup);
 
-            _talkDefaultRoomTypeLabel.Text = Strings.TalkRoomGroup;
-            _talkDefaultRoomTypeLabel.Location = new Point(12, 28);
-            _talkDefaultRoomTypeLabel.AutoSize = true;
-            _talkDefaultsGroup.Controls.Add(_talkDefaultRoomTypeLabel);
-
-            _talkDefaultRoomTypeCombo.DropDownStyle = ComboBoxStyle.DropDownList;
-            _talkDefaultRoomTypeCombo.IntegralHeight = false;
-            _talkDefaultRoomTypeCombo.Location = new Point(200, 26);
-            _talkDefaultRoomTypeCombo.Width = 240;
-            _talkDefaultRoomTypeCombo.Items.Add(new TalkRoomTypeOption(TalkRoomType.EventConversation, Strings.TalkEventRadio));
-            _talkDefaultRoomTypeCombo.Items.Add(new TalkRoomTypeOption(TalkRoomType.StandardRoom, Strings.TalkStandardRadio));
-            _talkDefaultRoomTypeCombo.SelectedIndexChanged += (s, e) => UpdateTalkRoomTypeTooltip();
-            _talkDefaultsGroup.Controls.Add(_talkDefaultRoomTypeCombo);
+            // Room type label and combo hidden — EventConversation is always used.
 
             _talkDefaultPasswordCheckBox.Text = Strings.TalkPasswordSetCheck;
             _talkDefaultPasswordCheckBox.AutoSize = true;

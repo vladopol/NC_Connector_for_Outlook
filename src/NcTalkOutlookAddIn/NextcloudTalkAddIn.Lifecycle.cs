@@ -39,6 +39,12 @@ namespace NcTalkOutlookAddIn
                 _settingsStorage.Save(_currentSettings);
                 LogCore("TalkDeleteRoomOnEventDelete force-enabled and saved.");
             }
+            if (_currentSettings != null && _currentSettings.TalkDefaultRoomType != NcTalkOutlookAddIn.Models.TalkRoomType.EventConversation)
+            {
+                _currentSettings.TalkDefaultRoomType = NcTalkOutlookAddIn.Models.TalkRoomType.EventConversation;
+                _settingsStorage.Save(_currentSettings);
+                LogCore("TalkDefaultRoomType force-set to EventConversation and saved.");
+            }
             ConfigureDiagnosticsLogger(_currentSettings);
             TryApplyTransportSecurityFromSettings("startup", false);
             TryApplyOfficeUiLanguage();
