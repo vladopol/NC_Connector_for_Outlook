@@ -40,6 +40,7 @@ namespace NcTalkOutlookAddIn.UI
             MinimizeBox = false;
             ControlBox = false;
             ShowInTaskbar = false;
+            TopMost = true;
             Icon = BrandingAssets.GetAppIcon(32);
             MinimumSize = new Size(ScaleLogical(320), ScaleLogical(160));
 
