@@ -376,8 +376,6 @@ namespace NcTalkOutlookAddIn.UI
             _toolTip.SetToolTip(_searchCheckBox, Strings.TooltipSearchVisible);
             _toolTip.SetToolTip(_moderatorTextBox, Strings.TooltipModerator);
             _toolTip.SetToolTip(_moderatorClearButton, Strings.TooltipModerator);
-            UpdateRoomTypeTooltip();
-
             Controls.Add(_moderatorListBox);
             ApplyDialogLayout(false);
         }
@@ -689,7 +687,6 @@ namespace NcTalkOutlookAddIn.UI
             ApplyPolicyLockState();
             ApplySystemAddressbookLockState();
             UpdatePasswordState();
-            UpdateRoomTypeTooltip();
             UpdateModeratorHint();
         }
 
@@ -869,10 +866,8 @@ namespace NcTalkOutlookAddIn.UI
             LobbyUntilStart = _lobbyCheckBox.Checked;
             SearchVisible = _searchCheckBox.Checked;
             AddUsers = _addUsersCheckBox.Checked;
-            AddGuests = _addGuestsCheckBox.Checked;
-
-            var selected = _roomTypeComboBox.SelectedItem as RoomTypeOption;
-            SelectedRoomType = selected != null ? selected.Value : TalkRoomType.StandardRoom;
+            AddGuests = false;
+            SelectedRoomType = TalkRoomType.EventConversation;
 
             string moderatorCandidate = _selectedModerator != null ? _selectedModerator.UserId : _moderatorTextBox.Text.Trim();
             DelegateModeratorId = string.IsNullOrWhiteSpace(moderatorCandidate) ? string.Empty : moderatorCandidate.Trim();
