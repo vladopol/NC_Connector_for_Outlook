@@ -753,14 +753,21 @@ namespace NcTalkOutlookAddIn
                 return false;
             }
 
-            switch (appointment.MeetingStatus)
+            try
             {
-                case Outlook.OlMeetingStatus.olNonMeeting:
-                case Outlook.OlMeetingStatus.olMeeting:
-                case Outlook.OlMeetingStatus.olMeetingCanceled:
-                    return true;
-                default:
-                    return false;
+                switch (appointment.MeetingStatus)
+                {
+                    case Outlook.OlMeetingStatus.olNonMeeting:
+                    case Outlook.OlMeetingStatus.olMeeting:
+                    case Outlook.OlMeetingStatus.olMeetingCanceled:
+                        return true;
+                    default:
+                        return false;
+                }
+            }
+            catch (System.Runtime.InteropServices.COMException)
+            {
+                return false;
             }
         }
 
