@@ -849,9 +849,18 @@ namespace NcTalkOutlookAddIn
                 };
                 launchOptions.InitialSelections.Add(new FileLinkSelection(FileLinkSelectionType.File, localPath));
 
+                // Suppress OnAttachmentAdd evaluation while the wizard runs.
+                // Outlook's DnD may add the file despite cancel=true in BeforeAttachmentAdd;
+                // without suppression a second prompt appears after the link is already created.
+                _attachmentSuppressed = true;
+                _pendingAddedBatch.Clear();
                 try
                 {
                     bool wizardAccepted = await _owner.RunFileLinkWizardForMail(_mail, launchOptions);
+                    if (wizardAccepted)
+                    {
+                        TryRemoveAttachmentByName(candidate != null ? candidate.Name : null);
+                    }
                     LogFileLink(
                         "Compose before-attachment-add share flow completed (composeKey="
                         + _composeKey
@@ -869,6 +878,8 @@ namespace NcTalkOutlookAddIn
                 }
                 finally
                 {
+                    _attachmentSuppressed = false;
+                    _pendingAddedBatch.Clear();
                     if (cleanupLocalPathAfterFlow)
                     {
                         CleanupTemporaryFiles(new List<string> { localPath });
@@ -1203,6 +1214,52 @@ namespace NcTalkOutlookAddIn
                     + ", removed="
                     + removed.ToString(CultureInfo.InvariantCulture)
                     + ").");
+            }
+
+            private void TryRemoveAttachmentByName(string name)
+            {
+                if (string.IsNullOrWhiteSpace(name) || _mail == null)
+                    return;
+                Outlook.Attachments attachments = null;
+                try
+                {
+                    attachments = _mail.Attachments;
+                    if (attachments == null)
+                        return;
+                    int count = attachments.Count;
+                    for (int i = count; i >= 1; i--)
+                    {
+                        Outlook.Attachment att = null;
+                        try
+                        {
+                            att = attachments[i];
+                            string attName = null;
+                            try { attName = att != null ? att.FileName : null; } catch { }
+                            if (string.Equals(attName, name, StringComparison.OrdinalIgnoreCase))
+                            {
+                                attachments.Remove(i);
+                                LogFileLink("Removed attachment added by DnD despite cancel=true (composeKey=" + _composeKey + ", name=" + name + ").");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to check/remove attachment by name (composeKey=" + _composeKey + ").", ex);
+                        }
+                        finally
+                        {
+                            if (att != null)
+                                ComInteropScope.TryRelease(att, LogCategories.FileLink, "Failed to release attachment COM object.");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticsLogger.LogException(LogCategories.FileLink, "TryRemoveAttachmentByName failed (composeKey=" + _composeKey + ").", ex);
+                }
+                finally
+                {
+                    ComInteropScope.TryRelease(attachments, LogCategories.FileLink, "Failed to release attachments COM object.");
+                }
             }
 
             private void RemoveLastAddedAttachmentBatch(AttachmentBatchInfo lastAdded)
