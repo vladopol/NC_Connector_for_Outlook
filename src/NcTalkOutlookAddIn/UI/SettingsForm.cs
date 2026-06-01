@@ -551,9 +551,6 @@ namespace NcTalkOutlookAddIn.UI
             _talkDefaultAddUsersCheckBox.Location = new Point(innerPadding, y);
             y = _talkDefaultAddUsersCheckBox.Bottom + checkGap;
 
-            _talkDefaultAddGuestsCheckBox.Location = new Point(innerPadding, y);
-            y = _talkDefaultAddGuestsCheckBox.Bottom + checkGap;
-
             _talkDefaultLobbyCheckBox.Location = new Point(innerPadding, y);
             y = _talkDefaultLobbyCheckBox.Bottom + checkGap;
 
@@ -921,10 +918,7 @@ namespace NcTalkOutlookAddIn.UI
             _talkDefaultAddUsersCheckBox.Location = new Point(12, 84);
             _talkDefaultsGroup.Controls.Add(_talkDefaultAddUsersCheckBox);
 
-            _talkDefaultAddGuestsCheckBox.Text = Strings.TalkAddGuestsCheck;
-            _talkDefaultAddGuestsCheckBox.AutoSize = true;
-            _talkDefaultAddGuestsCheckBox.Location = new Point(12, 108);
-            _talkDefaultsGroup.Controls.Add(_talkDefaultAddGuestsCheckBox);
+            // AddGuests hidden — external users connect via room link and password.
 
             _talkDefaultLobbyCheckBox.Text = Strings.TalkLobbyCheck;
             _talkDefaultLobbyCheckBox.AutoSize = true;
@@ -975,7 +969,6 @@ namespace NcTalkOutlookAddIn.UI
             _talkAddressbookWarningPanel.Controls.Add(_talkAddressbookWarningLinkLabel);
 
             _toolTip.SetToolTip(_talkDefaultAddUsersCheckBox, Strings.TooltipAddUsers);
-            _toolTip.SetToolTip(_talkDefaultAddGuestsCheckBox, Strings.TooltipAddGuests);
             _toolTip.SetToolTip(_talkDefaultLobbyCheckBox, Strings.TooltipLobby);
             _toolTip.SetToolTip(_talkDefaultSearchCheckBox, Strings.TooltipSearchVisible);
             _toolTip.SetToolTip(_talkDeleteRoomOnEventDeleteCheckBox, Strings.TooltipDeleteRoomOnEventDelete);
