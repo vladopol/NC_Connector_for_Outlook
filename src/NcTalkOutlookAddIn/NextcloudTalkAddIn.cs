@@ -710,6 +710,33 @@ namespace NcTalkOutlookAddIn
             });
         }
 
+        internal void TryQueueCalDavDelete(string entryId)
+        {
+            if (string.IsNullOrWhiteSpace(entryId) || _currentSettings == null || !_currentSettings.CalDavSyncEnabled)
+                return;
+            var settings = _currentSettings;
+            string uid = Services.CalDavCalendarSync.DeriveUid(entryId);
+            Task.Run(() =>
+            {
+                try
+                {
+                    var config = new Services.TalkServiceConfiguration(settings.ServerUrl, settings.Username, settings.AppPassword);
+                    if (!config.IsComplete())
+                        return;
+                    string calendarName = string.IsNullOrWhiteSpace(settings.CalDavCalendarName)
+                        ? Settings.AddinSettings.DefaultCalDavCalendarName
+                        : settings.CalDavCalendarName;
+                    var service = new Services.CalDavSyncService();
+                    service.DeleteAppointment(config, calendarName, uid);
+                    DiagnosticsLogger.Log(LogCategories.CalDav, "CalDAV event deleted on appointment removal (uid=" + uid + ").");
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticsLogger.LogException(LogCategories.CalDav, "Failed to delete CalDAV event on appointment removal (uid=" + uid + ").", ex);
+                }
+            });
+        }
+
         private void RefreshEntryBinding(AppointmentSubscription subscription)
         {
             if (subscription == null)

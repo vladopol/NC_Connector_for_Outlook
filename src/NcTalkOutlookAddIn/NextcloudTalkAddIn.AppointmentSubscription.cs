@@ -616,6 +616,7 @@ namespace NcTalkOutlookAddIn
 
                 _roomDeleted = true;
                 _owner.QueueSavedEventRoomDeletion(_roomToken, _isEventConversation);
+                _owner.TryQueueCalDavDelete(_entryId);
                 Dispose();
             }
 
