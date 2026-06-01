@@ -10,6 +10,7 @@ Fork patch on upstream 3.1.0. All changes are specific to this fork.
 
 ### Fixed
 
+- **Duplicate attachment prompt on drag-and-drop** — Outlook DnD sometimes adds the file despite `BeforeAttachmentAdd cancel=true`. After creating the Nextcloud link, `OnAttachmentAdd` fired and showed a second "limit exceeded" dialog. Now suppresses evaluation during the wizard and removes the attachment by name if Outlook added it anyway.
 - **CalDAV sync settings not persisted** — `CalDavSyncEnabled` and `CalDavCalendarName` were missing from XML serialization and deserialization in `SettingsStorage`, so the checkbox state was lost after every Outlook restart.
 - **Outlook UI freezes** — `FileLink` wizard and `Talk` button were blocking the UI thread with synchronous HTTP requests. Replaced `.GetAwaiter().GetResult()` with `await Task.WhenAll(...)` in `FileLinkLaunchController` and wrapped address book fetches in `Task.Run` in `TalkRibbonController`. Propagated `async/await` through the attachment flow timer callbacks.
 - **Outlook crash on meeting cancellation** — `COMException 0x9284010A` was thrown when the deferred lobby verification timer fired after the appointment COM object had already been invalidated by a deletion/cancellation. Added `COMException` handling in `IsOrganizer` and wrapped the timer tick body in a try/catch that stops the timer cleanly.
