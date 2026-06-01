@@ -474,6 +474,8 @@ namespace NcTalkOutlookAddIn.Settings
             AppendElement(document, root, "TalkDefaultPasswordEnabled", settings.TalkDefaultPasswordEnabled.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "TalkDefaultAddUsers", settings.TalkDefaultAddUsers.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "TalkDefaultAddGuests", settings.TalkDefaultAddGuests.ToString(CultureInfo.InvariantCulture));
+            AppendElement(document, root, "CalDavSyncEnabled", settings.CalDavSyncEnabled.ToString(CultureInfo.InvariantCulture));
+            AppendElement(document, root, "CalDavCalendarName", Safe(settings.CalDavCalendarName));
 
             var writerSettings = new XmlWriterSettings
             {
@@ -696,6 +698,18 @@ namespace NcTalkOutlookAddIn.Settings
                     {
                         settings.TalkDefaultAddGuests = talkAddGuests;
                     }
+                    break;
+                case "CalDavSyncEnabled":
+                    bool calDavSyncEnabled;
+                    if (bool.TryParse(value, out calDavSyncEnabled))
+                    {
+                        settings.CalDavSyncEnabled = calDavSyncEnabled;
+                    }
+                    break;
+                case "CalDavCalendarName":
+                    settings.CalDavCalendarName = string.IsNullOrWhiteSpace(value)
+                        ? AddinSettings.DefaultCalDavCalendarName
+                        : value.Trim();
                     break;
                 default:
                     break;

@@ -208,13 +208,15 @@ namespace NcTalkOutlookAddIn
         public async void OnTalkButtonPressed(IRibbonControl control)
         {
             EnsureSettingsLoaded();
-            await _talkRibbonController.OnTalkButtonPressedAsync(control);
+            try { await _talkRibbonController.OnTalkButtonPressedAsync(control); }
+            catch (Exception ex) { DiagnosticsLogger.LogException(LogCategories.Talk, "OnTalkButtonPressed failed.", ex); }
         }
 
         public async void OnSettingsButtonPressed(IRibbonControl control)
         {
             EnsureSettingsLoaded();
-            await CreateSettingsWorkflowController().RunAsync();
+            try { await CreateSettingsWorkflowController().RunAsync(); }
+            catch (Exception ex) { DiagnosticsLogger.LogException(LogCategories.Core, "OnSettingsButtonPressed failed.", ex); }
         }
 
         private SettingsWorkflowController CreateSettingsWorkflowController()
@@ -253,15 +255,16 @@ namespace NcTalkOutlookAddIn
             }
         }
 
-        public void OnFileLinkButtonPressed(IRibbonControl control)
+        public async void OnFileLinkButtonPressed(IRibbonControl control)
         {
             EnsureSettingsLoaded();
-            _fileLinkLaunchController.OnFileLinkButtonPressed(control);
+            try { await _fileLinkLaunchController.OnFileLinkButtonPressed(control); }
+            catch (Exception ex) { DiagnosticsLogger.LogException(LogCategories.FileLink, "OnFileLinkButtonPressed failed.", ex); }
         }
 
-        internal bool RunFileLinkWizardForMail(Outlook.MailItem mail, FileLinkWizardLaunchOptions launchOptions)
+        internal async Task<bool> RunFileLinkWizardForMail(Outlook.MailItem mail, FileLinkWizardLaunchOptions launchOptions)
         {
-            return _fileLinkLaunchController.RunFileLinkWizardForMail(mail, launchOptions);
+            return await _fileLinkLaunchController.RunFileLinkWizardForMail(mail, launchOptions);
         }
 
         internal MailComposeSubscription EnsureMailComposeSubscription(Outlook.MailItem mail, string inspectorIdentityOverride = null)
@@ -512,6 +515,7 @@ namespace NcTalkOutlookAddIn
                 if (_calDavCalendarSync != null)
                 {
                     _calDavCalendarSync.Detach();
+                    _calDavCalendarSync = null;
                 }
                 LogCore("CalDAV calendar sync disabled.");
                 return;
