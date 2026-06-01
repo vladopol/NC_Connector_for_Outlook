@@ -4,6 +4,30 @@ All notable changes to **NC Connector for Outlook** will be documented in this f
 
 This project follows the principles of **Keep a Changelog** and **Semantic Versioning**.
 
+## [3.1.0.1] - 2026-06-01
+
+Fork patch on upstream 3.1.0. All changes are specific to this fork.
+
+### Fixed
+
+- **CalDAV sync settings not persisted** — `CalDavSyncEnabled` and `CalDavCalendarName` were missing from XML serialization and deserialization in `SettingsStorage`, so the checkbox state was lost after every Outlook restart.
+- **Outlook UI freezes** — `FileLink` wizard and `Talk` button were blocking the UI thread with synchronous HTTP requests. Replaced `.GetAwaiter().GetResult()` with `await Task.WhenAll(...)` in `FileLinkLaunchController` and wrapped address book fetches in `Task.Run` in `TalkRibbonController`. Propagated `async/await` through the attachment flow timer callbacks.
+- **Outlook crash on meeting cancellation** — `COMException 0x9284010A` was thrown when the deferred lobby verification timer fired after the appointment COM object had already been invalidated by a deletion/cancellation. Added `COMException` handling in `IsOrganizer` and wrapped the timer tick body in a try/catch that stops the timer cleanly.
+- **Unhandled exceptions in VSTO ribbon handlers** — `async void` COM callbacks (`OnTalkButtonPressed`, `OnSettingsButtonPressed`, `OnFileLinkButtonPressed`) lacked `try/catch`, causing unhandled exceptions to crash Outlook via the `SynchronizationContext`. Added exception guards with diagnostic logging.
+- **CalDAV event not deleted when meeting is removed** — When an organizer deleted a saved Outlook event, the Nextcloud Talk room was removed but the corresponding Nextcloud Calendar event remained. `CalDavDeleteTracker` is volatile and lost on Outlook restart; now a direct CalDAV DELETE is explicitly queued from `QueueSavedEventRoomDeletion` using the EntryID-derived UID.
+- **Wrong room type returned from hidden combo** — After hiding the room type selector in `TalkLinkForm`, the combo had no items and silently returned `StandardRoom` on OK. Hardcoded `SelectedRoomType = EventConversation` directly.
+- **`_calDavCalendarSync` zombie state** — After `Detach()` the object was not nulled, causing `TryDirectCalDavSync` to call into a detached instance. Fixed by setting `_calDavCalendarSync = null` after `Detach()`.
+- **Merge artifact: duplicate `BuildPlainText`** — Fork's older implementation of `BuildPlainText` in `FileLinkHtmlBuilder` survived the upstream merge, causing a `CS0111` build error. Removed the stale copy and added the missing `using System.Collections.Generic`.
+
+### Changed
+
+- **IFB disabled and hidden** — IFB (Free/Busy endpoint) is force-disabled on startup for any user who had it enabled, and the settings tab is hidden. The infrastructure remains in code for potential future use.
+- **Signature tab hidden** — The email signature tab requires a server-side plugin component not present in this deployment. Tab is hidden; settings remain functional if re-enabled.
+- **Room type fixed to "Event Conversation"** — Group conversations are created directly in Nextcloud Talk; Outlook meetings always map to Event Conversations. The room type selector is hidden in both the settings and the create-room dialog, and `EventConversation` is force-set on startup.
+- **"Add Guests" option hidden** — External users connect via the room link and optional password. The email-guest invite mechanism is redundant when Outlook already sends calendar invitations. The option is hidden in both the settings and the create-room dialog; value is always `false`.
+- **Talk room deletion on event delete always enabled** — Deleting a saved Outlook event now always removes the linked Talk room on Nextcloud. The opt-in checkbox is hidden; the setting is force-enabled on startup.
+- **Async propagation in attachment flow** — Timer callbacks (`OnAttachmentEvalTimerTick`, `OnBeforeAddShareTimerTick`) and their call chains are now `async void` / `async Task`, preventing UI thread blocking during the file-link wizard flow triggered by attachment events.
+
 ## [3.1.0] - 2026-05-12
 
 ### Added
