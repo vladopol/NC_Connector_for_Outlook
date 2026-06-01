@@ -560,9 +560,6 @@ namespace NcTalkOutlookAddIn.UI
             _talkDefaultSearchCheckBox.Location = new Point(innerPadding, y);
             y = _talkDefaultSearchCheckBox.Bottom + rowGap;
 
-            _talkDeleteRoomOnEventDeleteCheckBox.Location = new Point(innerPadding, y);
-            y = _talkDeleteRoomOnEventDeleteCheckBox.Bottom + rowGap;
-
             if (_talkAddressbookWarningPanel.Visible)
             {
                 int warningPadding = ScaleLogical(8);
@@ -939,10 +936,7 @@ namespace NcTalkOutlookAddIn.UI
             _talkDefaultSearchCheckBox.Location = new Point(12, 156);
             _talkDefaultsGroup.Controls.Add(_talkDefaultSearchCheckBox);
 
-            _talkDeleteRoomOnEventDeleteCheckBox.Text = Strings.TalkDeleteRoomOnEventDeleteCheck;
-            _talkDeleteRoomOnEventDeleteCheckBox.AutoSize = true;
-            _talkDeleteRoomOnEventDeleteCheckBox.Location = new Point(12, 180);
-            _talkDefaultsGroup.Controls.Add(_talkDeleteRoomOnEventDeleteCheckBox);
+            // TalkDeleteRoomOnEventDelete is force-enabled and not shown in UI.
 
             _talkAddressbookWarningPanel.Visible = false;
             _talkAddressbookWarningPanel.BackColor = Color.FromArgb(20, 176, 0, 32);
