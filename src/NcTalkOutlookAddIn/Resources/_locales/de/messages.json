@@ -536,6 +536,30 @@
   "options_tab_sharing": {
     "message": "Freigabe"
   },
+  "options_tab_signature": {
+    "message": "Signatur"
+  },
+  "options_signature_defaults_heading": {
+    "message": "E-Mail-Signatur"
+  },
+  "options_signature_identity_hint": {
+    "message": "Die zentrale Signatur wird nur angewendet, wenn das Outlook-Absenderkonto mit der E-Mail-Adresse des Nextcloud-Benutzers übereinstimmt."
+  },
+  "options_signature_on_compose_label": {
+    "message": "Signatur beim Verfassen hinzufügen"
+  },
+  "options_signature_on_reply_label": {
+    "message": "Signatur beim Antworten hinzufügen"
+  },
+  "options_signature_on_forward_label": {
+    "message": "Signatur beim Weiterleiten hinzufügen"
+  },
+  "options_signature_backend_inactive_tooltip": {
+    "message": "Die zentrale Signaturrichtlinie ist inaktiv oder unvollständig."
+  },
+  "options_signature_backend_update_required_tooltip": {
+    "message": "Bitte aktualisieren Sie das NC Connector Backend. Diese Backend-Version unterstützt zentrale E-Mail-Signaturen noch nicht."
+  },
   "options_tab_talklink": {
     "message": "Talk-Link"
   },
@@ -627,7 +651,7 @@
     "message": "https://nc-connector.de"
   },
   "options_about_overview_text": {
-    "message": "Mehr als nur Datei-Links\n\nNC Connector verbindet sichere Datei-Freigaben, Talk-Besprechungen und Anhangsautomatisierung direkt mit Thunderbird und Outlook. So bleiben wichtige Team-Workflows dort, wo sie gebraucht werden: im Mail- und Kalender-Client.\n\nWas NC Connector abdeckt\n- Datei-Freigaben mit Passwort, Ablaufdatum und optional separater Passwortzustellung\n- Talk-Meetings direkt aus Kalenderterminen erstellen und aktualisieren\n- Anhangsautomatisierung mit klaren Regeln statt manueller Einzelschritte\n- Einheitliche Freigabe- und Einladungsblöcke direkt im gewohnten Arbeitsablauf\n\nOptional mit Nextcloud-Backend\n- Zentrale Seat-Zuteilung und Richtlinienverwaltung\n- Eigene Vorlagen und Designs für Freigaben und Talk-Einladungen\n- Separate Passwortzustellung und zentrale Steuerung für Organisationen\n- 1 Seat entspricht 1 Nextcloud-Benutzer\n\nOhne Backend bleiben die Add-ons direkt nutzbar. Mit Backend kommt zentrale Steuerung für Teams und Organisationen hinzu."
+    "message": "Mehr als nur Datei-Links\n\nNC Connector verbindet sichere Datei-Freigaben, Talk-Besprechungen, Anhangsautomatisierung und zentral verwaltete E-Mail-Signaturen direkt mit Thunderbird und Outlook. So bleiben wichtige Team-Workflows dort, wo sie gebraucht werden: im Mail- und Kalender-Client.\n\nWas NC Connector abdeckt\n- Datei-Freigaben mit Passwort, Ablaufdatum und optional separater Passwortzustellung\n- Talk-Meetings direkt aus Kalenderterminen erstellen und aktualisieren\n- Anhangsautomatisierung mit klaren Regeln statt manueller Einzelschritte\n- Einheitliche Freigabe- und Einladungsblöcke direkt im gewohnten Arbeitsablauf\n- Zentrale E-Mail-Signaturen fuer Verfassen, Antworten und Weiterleiten mit Nextcloud-Profilfeldern\n\nOptional mit Nextcloud-Backend\n- Zentrale Seat-Zuteilung und Richtlinienverwaltung\n- Eigene Vorlagen und Designs fuer Freigaben, Talk-Einladungen und E-Mail-Signaturen\n- Separate Passwortzustellung und zentrale Steuerung fuer Organisationen\n- 1 Seat entspricht 1 Nextcloud-Benutzer\n\nOhne Backend bleiben die Add-ons direkt nutzbar. Mit Backend kommt zentrale Steuerung fuer Teams und Organisationen hinzu."
   },
   "options_about_more_info_label": {
     "message": "Mehr Informationen -->"
@@ -718,6 +742,12 @@
   },
   "options_talk_default_password_label": {
     "message": "Passwort setzen"
+  },
+  "options_talk_delete_room_on_event_delete_label": {
+    "message": "Talk-Raum beim Loeschen eines gespeicherten Termins loeschen"
+  },
+  "options_talk_delete_room_on_event_delete_tooltip": {
+    "message": "Erfordert NC-Connector-Talk-Metadaten und diese Zustimmung. Der Cleanup verworfener ungespeicherter Termine bleibt aktiv."
   },
   "options_talk_default_roomtype_label": {
     "message": "Raumtyp"
@@ -950,6 +980,9 @@
   "sharing_status_uploading_bulk": {
     "message": "Dateien werden hochgeladen..."
   },
+  "sharing_status_speed_kbps": {
+    "message": "$1 KB/s"
+  },
   "sharing_message_invalid_share_name": {
     "message": "Bitte einen Freigabenamen eingeben."
   },
@@ -1000,7 +1033,8 @@
   },
   "outlook_ifb_port_label": {
     "message": "Lokaler IFB-Port:"
-  },  "outlook_ifb_cache_hours_label": {
+  },
+  "outlook_ifb_cache_hours_label": {
     "message": "Adressbuch-Cache (Stunden):"
   },
   "outlook_debug_file_label": {
@@ -1391,8 +1425,3 @@
     "message": "Ihr NC Connector Seat ist derzeit pausiert. Bitte wenden Sie sich an Ihren Nextcloud-Administrator."
   }
 }
-
-
-
-
-
