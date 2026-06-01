@@ -6,28 +6,45 @@ This project follows the principles of **Keep a Changelog** and **Semantic Versi
 
 ## [3.1.0.1] - 2026-06-01
 
-Fork patch on upstream 3.1.0. All changes are specific to this fork.
+Fork patch on upstream 3.1.0.
 
-### Fixed
+---
 
-- **Duplicate attachment prompt on drag-and-drop** — Outlook DnD sometimes adds the file despite `BeforeAttachmentAdd cancel=true`. After creating the Nextcloud link, `OnAttachmentAdd` fired and showed a second "limit exceeded" dialog. Now suppresses evaluation during the wizard and removes the attachment by name if Outlook added it anyway.
-- **CalDAV sync settings not persisted** — `CalDavSyncEnabled` and `CalDavCalendarName` were missing from XML serialization and deserialization in `SettingsStorage`, so the checkbox state was lost after every Outlook restart.
-- **Outlook UI freezes** — `FileLink` wizard and `Talk` button were blocking the UI thread with synchronous HTTP requests. Replaced `.GetAwaiter().GetResult()` with `await Task.WhenAll(...)` in `FileLinkLaunchController` and wrapped address book fetches in `Task.Run` in `TalkRibbonController`. Propagated `async/await` through the attachment flow timer callbacks.
-- **Outlook crash on meeting cancellation** — `COMException 0x9284010A` was thrown when the deferred lobby verification timer fired after the appointment COM object had already been invalidated by a deletion/cancellation. Added `COMException` handling in `IsOrganizer` and wrapped the timer tick body in a try/catch that stops the timer cleanly.
-- **Unhandled exceptions in VSTO ribbon handlers** — `async void` COM callbacks (`OnTalkButtonPressed`, `OnSettingsButtonPressed`, `OnFileLinkButtonPressed`) lacked `try/catch`, causing unhandled exceptions to crash Outlook via the `SynchronizationContext`. Added exception guards with diagnostic logging.
-- **CalDAV event not deleted when meeting is removed** — When an organizer deleted a saved Outlook event, the Nextcloud Talk room was removed but the corresponding Nextcloud Calendar event remained. `CalDavDeleteTracker` is volatile and lost on Outlook restart; now a direct CalDAV DELETE is explicitly queued from `QueueSavedEventRoomDeletion` using the EntryID-derived UID.
-- **Wrong room type returned from hidden combo** — After hiding the room type selector in `TalkLinkForm`, the combo had no items and silently returned `StandardRoom` on OK. Hardcoded `SelectedRoomType = EventConversation` directly.
-- **`_calDavCalendarSync` zombie state** — After `Detach()` the object was not nulled, causing `TryDirectCalDavSync` to call into a detached instance. Fixed by setting `_calDavCalendarSync = null` after `Detach()`.
-- **Merge artifact: duplicate `BuildPlainText`** — Fork's older implementation of `BuildPlainText` in `FileLinkHtmlBuilder` survived the upstream merge, causing a `CS0111` build error. Removed the stale copy and added the missing `using System.Collections.Generic`.
+### Upstream bugs fixed
 
-### Changed
+These bugs exist in the original upstream codebase and are fixed here.
+They are candidates for contributing back to upstream.
 
-- **IFB disabled and hidden** — IFB (Free/Busy endpoint) is force-disabled on startup for any user who had it enabled, and the settings tab is hidden. The infrastructure remains in code for potential future use.
-- **Signature tab hidden** — The email signature tab requires a server-side plugin component not present in this deployment. Tab is hidden; settings remain functional if re-enabled.
-- **Room type fixed to "Event Conversation"** — Group conversations are created directly in Nextcloud Talk; Outlook meetings always map to Event Conversations. The room type selector is hidden in both the settings and the create-room dialog, and `EventConversation` is force-set on startup.
-- **"Add Guests" option hidden** — External users connect via the room link and optional password. The email-guest invite mechanism is redundant when Outlook already sends calendar invitations. The option is hidden in both the settings and the create-room dialog; value is always `false`.
-- **Talk room deletion on event delete always enabled** — Deleting a saved Outlook event now always removes the linked Talk room on Nextcloud. The opt-in checkbox is hidden; the setting is force-enabled on startup.
-- **Async propagation in attachment flow** — Timer callbacks (`OnAttachmentEvalTimerTick`, `OnBeforeAddShareTimerTick`) and their call chains are now `async void` / `async Task`, preventing UI thread blocking during the file-link wizard flow triggered by attachment events.
+- **Outlook UI freezes on FileLink and Talk button** — `FileLinkLaunchController.RunFileLinkWizardForMail` blocked the UI thread with `.GetAwaiter().GetResult()` while waiting for two parallel HTTP requests. `TalkRibbonController` called `GetSystemAddressbookStatus(forceRefresh=true)` and `GetUsers` synchronously on the UI thread. Fixed by making `RunFileLinkWizardForMail` fully `async Task<bool>` and wrapping address book calls in `Task.Run`.
+- **Outlook crash on meeting cancellation (`COMException 0x9284010A`)** — The deferred lobby verification timer continued firing after the appointment COM object was invalidated by a delete or cancel. `IsOrganizer` had no `COMException` guard; the timer tick had no outer catch. Added `COMException` handling in `IsOrganizer` (returns `false`) and a try/catch around the tick body that stops the timer cleanly.
+- **Unhandled exceptions crash Outlook via async void ribbon handlers** — `OnTalkButtonPressed`, `OnSettingsButtonPressed`, and `OnFileLinkButtonPressed` are `async void` COM callbacks with no `try/catch`. Any unhandled exception propagated through `SynchronizationContext` and crashed Outlook. Added exception guards with diagnostic logging to all three.
+- **Duplicate attachment prompt after drag-and-drop** — Outlook DnD sometimes ignores `BeforeAttachmentAdd cancel=true` and adds the file anyway. After the wizard created the Nextcloud link, `OnAttachmentAdd` fired, the evaluation timer triggered, and a second "limit exceeded" dialog appeared. Fixed by setting `_attachmentSuppressed = true` during the wizard in `StartBeforeAddAttachmentShareFlow` and removing the attachment by name if Outlook added it despite `cancel=true`.
+- **Attachment prompt dialog hidden behind other windows** — `ComposeAttachmentPromptForm` appeared below Explorer and other app windows because it was only modal relative to Outlook. Timer-triggered dialogs require `TopMost = true` since Outlook may not be the foreground app at the moment they appear.
+- **UI thread blocked during attachment flow timer callbacks** — `OnAttachmentEvalTimerTick` and `OnBeforeAddShareTimerTick` were synchronous `void` callbacks. If the share wizard was triggered from a timer tick, it blocked the UI thread for the duration of HTTP prefetch requests. Made both timer callbacks `async void` and propagated `async Task` through `EvaluateAttachmentAutomation`, `StartComposeAttachmentShareFlow`, and `RunQueuedBeforeAddAttachmentShareFlow`.
+
+---
+
+### Fork-specific fixes
+
+These fixes apply only to features or changes introduced in this fork.
+
+- **CalDAV sync settings not persisted** — `CalDavSyncEnabled` and `CalDavCalendarName` were missing from both `SaveToXmlFile` and `ApplySettingValue` in `SettingsStorage`. The checkbox state was lost on every Outlook restart.
+- **Nextcloud Calendar event not deleted when meeting is removed** — When the organizer deleted a saved Outlook event, the Talk room was removed but the CalDAV event remained in Nextcloud Calendar. `CalDavDeleteTracker` is ephemeral and lost on Outlook restart; if the appointment was deleted without a prior modification, no tracker existed. Fixed by explicitly queuing a CalDAV DELETE in `QueueSavedEventRoomDeletion` using the EntryID-derived UID, independent of the tracker.
+- **`_calDavCalendarSync` zombie state after Detach** — After `Detach()`, `_calDavCalendarSync` was not nulled. Subsequent calls to `TryDirectCalDavSync` reached a detached instance. Fixed by setting `_calDavCalendarSync = null` after `Detach()`.
+- **Wrong room type silently returned after hiding room type combo** — After hiding the room type selector in `TalkLinkForm`, `SelectedRoomType` was read from an empty combo which defaulted to `StandardRoom`. Hardcoded `SelectedRoomType = TalkRoomType.EventConversation` directly on OK.
+- **Merge artifact: duplicate `BuildPlainText` build error** — The fork's older `BuildPlainText` implementation in `FileLinkHtmlBuilder` was not removed during the upstream 3.1.0 merge, causing `CS0111`. Removed the stale copy and added the missing `using System.Collections.Generic` required by the upstream implementation.
+
+---
+
+### Fork-specific changes
+
+Intentional behavior and UI changes specific to this deployment.
+
+- **IFB disabled and hidden** — The IFB (Free/Busy) endpoint is not used in this deployment. Force-disabled on startup; settings tab hidden.
+- **Signature tab hidden** — The email signature feature requires a server-side Nextcloud plugin component not available in this environment. Tab is hidden; the underlying settings remain accessible in code.
+- **Room type fixed to "Event Conversation"** — Outlook meetings always map to Nextcloud Talk Event Conversations. Group conversations are created directly in Nextcloud Talk. Room type selector hidden in both settings and create-room dialog; `EventConversation` is force-set on startup.
+- **"Add Guests" option hidden** — External participants connect via the room link and optional password. The email-guest invite API is redundant when Outlook already delivers calendar invitations to all attendees. Hidden in both settings and create-room dialog; value is always `false`.
+- **Talk room deletion on event delete always enabled** — Deleting a saved Outlook event always removes the linked Talk room on Nextcloud. The per-user opt-in checkbox is hidden; the setting is force-enabled on startup.
 
 ## [3.1.0] - 2026-05-12
 
