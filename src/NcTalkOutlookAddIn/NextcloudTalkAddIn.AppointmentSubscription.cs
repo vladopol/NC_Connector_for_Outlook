@@ -284,6 +284,26 @@ namespace NcTalkOutlookAddIn
                     StopDeferredWriteLobbyTimer();
                     return;
                 }
+                try
+                {
+                    OnDeferredWriteLobbyTickCore();
+                }
+                catch (System.Runtime.InteropServices.COMException ex)
+                {
+                    LogTalk("Deferred post-write lobby tick aborted: appointment COM object is no longer valid (token=" + _roomToken + "): " + ex.Message);
+                    _deferredWriteLobbyAttempts = 0;
+                    StopDeferredWriteLobbyTimer();
+                }
+            }
+
+            private void OnDeferredWriteLobbyTickCore()
+            {
+                if (_disposed || _roomDeleted || _appointment == null)
+                {
+                    _deferredWriteLobbyAttempts = 0;
+                    StopDeferredWriteLobbyTimer();
+                    return;
+                }
 
                 _deferredWriteLobbyAttempts++;
 
