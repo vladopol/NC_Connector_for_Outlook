@@ -536,6 +536,30 @@
   "options_tab_sharing": {
     "message": "Delen"
   },
+  "options_tab_signature": {
+    "message": "Handtekening"
+  },
+  "options_signature_defaults_heading": {
+    "message": "E-mailhandtekening"
+  },
+  "options_signature_identity_hint": {
+    "message": "De centrale handtekening wordt alleen toegepast wanneer het Outlook-afzenderaccount overeenkomt met het e-mailadres van de Nextcloud-gebruiker."
+  },
+  "options_signature_on_compose_label": {
+    "message": "Handtekening toevoegen bij opstellen"
+  },
+  "options_signature_on_reply_label": {
+    "message": "Handtekening toevoegen bij antwoorden"
+  },
+  "options_signature_on_forward_label": {
+    "message": "Handtekening toevoegen bij doorsturen"
+  },
+  "options_signature_backend_inactive_tooltip": {
+    "message": "Het centrale handtekeningbeleid is inactief of onvolledig."
+  },
+  "options_signature_backend_update_required_tooltip": {
+    "message": "Werk de NC Connector-backend bij. Deze backendversie ondersteunt centrale e-mailhandtekeningen nog niet."
+  },
   "options_tab_talklink": {
     "message": "Talk-link"
   },
@@ -606,7 +630,7 @@
     "message": "https://nc-connector.de"
   },
   "options_about_overview_text": {
-    "message": "Meer dan alleen bestandslinks\n\nNC Connector brengt veilig bestanden delen, Talk-vergaderingen en automatisering van bijlagen direct samen in Thunderbird en Outlook. Zo blijven belangrijke teamworkflows waar ze horen: in de mail- en agenda-client.\n\nWat NC Connector afdekt\n- Bestanden delen met wachtwoord, vervaldatum en optionele aparte verzending van het wachtwoord\n- Talk-vergaderingen direct vanuit agenda-afspraken aanmaken en bijwerken\n- Automatisering van bijlagen met duidelijke regels in plaats van losse handmatige stappen\n- Eenduidige deel- en uitnodigingsblokken direct in de vertrouwde workflow\n\nOptioneel met Nextcloud-backend\n- Centrale Seat-toewijzing en beleidsbeheer\n- Eigen sjablonen en ontwerpen voor shares en Talk-uitnodigingen\n- Aparte wachtwoordverzending en centrale aansturing voor organisaties\n- 1 Seat = 1 Nextcloud-gebruiker\n\nZonder backend blijven de add-ons direct bruikbaar. Met backend komt daar centrale aansturing voor teams en organisaties bij."
+    "message": "Meer dan alleen bestandslinks\n\nNC Connector brengt veilig bestanden delen, Talk-vergaderingen, automatisering van bijlagen en centraal beheerde e-mailsignaturen direct samen in Thunderbird en Outlook. Zo blijven belangrijke teamworkflows waar ze horen: in de mail- en agenda-client.\n\nWat NC Connector afdekt\n- Bestanden delen met wachtwoord, vervaldatum en optionele aparte verzending van het wachtwoord\n- Talk-vergaderingen direct vanuit agenda-afspraken aanmaken en bijwerken\n- Automatisering van bijlagen met duidelijke regels in plaats van losse handmatige stappen\n- Eenduidige deel- en uitnodigingsblokken direct in de vertrouwde workflow\n- Centrale e-mailsignaturen voor opstellen, beantwoorden en doorsturen met Nextcloud-profielgegevens\n\nOptioneel met Nextcloud-backend\n- Centrale Seat-toewijzing en beleidsbeheer\n- Eigen sjablonen en ontwerpen voor shares, Talk-uitnodigingen en e-mailsignaturen\n- Aparte wachtwoordverzending en centrale aansturing voor organisaties\n- 1 Seat = 1 Nextcloud-gebruiker\n\nZonder backend blijven de add-ons direct bruikbaar. Met backend komt daar centrale aansturing voor teams en organisaties bij."
   },
   "options_about_more_info_label": {
     "message": "Meer informatie -->"
@@ -697,6 +721,12 @@
   },
   "options_talk_default_password_label": {
     "message": "Wachtwoord instellen"
+  },
+  "options_talk_delete_room_on_event_delete_label": {
+    "message": "Talk-ruimte verwijderen bij het verwijderen van een opgeslagen afspraak"
+  },
+  "options_talk_delete_room_on_event_delete_tooltip": {
+    "message": "Vereist NC Connector Talk-metadata en deze expliciete opt-in. Opschonen van niet-opgeslagen afspraken blijft actief."
   },
   "options_talk_default_roomtype_label": {
     "message": "Type ruimte"
@@ -929,6 +959,9 @@
   "sharing_status_uploading_bulk": {
     "message": "Bestanden uploaden..."
   },
+  "sharing_status_speed_kbps": {
+    "message": "$1 KB/s"
+  },
   "sharing_message_invalid_share_name": {
     "message": "Voer een deelnaam in."
   },
@@ -979,7 +1012,8 @@
   },
   "outlook_ifb_port_label": {
     "message": "Lokale IFB-poort:"
-  },  "outlook_ifb_cache_hours_label": {
+  },
+  "outlook_ifb_cache_hours_label": {
     "message": "Adresboekcache (uren):"
   },
   "outlook_debug_file_label": {
@@ -1391,6 +1425,3 @@
     "message": "Wanneer het standaard TLS-beleid van het besturingssysteem is uitgeschakeld, schakel dan minimaal een TLS-versie in (1.2 of 1.3)."
   }
 }
-
-
-

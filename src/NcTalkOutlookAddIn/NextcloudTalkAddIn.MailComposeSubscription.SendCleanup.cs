@@ -42,6 +42,8 @@ namespace NcTalkOutlookAddIn
                 _awaitingGraceCloseResolution = false;
 
                 CapturePasswordDispatchRecipients();
+                CapturePasswordDispatchSender();
+                SchedulePostSendGraceCheckIfNeeded();
                 LogFileLink(
                     "Compose send state updated (composeKey="
                     + _composeKey
@@ -49,6 +51,29 @@ namespace NcTalkOutlookAddIn
                     + _sendPending.ToString(CultureInfo.InvariantCulture)
                     + ", cleanupArmedCount="
                     + _cleanupEntries.Count.ToString(CultureInfo.InvariantCulture)
+                    + ").");
+            }
+
+            private void SchedulePostSendGraceCheckIfNeeded()
+            {
+                if (_cleanupEntries.Count == 0 && _passwordDispatchQueue.Count == 0)
+                {
+                    return;
+                }
+
+                _awaitingGraceCloseResolution = true;
+                _cleanupGraceTimer.Interval = ComposeShareCleanupSendGraceMs;
+                _cleanupGraceTimer.Start();
+
+                LogFileLink(
+                    "Compose post-send cleanup check scheduled (composeKey="
+                    + _composeKey
+                    + ", delayMs="
+                    + ComposeShareCleanupSendGraceMs.ToString(CultureInfo.InvariantCulture)
+                    + ", cleanupArmedCount="
+                    + _cleanupEntries.Count.ToString(CultureInfo.InvariantCulture)
+                    + ", passwordQueued="
+                    + _passwordDispatchQueue.Count.ToString(CultureInfo.InvariantCulture)
                     + ").");
             }
 
@@ -324,6 +349,53 @@ namespace NcTalkOutlookAddIn
                     + ", source="
                     + (capturedFromRecipients ? "recipients_collection" : "mail_fields")
                     + ").");
+            }
+
+            private void CapturePasswordDispatchSender()
+            {
+                if (_passwordDispatchQueue.Count == 0)
+                {
+                    return;
+                }
+
+                string senderEmail = EmailSignaturePolicyService.NormalizeEmail(ResolveCurrentSenderEmail());
+                string accountSmtp = EmailSignaturePolicyService.NormalizeEmail(ResolveSendUsingAccountSmtpAddress());
+                string sentOnBehalfOfName = ReadCurrentSentOnBehalfOfName();
+                for (int i = 0; i < _passwordDispatchQueue.Count; i++)
+                {
+                    _passwordDispatchQueue[i].SenderEmail = senderEmail;
+                    _passwordDispatchQueue[i].SendUsingAccountSmtpAddress = accountSmtp;
+                    _passwordDispatchQueue[i].SentOnBehalfOfName = sentOnBehalfOfName;
+                }
+
+                LogFileLink(
+                    "Separate password sender captured (composeKey="
+                    + _composeKey
+                    + ", queued="
+                    + _passwordDispatchQueue.Count.ToString(CultureInfo.InvariantCulture)
+                    + ", hasSender="
+                    + (!string.IsNullOrWhiteSpace(senderEmail)).ToString(CultureInfo.InvariantCulture)
+                    + ", hasAccount="
+                    + (!string.IsNullOrWhiteSpace(accountSmtp)).ToString(CultureInfo.InvariantCulture)
+                    + ", sentOnBehalf="
+                    + (!string.IsNullOrWhiteSpace(sentOnBehalfOfName)).ToString(CultureInfo.InvariantCulture)
+                    + ").");
+            }
+
+            private string ReadCurrentSentOnBehalfOfName()
+            {
+                try
+                {
+                    return _mail != null ? (_mail.SentOnBehalfOfName ?? string.Empty).Trim() : string.Empty;
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticsLogger.LogException(
+                        LogCategories.FileLink,
+                        "Failed to read compose sent-on-behalf name for separate password mail (composeKey=" + _composeKey + ").",
+                        ex);
+                    return string.Empty;
+                }
             }
 
             private bool TryCaptureRecipientListsFromRecipientsCollection(out string to, out string cc, out string bcc)

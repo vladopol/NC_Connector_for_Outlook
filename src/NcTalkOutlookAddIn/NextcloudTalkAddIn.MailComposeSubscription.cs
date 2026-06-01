@@ -93,6 +93,7 @@ namespace NcTalkOutlookAddIn
             private readonly System.Windows.Forms.Timer _attachmentEvalTimer = new System.Windows.Forms.Timer();
             private readonly System.Windows.Forms.Timer _beforeAddShareTimer = new System.Windows.Forms.Timer();
             private readonly System.Windows.Forms.Timer _cleanupGraceTimer = new System.Windows.Forms.Timer();
+            private readonly System.Windows.Forms.Timer _emailSignatureTimer = new System.Windows.Forms.Timer();
             private readonly List<AttachmentBatchEntry> _pendingAddedBatch = new List<AttachmentBatchEntry>();
             private readonly List<BeforeAddShareEntry> _pendingBeforeAddShareEntries = new List<BeforeAddShareEntry>();
             private readonly List<ComposeShareCleanupEntry> _cleanupEntries = new List<ComposeShareCleanupEntry>();
@@ -104,18 +105,26 @@ namespace NcTalkOutlookAddIn
             private bool _sendPending;
             private DateTime _sendPendingAtUtc;
             private bool _awaitingGraceCloseResolution;
+            private bool _emailSignatureManaged;
+            private bool _emailSignatureInitialSlotHandled;
+            private bool _emailSignatureApplying;
+            private bool _isInlineResponse;
+            private string _pendingEmailSignatureReason = string.Empty;
             private bool _disposed;
             private const int BeforeAddShareBatchDebounceMs = 3000;
+            private const int EmailSignatureApplyDebounceMs = 900;
+            private const int EmailSignatureInlineApplyDebounceMs = 250;
 
-            internal MailComposeSubscription(NextcloudTalkAddIn owner, Outlook.MailItem mail, string mailIdentityKey, string inspectorIdentityKey)
+            internal MailComposeSubscription(NextcloudTalkAddIn owner, Outlook.MailItem mail, string mailIdentityKey, string inspectorIdentityKey, bool isInlineResponse)
             {
                 _owner = owner;
                 _mail = mail;
+                _isInlineResponse = isInlineResponse;
                 _mailIdentityKey = string.IsNullOrWhiteSpace(mailIdentityKey)
                     ? ComInteropScope.ResolveIdentityKey(mail, LogCategories.FileLink, "MailItem")
                     : mailIdentityKey.Trim();
                 _inspectorIdentityKey = string.IsNullOrWhiteSpace(inspectorIdentityKey)
-                    ? MailInteropController.ResolveMailInspectorIdentityKey(mail)
+                    ? (isInlineResponse ? string.Empty : MailInteropController.ResolveMailInspectorIdentityKey(mail))
                     : inspectorIdentityKey.Trim();
                 _composeKey = BuildComposeKey(mail, _mailIdentityKey, _inspectorIdentityKey);
 
@@ -129,6 +138,9 @@ namespace NcTalkOutlookAddIn
 
                 _cleanupGraceTimer.Interval = ComposeShareCleanupSendGraceMs;
                 _cleanupGraceTimer.Tick += OnCleanupGraceTimerTick;
+
+                _emailSignatureTimer.Interval = isInlineResponse ? EmailSignatureInlineApplyDebounceMs : EmailSignatureApplyDebounceMs;
+                _emailSignatureTimer.Tick += OnEmailSignatureTimerTick;
 
                 _events = mail as Outlook.ItemEvents_10_Event;                if (_events != null)
                 {
@@ -146,7 +158,26 @@ namespace NcTalkOutlookAddIn
                     + (_mailIdentityKey ?? string.Empty)
                     + ", inspectorIdentity="
                     + (_inspectorIdentityKey ?? string.Empty)
+                    + ", inline="
+                    + _isInlineResponse.ToString(CultureInfo.InvariantCulture)
                     + ").");
+
+                ScheduleEmailSignatureApplication("compose_open");
+            }
+
+            internal void MarkInlineResponse()
+            {
+                if (_disposed)
+                {
+                    return;
+                }
+                if (_isInlineResponse)
+                {
+                    return;
+                }
+                _isInlineResponse = true;
+                _emailSignatureTimer.Interval = EmailSignatureInlineApplyDebounceMs;
+                ScheduleEmailSignatureApplication("inline_response");
             }
 
             internal bool IsFor(Outlook.MailItem mail, string mailIdentityKey, string inspectorIdentityKey)
@@ -214,8 +245,16 @@ namespace NcTalkOutlookAddIn
                     + ").");
             }
 
-            internal void RegisterSeparatePasswordDispatch(FileLinkResult result, FileLinkRequest request, string passwordOnlyHtml)
-            {                if (result == null || request == null || string.IsNullOrWhiteSpace(passwordOnlyHtml))
+            internal void RegisterSeparatePasswordDispatch(FileLinkResult result, FileLinkRequest request, string passwordOnlyHtml, string passwordOnlyPlainText, bool isPlainText)
+            {                if (result == null || request == null)
+                {
+                    return;
+                }
+                if (isPlainText && string.IsNullOrWhiteSpace(passwordOnlyPlainText))
+                {
+                    return;
+                }
+                if (!isPlainText && string.IsNullOrWhiteSpace(passwordOnlyHtml))
                 {
                     return;
                 }
@@ -230,6 +269,8 @@ namespace NcTalkOutlookAddIn
                     ShareUrl = result.ShareUrl ?? string.Empty,
                     Password = password.Trim(),
                     Html = passwordOnlyHtml,
+                    PlainText = passwordOnlyPlainText,
+                    IsPlainText = isPlainText,
                     To = ComposeShareLifecycleController.BuildNormalizedRecipientCsv(ReadMailRecipientList("To")),
                     Cc = ComposeShareLifecycleController.BuildNormalizedRecipientCsv(ReadMailRecipientList("CC")),
                     Bcc = ComposeShareLifecycleController.BuildNormalizedRecipientCsv(ReadMailRecipientList("BCC"))
@@ -243,6 +284,8 @@ namespace NcTalkOutlookAddIn
                     + _passwordDispatchQueue.Count.ToString(CultureInfo.InvariantCulture)
                     + ", hasShareUrl="
                     + (!string.IsNullOrWhiteSpace(entry.ShareUrl)).ToString(CultureInfo.InvariantCulture)
+                    + ", plainText="
+                    + entry.IsPlainText.ToString(CultureInfo.InvariantCulture)
                     + ").");
             }
 
@@ -362,6 +405,7 @@ namespace NcTalkOutlookAddIn
                 _attachmentEvalTimer.Stop();
                 _beforeAddShareTimer.Stop();
                 _cleanupGraceTimer.Stop();
+                _emailSignatureTimer.Stop();
 
                 if (_pendingBeforeAddShareEntries.Count > 0)
                 {
@@ -384,9 +428,11 @@ namespace NcTalkOutlookAddIn
                     _attachmentEvalTimer.Tick -= OnAttachmentEvalTimerTick;
                     _beforeAddShareTimer.Tick -= OnBeforeAddShareTimerTick;
                     _cleanupGraceTimer.Tick -= OnCleanupGraceTimerTick;
+                    _emailSignatureTimer.Tick -= OnEmailSignatureTimerTick;
                     _attachmentEvalTimer.Dispose();
                     _beforeAddShareTimer.Dispose();
                     _cleanupGraceTimer.Dispose();
+                    _emailSignatureTimer.Dispose();
                 }
                 catch (Exception ex)
                 {

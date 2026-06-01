@@ -536,6 +536,30 @@
   "options_tab_sharing": {
     "message": "Condivisione"
   },
+  "options_tab_signature": {
+    "message": "Firma"
+  },
+  "options_signature_defaults_heading": {
+    "message": "Firma e-mail"
+  },
+  "options_signature_identity_hint": {
+    "message": "La firma centrale viene applicata solo quando l’account mittente di Outlook corrisponde all’indirizzo e-mail dell’utente Nextcloud."
+  },
+  "options_signature_on_compose_label": {
+    "message": "Aggiungi firma durante la composizione"
+  },
+  "options_signature_on_reply_label": {
+    "message": "Aggiungi firma nelle risposte"
+  },
+  "options_signature_on_forward_label": {
+    "message": "Aggiungi firma negli inoltri"
+  },
+  "options_signature_backend_inactive_tooltip": {
+    "message": "La policy centrale della firma è inattiva o incompleta."
+  },
+  "options_signature_backend_update_required_tooltip": {
+    "message": "Aggiornare il backend NC Connector. Questa versione del backend non supporta ancora le firme e-mail centralizzate."
+  },
   "options_tab_talklink": {
     "message": "Link Talk"
   },
@@ -606,7 +630,7 @@
     "message": "https://nc-connector.de"
   },
   "options_about_overview_text": {
-    "message": "Più di semplici link ai file\n\nNC Connector unisce la condivisione sicura dei file, le riunioni Talk e l'automazione degli allegati direttamente in Thunderbird e Outlook. In questo modo i flussi di lavoro importanti del team restano dove devono essere: nel client di posta e calendario.\n\nCosa copre NC Connector\n- Condivisione file con password, data di scadenza e invio separato opzionale della password\n- Creazione e aggiornamento di riunioni Talk direttamente dagli eventi del calendario\n- Automazione degli allegati con regole chiare invece di passaggi manuali isolati\n- Blocchi uniformi di condivisione e invito direttamente nel flusso di lavoro abituale\n\nFacoltativamente con backend Nextcloud\n- Assegnazione centrale dei Seat e gestione delle policy\n- Modelli e design personalizzati per condivisioni e inviti Talk\n- Invio separato della password e controllo centralizzato per le organizzazioni\n- 1 Seat = 1 utente Nextcloud\n\nSenza backend, i componenti aggiuntivi restano utilizzabili direttamente. Con il backend si aggiunge un controllo centralizzato per team e organizzazioni."
+    "message": "Più di semplici link ai file\n\nNC Connector unisce la condivisione sicura dei file, le riunioni Talk, l'automazione degli allegati e le firme e-mail gestite centralmente direttamente in Thunderbird e Outlook. In questo modo i flussi di lavoro importanti del team restano dove devono essere: nel client di posta e calendario.\n\nCosa copre NC Connector\n- Condivisione file con password, data di scadenza e invio separato opzionale della password\n- Creazione e aggiornamento di riunioni Talk direttamente dagli eventi del calendario\n- Automazione degli allegati con regole chiare invece di passaggi manuali isolati\n- Blocchi uniformi di condivisione e invito direttamente nel flusso di lavoro abituale\n- Firme e-mail centrali per composizione, risposta e inoltro usando i dati del profilo Nextcloud\n\nFacoltativamente con backend Nextcloud\n- Assegnazione centrale dei Seat e gestione delle policy\n- Modelli e design personalizzati per condivisioni, inviti Talk e firme e-mail\n- Invio separato della password e controllo centralizzato per le organizzazioni\n- 1 Seat = 1 utente Nextcloud\n\nSenza backend, i componenti aggiuntivi restano utilizzabili direttamente. Con il backend si aggiunge un controllo centralizzato per team e organizzazioni."
   },
   "options_about_more_info_label": {
     "message": "Maggiori informazioni -->"
@@ -697,6 +721,12 @@
   },
   "options_talk_default_password_label": {
     "message": "Imposta password"
+  },
+  "options_talk_delete_room_on_event_delete_label": {
+    "message": "Elimina la stanza Talk quando elimini un evento salvato"
+  },
+  "options_talk_delete_room_on_event_delete_tooltip": {
+    "message": "Richiede metadati Talk di NC Connector e questa abilitazione esplicita. La pulizia degli appuntamenti non salvati resta attiva."
   },
   "options_talk_default_roomtype_label": {
     "message": "Tipo di stanza"
@@ -929,6 +959,9 @@
   "sharing_status_uploading_bulk": {
     "message": "Caricamento file..."
   },
+  "sharing_status_speed_kbps": {
+    "message": "$1 KB/s"
+  },
   "sharing_message_invalid_share_name": {
     "message": "Inserisci un nome di condivisione."
   },
@@ -979,7 +1012,8 @@
   },
   "outlook_ifb_port_label": {
     "message": "Porta IFB locale:"
-  },  "outlook_ifb_cache_hours_label": {
+  },
+  "outlook_ifb_cache_hours_label": {
     "message": "Cache rubrica (ore):"
   },
   "outlook_debug_file_label": {
@@ -1391,6 +1425,3 @@
     "message": "Quando il criterio TLS predefinito del sistema operativo è disattivato, abilita almeno una versione TLS (1.2 o 1.3)."
   }
 }
-
-
-

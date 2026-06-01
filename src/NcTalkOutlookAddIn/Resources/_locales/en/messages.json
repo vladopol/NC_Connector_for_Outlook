@@ -536,6 +536,30 @@
   "options_tab_sharing": {
     "message": "Sharing"
   },
+  "options_tab_signature": {
+    "message": "Signature"
+  },
+  "options_signature_defaults_heading": {
+    "message": "Email signature"
+  },
+  "options_signature_identity_hint": {
+    "message": "The central signature is only applied when the Outlook sender account matches the Nextcloud user email address."
+  },
+  "options_signature_on_compose_label": {
+    "message": "Add signature when composing"
+  },
+  "options_signature_on_reply_label": {
+    "message": "Add signature when replying"
+  },
+  "options_signature_on_forward_label": {
+    "message": "Add signature when forwarding"
+  },
+  "options_signature_backend_inactive_tooltip": {
+    "message": "Central signature policy is inactive or incomplete."
+  },
+  "options_signature_backend_update_required_tooltip": {
+    "message": "Please update the NC Connector backend. This backend version does not support central email signatures yet."
+  },
   "options_tab_talklink": {
     "message": "Talk Link"
   },
@@ -627,7 +651,7 @@
     "message": "https://nc-connector.de"
   },
   "options_about_overview_text": {
-    "message": "More than file links\n\nNC Connector combines secure file sharing, Talk meetings, and attachment automation directly in Thunderbird and Outlook. This keeps important team workflows where they belong: in the mail and calendar client.\n\nWhat NC Connector covers\n- File sharing with password, expiration date, and optional separate password delivery\n- Create and update Talk meetings directly from calendar appointments\n- Attachment automation with clear rules instead of manual individual steps\n- Consistent sharing and invitation blocks directly in the familiar workflow\n\nOptional with Nextcloud backend\n- Central Seat assignment and policy management\n- Custom templates and designs for shares and Talk invitations\n- Separate password delivery and central control for organizations\n- 1 Seat = 1 Nextcloud user\n\nWithout backend, the add-ins remain directly usable. With backend, central control for teams and organizations is added."
+    "message": "More than file links\n\nNC Connector combines secure file sharing, Talk meetings, attachment automation, and centrally managed email signatures directly in Thunderbird and Outlook. This keeps important team workflows where they belong: in the mail and calendar client.\n\nWhat NC Connector covers\n- File sharing with password, expiration date, and optional separate password delivery\n- Create and update Talk meetings directly from calendar appointments\n- Attachment automation with clear rules instead of manual individual steps\n- Consistent sharing and invitation blocks directly in the familiar workflow\n- Central email signatures for compose, reply, and forward using Nextcloud profile data\n\nOptional with Nextcloud backend\n- Central Seat assignment and policy management\n- Custom templates and designs for shares, Talk invitations, and email signatures\n- Separate password delivery and central control for organizations\n- 1 Seat = 1 Nextcloud user\n\nWithout backend, the add-ins remain directly usable. With backend, central control for teams and organizations is added."
   },
   "options_about_more_info_label": {
     "message": "More information -->"
@@ -718,6 +742,12 @@
   },
   "options_talk_default_password_label": {
     "message": "Set password"
+  },
+  "options_talk_delete_room_on_event_delete_label": {
+    "message": "Delete Talk room when deleting a saved event"
+  },
+  "options_talk_delete_room_on_event_delete_tooltip": {
+    "message": "Requires NC Connector Talk metadata and this opt-in. Unsaved appointment cleanup remains active."
   },
   "options_talk_default_roomtype_label": {
     "message": "Room type"
@@ -950,6 +980,9 @@
   "sharing_status_uploading_bulk": {
     "message": "Uploading files..."
   },
+  "sharing_status_speed_kbps": {
+    "message": "$1 KB/s"
+  },
   "sharing_message_invalid_share_name": {
     "message": "Please enter a share name."
   },
@@ -1000,7 +1033,8 @@
   },
   "outlook_ifb_port_label": {
     "message": "Local IFB port:"
-  },  "outlook_ifb_cache_hours_label": {
+  },
+  "outlook_ifb_cache_hours_label": {
     "message": "Address book cache (hours):"
   },
   "outlook_debug_file_label": {
@@ -1406,7 +1440,3 @@
     "message": "personal"
   }
 }
-
-
-
-

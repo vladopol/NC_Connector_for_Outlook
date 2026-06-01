@@ -11,7 +11,6 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
@@ -44,7 +43,10 @@ namespace NcTalkOutlookAddIn
         private FreeBusyManager _freeBusyManager;
         private CalDavCalendarSync _calDavCalendarSync;
         private Outlook.Inspectors _inspectors;
-        private Outlook.ApplicationEvents_11_Event _applicationEvents;
+        private Outlook.Explorers _explorers;
+        private Outlook.ExplorersEvents_Event _explorersEvents;
+        private readonly Dictionary<string, Outlook.Explorer> _inlineResponseExplorers = new Dictionary<string, Outlook.Explorer>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, Outlook.ExplorerEvents_10_Event> _inlineResponseExplorerEvents = new Dictionary<string, Outlook.ExplorerEvents_10_Event>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, AppointmentSubscription> _subscriptionByEntryId = new Dictionary<string, AppointmentSubscription>(StringComparer.OrdinalIgnoreCase);
         private readonly MailComposeSubscriptionRegistryController _mailComposeSubscriptionRegistry = new MailComposeSubscriptionRegistryController();
         private readonly OutlookAttachmentAutomationGuardService _attachmentGuardService = new OutlookAttachmentAutomationGuardService();
@@ -59,17 +61,6 @@ namespace NcTalkOutlookAddIn
         private const int ComposeAttachmentEvalDebounceMs = 250;
         private const int ComposeShareCleanupSendGraceMs = 15000;
 
-        internal const string PropertyToken = "NcTalkRoomToken";
-        internal const string PropertyRoomType = "NcTalkRoomType";
-        internal const string PropertyLobby = "NcTalkLobbyEnabled";
-        internal const string PropertySearchVisible = "NcTalkSearchVisible";
-        internal const string PropertyPasswordSet = "NcTalkPasswordSet";
-        internal const string PropertyStartEpoch = "NcTalkStartEpoch";
-        internal const string PropertyDataVersion = "NcTalkDataVersion";
-        internal const string PropertyAddUsers = "NcTalkAddUsers";
-        internal const string PropertyAddGuests = "NcTalkAddGuests";
-        internal const string PropertyDelegateId = "NcTalkDelegateId";
-        internal const string PropertyDelegated = "NcTalkDelegated";
         internal const string IcalToken = "X-NCTALK-TOKEN";
         internal const string IcalUrl = "X-NCTALK-URL";
         internal const string IcalLobby = "X-NCTALK-LOBBY";
@@ -78,13 +69,10 @@ namespace NcTalkOutlookAddIn
         internal const string IcalObjectId = "X-NCTALK-OBJECTID";
         internal const string IcalAddUsers = "X-NCTALK-ADD-USERS";
         internal const string IcalAddGuests = "X-NCTALK-ADD-GUESTS";
-        internal const string IcalAddParticipants = "X-NCTALK-ADD-PARTICIPANTS";
         internal const string IcalDelegate = "X-NCTALK-DELEGATE";
         internal const string IcalDelegateName = "X-NCTALK-DELEGATE-NAME";
         internal const string IcalDelegated = "X-NCTALK-DELEGATED";
         internal const string IcalDelegateReady = "X-NCTALK-DELEGATE-READY";
-        internal const int PropertyVersionValue = 1;
-        private static readonly Regex TalkUrlTokenRegex = new Regex(@"https?://[^\s""'<>]+/call/(?<token>[A-Za-z0-9_-]+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
         public NextcloudTalkAddIn()
         {
@@ -157,13 +145,31 @@ namespace NcTalkOutlookAddIn
         </group>
       </tab>
     </tabs>
+    <contextualTabs>
+      <tabSet idMso='TabComposeTools'>
+        <tab idMso='TabMessage'>
+          <group id='NcTalkInlineMailGroup' label='{1}'>
+            <button id='NcTalkInlineFileLinkButton'
+                    label='{5}'
+                    size='large'
+                    getImage='OnGetButtonImage'
+                    onAction='OnFileLinkButtonPressed'
+                    screentip='{6}'
+                    supertip='{7}' />
+          </group>
+        </tab>
+      </tabSet>
+    </contextualTabs>
   </ribbon>
 </customUI>",
                     EscapeXml(Strings.RibbonExplorerTabLabel),
                     EscapeXml(Strings.RibbonExplorerGroupLabel),
                     EscapeXml(Strings.RibbonSettingsButtonLabel),
                     EscapeXml(Strings.RibbonSettingsScreenTip),
-                    EscapeXml(Strings.RibbonSettingsSuperTip));
+                    EscapeXml(Strings.RibbonSettingsSuperTip),
+                    EscapeXml(Strings.RibbonFileLinkButtonLabel),
+                    EscapeXml(Strings.RibbonFileLinkButtonScreenTip),
+                    EscapeXml(Strings.RibbonFileLinkButtonSuperTip));
             }
             if (string.Equals(ribbonID, "Microsoft.Outlook.Mail.Compose", StringComparison.OrdinalIgnoreCase))
             {
@@ -230,7 +236,8 @@ namespace NcTalkOutlookAddIn
                 (source, showWarning) => TryApplyTransportSecurityFromSettings(source, showWarning),
                 () => { ApplyIfbSettings(); ApplyCalDavSyncSettings(); },
                 settings =>
-                {                    if (_settingsStorage != null)
+                {
+                    if (_settingsStorage != null)
                     {
                         _settingsStorage.Save(settings);
                     }
@@ -243,7 +250,8 @@ namespace NcTalkOutlookAddIn
             string resourceName = "NcTalkOutlookAddIn.Resources.app.png";
 
             using (Stream resourceStream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName))
-            {                if (resourceStream == null)
+            {
+                if (resourceStream == null)
                 {
                     return null;
                 }
@@ -267,8 +275,13 @@ namespace NcTalkOutlookAddIn
             return await _fileLinkLaunchController.RunFileLinkWizardForMail(mail, launchOptions);
         }
 
-        internal MailComposeSubscription EnsureMailComposeSubscription(Outlook.MailItem mail, string inspectorIdentityOverride = null)
-        {            if (mail == null)
+        internal MailComposeSubscription EnsureMailComposeSubscription(Outlook.MailItem mail, string inspectorIdentityOverride = null, bool isInlineResponse = false)
+        {
+            if (mail == null)
+            {
+                return null;
+            }
+            if (!IsMailComposeCandidate(mail, "ensure_subscription"))
             {
                 return null;
             }
@@ -277,11 +290,16 @@ namespace NcTalkOutlookAddIn
                 ? MailInteropController.ResolveMailInspectorIdentityKey(mail)
                 : inspectorIdentityOverride.Trim();
 
-            return _mailComposeSubscriptionRegistry.GetOrCreate(
+            MailComposeSubscription subscription = _mailComposeSubscriptionRegistry.GetOrCreate(
                 mail,
                 mailIdentityKey,
                 inspectorIdentityKey,
-                () => new MailComposeSubscription(this, mail, mailIdentityKey, inspectorIdentityKey));
+                () => new MailComposeSubscription(this, mail, mailIdentityKey, inspectorIdentityKey, isInlineResponse));
+            if (isInlineResponse && subscription != null)
+            {
+                subscription.MarkInlineResponse();
+            }
+            return subscription;
         }
 
         private void RemoveMailComposeSubscription(MailComposeSubscription subscription)
@@ -331,7 +349,8 @@ namespace NcTalkOutlookAddIn
                 return;
             }
 
-            SynchronizationContext notificationUiContext = _uiSynchronizationContext ?? SynchronizationContext.Current;            if (notificationUiContext == null)
+            SynchronizationContext notificationUiContext = _uiSynchronizationContext ?? SynchronizationContext.Current;
+            if (notificationUiContext == null)
             {
                 LogFileLink("Separate password notification skipped (UI context unavailable, recipients=" + recipientCount.ToString(CultureInfo.InvariantCulture) + ").");
                 return;
@@ -375,7 +394,8 @@ namespace NcTalkOutlookAddIn
         }
 
         private void ScheduleNotifyIconDispose(NotifyIcon notifyIcon, int delayMs, SynchronizationContext notificationUiContext)
-        {            if (notifyIcon == null)
+        {
+            if (notifyIcon == null)
             {
                 return;
             }
@@ -388,7 +408,8 @@ namespace NcTalkOutlookAddIn
         }
 
         private void DisposeNotifyIconOnUiContext(NotifyIcon notifyIcon, SynchronizationContext notificationUiContext)
-        {            if (notifyIcon == null)
+        {
+            if (notifyIcon == null)
             {
                 return;
             }
@@ -409,7 +430,8 @@ namespace NcTalkOutlookAddIn
         }
 
         private static void DisposeNotifyIcon(NotifyIcon notifyIcon)
-        {            if (notifyIcon == null)
+        {
+            if (notifyIcon == null)
             {
                 return;
             }
@@ -434,14 +456,19 @@ namespace NcTalkOutlookAddIn
             return _mailInteropController.ResolveActiveInspectorIdentityKey();
         }
 
-        internal void InsertTextIntoMail(Outlook.MailItem mail, string plainText, string htmlFallback)
+        internal bool IsActiveInlineResponse(Outlook.MailItem mail)
         {
-            _mailInteropController.InsertTextIntoMail(mail, plainText, htmlFallback);
+            return _mailInteropController.IsActiveInlineResponse(mail);
         }
 
         internal void InsertHtmlIntoMail(Outlook.MailItem mail, string html)
         {
             _mailInteropController.InsertHtmlIntoMail(mail, html);
+        }
+
+        internal void InsertPlainTextIntoMail(Outlook.MailItem mail, string plainText)
+        {
+            _mailInteropController.InsertPlainTextIntoMail(mail, plainText);
         }
 
         internal static bool TryWriteAppointmentHtmlBody(Outlook.AppointmentItem appointment, string html)
@@ -450,7 +477,8 @@ namespace NcTalkOutlookAddIn
         }
 
         internal Outlook.AppointmentItem GetActiveAppointment()
-        {            if (_outlookApplication == null)
+        {
+            if (_outlookApplication == null)
             {
                 return null;
             }
@@ -565,16 +593,6 @@ namespace NcTalkOutlookAddIn
             _talkAppointmentController.ApplyRoomToAppointment(appointment, request, result);
         }
 
-        private bool TryStampIcalStartEpoch(Outlook.AppointmentItem appointment, string roomToken, out long startEpoch)
-        {
-            return _talkAppointmentController.TryStampIcalStartEpoch(appointment, roomToken, out startEpoch);
-        }
-
-        private bool TryReadRequiredIcalStartEpoch(Outlook.AppointmentItem appointment, string roomToken, out long startEpoch)
-        {
-            return _talkAppointmentController.TryReadRequiredIcalStartEpoch(appointment, roomToken, out startEpoch);
-        }
-
         private static long? GetIcalStartEpochOrNull(Outlook.AppointmentItem appointment)
         {
             return TalkAppointmentController.GetIcalStartEpochOrNull(appointment);
@@ -594,7 +612,8 @@ namespace NcTalkOutlookAddIn
         }
 
         internal void UpdateStoredServerVersion(string response)
-        {            if (_currentSettings == null || string.IsNullOrWhiteSpace(response))
+        {
+            if (_currentSettings == null || string.IsNullOrWhiteSpace(response))
             {
                 return;
             }
@@ -610,7 +629,8 @@ namespace NcTalkOutlookAddIn
                 return;
             }
 
-            _currentSettings.LastKnownServerVersion = versionText;            if (_settingsStorage != null)
+            _currentSettings.LastKnownServerVersion = versionText;
+            if (_settingsStorage != null)
             {
                 try
                 {
@@ -624,58 +644,75 @@ namespace NcTalkOutlookAddIn
             }
         }
 
-        private static string ExtractTokenFromTalkUrlText(string text)
-        {
-            if (string.IsNullOrWhiteSpace(text))
-            {
-                return null;
-            }
-
-            Match match = TalkUrlTokenRegex.Match(text);
-            if (!match.Success)
-            {
-                return null;
-            }
-            string token = match.Groups["token"] != null ? match.Groups["token"].Value : null;
-            return string.IsNullOrWhiteSpace(token) ? null : token.Trim();
-        }
-
         private string ResolveRoomTokenForAppointment(Outlook.AppointmentItem appointment)
         {
-            string roomToken = TalkAppointmentController.GetUserPropertyTextPrefer(appointment, IcalToken, PropertyToken);
+            string roomToken = TalkAppointmentController.GetUserPropertyText(appointment, IcalToken);
             if (!string.IsNullOrWhiteSpace(roomToken))
             {
                 return roomToken.Trim();
             }
-            string location = null;
-            try
+
+            return null;
+        }
+
+        internal bool ShouldDeleteTalkRoomOnSavedEventDelete()
+        {
+            bool localEnabled = _currentSettings != null && _currentSettings.TalkDeleteRoomOnEventDelete;
+            if (!SettingsAreComplete())
             {
-                location = appointment != null ? appointment.Location : null;
+                return localEnabled;
             }
-            catch (Exception ex)
+
+            var configuration = new TalkServiceConfiguration(
+                _currentSettings.ServerUrl,
+                _currentSettings.Username,
+                _currentSettings.AppPassword);
+            BackendPolicyStatus policyStatus = FetchBackendPolicyStatus(configuration, "talk_delete_room_on_event_delete");
+            if (policyStatus != null
+                && policyStatus.IsDomainActive("talk")
+                && policyStatus.IsLocked("talk", "talk_delete_room_on_event_delete"))
             {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read appointment location while resolving Talk token.", ex);
+                bool policyEnabled;
+                if (policyStatus.TryGetPolicyBool("talk", "talk_delete_room_on_event_delete", out policyEnabled))
+                {
+                    return policyEnabled;
+                }
+                return false;
             }
-            string extracted = ExtractTokenFromTalkUrlText(location);
-            if (string.IsNullOrWhiteSpace(extracted))
+
+            return localEnabled;
+        }
+
+        internal void QueueSavedEventRoomDeletion(string roomToken, bool isEventConversation)
+        {
+            if (string.IsNullOrWhiteSpace(roomToken))
             {
-                return null;
+                return;
             }
-            try
+
+            string normalizedRoomToken = roomToken.Trim();
+            Task.Run(() =>
             {
-                TalkAppointmentController.SetUserProperty(appointment, IcalToken, Outlook.OlUserPropertyType.olText, extracted);
-                TalkAppointmentController.SetUserProperty(appointment, PropertyToken, Outlook.OlUserPropertyType.olText, extracted);
-                LogTalk("Room token bootstrapped from location (token=" + extracted + ").");
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to persist bootstrapped room token.", ex);
-            }
-            return extracted;
+                try
+                {
+                    if (!ShouldDeleteTalkRoomOnSavedEventDelete())
+                    {
+                        LogTalk("Saved-event room deletion skipped (opt-in disabled, token=" + normalizedRoomToken + ").");
+                        return;
+                    }
+
+                    TryDeleteRoom(normalizedRoomToken, isEventConversation, false);
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticsLogger.LogException(LogCategories.Talk, "Saved-event room deletion failed in background (token=" + normalizedRoomToken + ").", ex);
+                }
+            });
         }
 
         private void RefreshEntryBinding(AppointmentSubscription subscription)
-        {            if (subscription == null)
+        {
+            if (subscription == null)
             {
                 return;
             }
@@ -710,7 +747,8 @@ namespace NcTalkOutlookAddIn
         }
 
         private bool IsOrganizer(Outlook.AppointmentItem appointment)
-        {            if (appointment == null)
+        {
+            if (appointment == null)
             {
                 return false;
             }
@@ -727,20 +765,30 @@ namespace NcTalkOutlookAddIn
         }
 
         internal void RegisterSubscription(Outlook.AppointmentItem appointment, TalkRoomCreationResult result)
-        {            if (result == null)
+        {
+            if (result == null)
             {
                 return;
             }
 
-            RegisterSubscription(appointment, result.RoomToken, result.LobbyEnabled, result.CreatedAsEventConversation);
+            RegisterSubscription(appointment, result.RoomToken, result.RoomUrl, result.LobbyEnabled, result.CreatedAsEventConversation);
         }
 
         internal void RegisterSubscription(Outlook.AppointmentItem appointment, string roomToken, bool lobbyEnabled, bool isEventConversation)
-        {            if (appointment == null || string.IsNullOrWhiteSpace(roomToken))
+        {
+            string roomUrl = TalkAppointmentController.GetUserPropertyText(appointment, IcalUrl);
+            RegisterSubscription(appointment, roomToken, roomUrl, lobbyEnabled, isEventConversation);
+        }
+
+        internal void RegisterSubscription(Outlook.AppointmentItem appointment, string roomToken, string roomUrl, bool lobbyEnabled, bool isEventConversation)
+        {
+            if (appointment == null || string.IsNullOrWhiteSpace(roomToken))
             {
                 return;
             }
-            LogTalk("Registering appointment subscription (token=" + roomToken + ", lobby=" + lobbyEnabled + ", event=" + isEventConversation + ").");
+            string normalizedRoomToken = roomToken.Trim();
+            string normalizedRoomUrl = !string.IsNullOrWhiteSpace(roomUrl) ? roomUrl.Trim() : string.Empty;
+            LogTalk("Registering appointment subscription (token=" + normalizedRoomToken + ", lobby=" + lobbyEnabled + ", event=" + isEventConversation + ", urlSet=" + !string.IsNullOrWhiteSpace(normalizedRoomUrl) + ").");
 
             string entryId = GetEntryId(appointment);
             if (!string.IsNullOrEmpty(entryId))
@@ -758,7 +806,7 @@ namespace NcTalkOutlookAddIn
             }
 
             AppointmentSubscription existingByToken;
-            if (_subscriptionByToken.TryGetValue(roomToken, out existingByToken))
+            if (_subscriptionByToken.TryGetValue(normalizedRoomToken, out existingByToken))
             {
                 if (existingByToken.IsFor(appointment))
                 {
@@ -768,9 +816,9 @@ namespace NcTalkOutlookAddIn
                 existingByToken.Dispose();
             }
             var key = Guid.NewGuid().ToString("N");
-            var subscription = new AppointmentSubscription(this, appointment, key, roomToken, lobbyEnabled, isEventConversation, entryId);
+            var subscription = new AppointmentSubscription(this, appointment, key, normalizedRoomToken, normalizedRoomUrl, lobbyEnabled, isEventConversation, entryId);
             _activeSubscriptions[key] = subscription;
-            _subscriptionByToken[roomToken] = subscription;
+            _subscriptionByToken[normalizedRoomToken] = subscription;
 
             if (!string.IsNullOrEmpty(entryId))
             {
@@ -807,6 +855,11 @@ namespace NcTalkOutlookAddIn
 
         internal bool TryDeleteRoom(string roomToken, bool isEventConversation)
         {
+            return TryDeleteRoom(roomToken, isEventConversation, true);
+        }
+
+        private bool TryDeleteRoom(string roomToken, bool isEventConversation, bool showWarning)
+        {
             if (string.IsNullOrWhiteSpace(roomToken))
             {
                 return true;
@@ -822,12 +875,18 @@ namespace NcTalkOutlookAddIn
             catch (TalkServiceException ex)
             {
                 LogTalk("Room could not be deleted: " + ex.Message);
-                ShowWarning(string.Format(Strings.WarningRoomDeleteFailed, ex.Message));
+                if (showWarning)
+                {
+                    ShowWarning(string.Format(Strings.WarningRoomDeleteFailed, ex.Message));
+                }
             }
             catch (Exception ex)
             {
                 LogTalk("Unexpected error while deleting room: " + ex.Message);
-                ShowWarning(string.Format(Strings.WarningRoomDeleteFailed, ex.Message));
+                if (showWarning)
+                {
+                    ShowWarning(string.Format(Strings.WarningRoomDeleteFailed, ex.Message));
+                }
             }
             return false;
         }
@@ -861,8 +920,10 @@ namespace NcTalkOutlookAddIn
         }
 
         internal void EnsureSettingsLoaded()
-        {            if (_currentSettings == null)
-            {                if (_settingsStorage != null)
+        {
+            if (_currentSettings == null)
+            {
+                if (_settingsStorage != null)
                 {
                     _currentSettings = _settingsStorage.Load();
                 }
@@ -912,7 +973,5 @@ namespace NcTalkOutlookAddIn
 
     }
 }
-
-
 
 
