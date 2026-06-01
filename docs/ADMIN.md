@@ -7,7 +7,7 @@ This document describes installation, rollout and operation of **NC Connector fo
 - [Updates / upgrade behavior](#updates--upgrade-behavior)
 - [Files & registry](#files--registry)
 - [Settings (profile XML)](#settings-profile-xml)
-- [Compose sharing lifecycle (3.0.4)](#compose-sharing-lifecycle-304)
+- [Compose sharing lifecycle (3.1.0)](#compose-sharing-lifecycle-310)
 - [Internet Free/Busy Gateway (IFB)](#internet-freebusy-gateway-ifb)
 - [System address book required for user search and moderator selection](#system-address-book-required-for-user-search-and-moderator-selection)
 - [Logging / support](#logging--support)
@@ -20,7 +20,7 @@ This document describes installation, rollout and operation of **NC Connector fo
 Silent install example:
 
 ```powershell
-msiexec /i "NCConnectorForOutlook-3.0.4.msi" /qn /norestart
+msiexec /i "NCConnectorForOutlook-3.1.0.msi" /qn /norestart
 ```
 
 Afterwards, start Outlook. The **NC Connector** tab/group appears in the ribbon (Calendar/Appointment and Mail compose).
@@ -86,6 +86,10 @@ Legacy migration on first start:
   <DebugLoggingEnabled>false</DebugLoggingEnabled>
   <LogAnonymizationEnabled>true</LogAnonymizationEnabled>
   <FileLinkBasePath>NC Connector</FileLinkBasePath>
+  <TalkDeleteRoomOnEventDelete>false</TalkDeleteRoomOnEventDelete>
+  <EmailSignatureOnCompose>true</EmailSignatureOnCompose>
+  <EmailSignatureOnReply>true</EmailSignatureOnReply>
+  <EmailSignatureOnForward>true</EmailSignatureOnForward>
 </Settings>
 ```
 
@@ -107,12 +111,15 @@ Runtime behavior:
 - checked when Talk wizard opens
 - checked when Sharing wizard opens
 - checked when Settings open or are saved
+- checked when deleting a saved Talk appointment would remove the remote Talk room
 - valid active seat => backend policy values apply and `policy_editable=false` fields are locked in the UI
 - missing backend / no seat / invalid seat => local Outlook settings remain active
 - if the backend is unreachable, Outlook falls back to the locally saved add-in settings
 - if the backend is reachable but the license/seat state is no longer usable, Outlook also falls back to the locally saved add-in settings
 - invalid seat states remain visible in the UI so users can contact their administrator
 - separate password delivery is only available when the backend endpoint exists and the current user has an active assigned seat
+- central email signatures are only available when the backend endpoint exists, the current user has an active assigned seat, and the backend returns a complete `policy.email_signature` payload
+- if Share/Talk policy is available but `policy.email_signature` is missing, Outlook treats only the central signature domain as unsupported and shows a backend update hint
 - backend custom templates stay inactive until the corresponding language override is set to `custom`
 - the `custom` option is only shown when the backend endpoint exists and stays disabled unless the effective backend policy for that domain is actually `custom` and provides a template
 - if `custom` is selected but the backend template is empty or unavailable, Outlook falls back to the local UI-default text block
@@ -120,11 +127,38 @@ Runtime behavior:
 
 Central policy can currently control:
 - Talk defaults and lock state
+- saved-event Talk room deletion opt-in (`talk_delete_room_on_event_delete`)
 - Sharing defaults and lock state
 - share HTML/password templates
 - Talk description language / custom invitation template
+- central email signature defaults and lock state
+
+### Central email signature behavior
+
+The backend can provide one central HTML email signature for the assigned seat user. Outlook applies it only when all of these conditions are true:
+
+- the backend endpoint is reachable and the current account has an active assigned seat
+- the backend status contains `policy.email_signature` and `policy_editable.email_signature`
+- `policy.email_signature.email_signature_on_compose=true`
+- `policy.email_signature.email_signature_template` contains HTML
+- `policy.email_signature.user_email` contains the Nextcloud user's email address
+- the effective Outlook sender identity matches that email address. If Outlook uses a `SentOnBehalfOfName`/From override for a shared mailbox or delegated Exchange identity, that override must resolve to the same SMTP address; otherwise no backend signature is inserted.
+
+The local settings `EmailSignatureOnCompose`, `EmailSignatureOnReply`, and `EmailSignatureOnForward` control whether the backend signature is inserted for new mails, replies, and forwards unless the backend locks the corresponding setting with `policy_editable.email_signature.<key>=false`.
+
+If an older backend already returns Share/Talk policy but does not expose the `policy.email_signature` domain yet, only central email signatures remain disabled. Settings then shows a backend update hint; Share and Talk stay controlled by their own policy domains.
+
+When `EmailSignatureOnCompose` is enabled for the matching Outlook sender account, NC Connector owns the signature slot for that identity. In HTML/RTF compose, Outlook-native or third-party signatures captured when the compose window opened are removed only when the quoted-message boundary is structurally identifiable. If the boundary is not structurally identifiable, NC Connector preserves Outlook's quoted message and separator. If the backend signature is inserted before a reply/forward separator, NC Connector keeps one empty line between the signature and the quoted message.
+
+Plain-text compose remains plain text. Outlook does not get switched to HTML. NC Connector converts the sanitized backend HTML to plain text and writes it through Outlook's WordEditor signature slot. It does not parse localized reply headers and does not rewrite `MailItem.Body`.
+
+If the backend signature is inactive, incomplete, compose-signature policy is disabled, or the Outlook sender account does not match the Nextcloud user email, NC Connector leaves Outlook's own signature handling untouched. It only removes/replaces a signature block or managed plain-text bookmark that NC Connector itself inserted into the open compose window.
+
+The backend signature HTML is sanitized with the same fail-closed template sanitizer used for sharing and Talk blocks. HTML/RTF signatures are inserted as marked HTML blocks; plain-text signatures are tracked with a Word bookmark for the open compose session.
 
 ### Talk appointment-safe HTML subset (backend templates)
+
+Saved appointment deletion is conservative by default: Outlook only queues remote Talk room deletion when `TalkDeleteRoomOnEventDelete` is enabled locally or locked/enabled by backend policy, and only when the appointment carries NC Connector `X-NCTALK-TOKEN` metadata. Generic Talk links in `Location` or URL fields are ignored. Cleanup for newly created appointments that are discarded before saving remains active.
 
 If backend policy/template delivery is enabled for Talk appointment descriptions (`event_description_type=html`), use this subset for robust Outlook rendering:
 
@@ -133,15 +167,18 @@ If backend policy/template delivery is enabled for Talk appointment descriptions
 - Keep links explicit with full `https://` URLs.
 - NC Connector adds legacy fallbacks automatically during appointment insert (`font color`, `bgcolor`, `align`, `valign`) and hardens anchor color rendering.
 
-## Compose sharing lifecycle (3.0.4)
+## Compose sharing lifecycle (3.1.0)
 
-### Attachment automation and cleanup contract
+### Attachment automation and cleanup rules
+- The `Insert Nextcloud share` button is also available in Outlook inline replies/forwards on the Message tab and uses the same wizard path as mail compose inspectors.
+- Inline replies/forwards write the share block through Outlook's active inline Word editor. HTML/RTF messages keep two empty lines above the share block; plain-text messages keep plain text and use the framed `#` block.
 - In compose attachment mode, created server artifacts are tracked immediately after share creation.
 - Cleanup tracking is cleared only after a confirmed successful primary mail send.
 - If a compose window is closed without a successful send, the add-in deletes the created share folder artifacts server-side (best effort, with send/close grace timer handling).
 - Attachment automation evaluates new files both pre-add (`BeforeAttachmentAdd`) and post-add; if pre-add can resolve a local file path, NC flow can best-effort cancel host add before Outlook post-add handling.
 - In Microsoft 365 / Exchange environments with server-side message-size limits, Outlook can block large attachments before add-in events fire; in those cases automation cannot intercept and users should use the `Insert Nextcloud share` button instead.
 - In sharing wizard file-step, admins/users can add files and folders via Explorer drag & drop across the full step area (queue and action area), not only via explicit add buttons.
+- File uploads larger than 20 MB use Nextcloud chunked upload v2. This avoids long single WebDAV `PUT` requests through proxies or web servers that reject very large request bodies.
 
 ### Separate password follow-up mail
 - If `Send password separately` is enabled, the main HTML block does not contain inline password text.

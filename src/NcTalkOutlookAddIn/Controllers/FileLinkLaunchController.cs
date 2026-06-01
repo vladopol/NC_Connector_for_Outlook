@@ -52,7 +52,8 @@ namespace NcTalkOutlookAddIn.Controllers
                 return;
             }
 
-            _owner.EnsureMailComposeSubscription(mail, _owner.ResolveActiveInspectorIdentityKey());
+            bool isInlineResponse = _owner.IsActiveInlineResponse(mail);
+            _owner.EnsureMailComposeSubscription(mail, isInlineResponse ? string.Empty : _owner.ResolveActiveInspectorIdentityKey(), isInlineResponse);
             await RunFileLinkWizardForMail(mail, null);
         }
 
@@ -81,9 +82,12 @@ namespace NcTalkOutlookAddIn.Controllers
             {                if (wizard.ShowDialog() == DialogResult.OK && wizard.Result != null)
                 {
                     string languageOverride = settings != null ? settings.ShareBlockLang : "default";
+                    bool plainTextCompose = MailInteropController.IsPlainTextMail(mail);
                     NextcloudTalkAddIn.LogFileLinkMessage("Share created (folder=\"" + wizard.Result.FolderName + "\").");
 
-                    NextcloudTalkAddIn.MailComposeSubscription composeSubscription = _owner.EnsureMailComposeSubscription(mail, _owner.ResolveActiveInspectorIdentityKey());                    if (composeSubscription != null)
+                    bool isInlineResponse = _owner.IsActiveInlineResponse(mail);
+                    NextcloudTalkAddIn.MailComposeSubscription composeSubscription = _owner.EnsureMailComposeSubscription(mail, isInlineResponse ? string.Empty : _owner.ResolveActiveInspectorIdentityKey(), isInlineResponse);
+                    if (composeSubscription != null)
                     {
                         composeSubscription.ArmShareCleanup(wizard.Result);
                     }
@@ -91,8 +95,12 @@ namespace NcTalkOutlookAddIn.Controllers
                     string plainText;
                     try
                     {
-                        html = FileLinkHtmlBuilder.Build(wizard.Result, wizard.RequestSnapshot, languageOverride, policyStatus);
-                        plainText = FileLinkHtmlBuilder.BuildPlainText(wizard.Result, wizard.RequestSnapshot, languageOverride, policyStatus);
+                        html = plainTextCompose
+                            ? string.Empty
+                            : FileLinkHtmlBuilder.Build(wizard.Result, wizard.RequestSnapshot, languageOverride, policyStatus);
+                        plainText = plainTextCompose
+                            ? FileLinkHtmlBuilder.BuildPlainText(wizard.Result, wizard.RequestSnapshot, languageOverride, policyStatus)
+                            : string.Empty;
                     }
                     catch (Exception ex)
                     {
@@ -110,9 +118,15 @@ namespace NcTalkOutlookAddIn.Controllers
                         && !string.IsNullOrWhiteSpace(wizard.Result.Password))
                     {
                         string passwordOnlyHtml;
+                        string passwordOnlyPlainText;
                         try
                         {
-                            passwordOnlyHtml = FileLinkHtmlBuilder.BuildPasswordOnly(wizard.Result, languageOverride, policyStatus);
+                            passwordOnlyHtml = plainTextCompose
+                                ? string.Empty
+                                : FileLinkHtmlBuilder.BuildPasswordOnly(wizard.Result, languageOverride, policyStatus);
+                            passwordOnlyPlainText = plainTextCompose
+                                ? FileLinkHtmlBuilder.BuildPasswordOnlyPlainText(wizard.Result, languageOverride, policyStatus)
+                                : string.Empty;
                         }
                         catch (Exception ex)
                         {
@@ -128,12 +142,14 @@ namespace NcTalkOutlookAddIn.Controllers
                         composeSubscription.RegisterSeparatePasswordDispatch(
                             wizard.Result,
                             wizard.RequestSnapshot,
-                            passwordOnlyHtml);
+                            passwordOnlyHtml,
+                            passwordOnlyPlainText,
+                            plainTextCompose);
                     }
 
-                    if (!string.IsNullOrWhiteSpace(plainText))
+                    if (plainTextCompose)
                     {
-                        _owner.InsertTextIntoMail(mail, plainText, html);
+                        _owner.InsertPlainTextIntoMail(mail, plainText);
                     }
                     else
                     {

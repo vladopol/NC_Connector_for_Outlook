@@ -466,8 +466,16 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string TabDebug { get { return Get("options_tab_debug", "Debug"); } }
         internal static string TabAbout { get { return Get("options_tab_about", "About"); } }
         internal static string TabFileLink { get { return Get("options_tab_sharing", "Sharing"); } }
+        internal static string TabSignature { get { return Get("options_tab_signature", "Signature"); } }
 
         internal static string SettingsTalkDefaultsGroup { get { return Get("options_talk_defaults_heading", "Default settings"); } }
+        internal static string SignatureDefaultsHeading { get { return Get("options_signature_defaults_heading", "Email signature"); } }
+        internal static string SignatureIdentityHint { get { return Get("options_signature_identity_hint", "The central signature is only applied when the Outlook sender account matches the Nextcloud user email address."); } }
+        internal static string SignatureOnComposeLabel { get { return Get("options_signature_on_compose_label", "Add signature when composing"); } }
+        internal static string SignatureOnReplyLabel { get { return Get("options_signature_on_reply_label", "Add signature when replying"); } }
+        internal static string SignatureOnForwardLabel { get { return Get("options_signature_on_forward_label", "Add signature when forwarding"); } }
+        internal static string SignatureBackendInactiveTooltip { get { return Get("options_signature_backend_inactive_tooltip", "Central signature policy is inactive or incomplete."); } }
+        internal static string SignatureBackendUpdateRequiredTooltip { get { return Get("options_signature_backend_update_required_tooltip", "Please update the NC Connector backend. This backend version does not support central email signatures yet."); } }
         internal static string LabelServerUrl { get { return Get("options_base_url_label", "Nextcloud URL"); } }
         internal static string LabelUsername { get { return Get("options_user_label", "Username"); } }
         internal static string LabelAppPassword { get { return Get("options_app_pass_label", "App password"); } }
@@ -526,6 +534,8 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string TalkRoomGroup { get { return Get("ui_create_roomtype_label", "Room type"); } }
         internal static string TalkEventRadio { get { return Get("ui_create_mode_event", "Event conversation"); } }
         internal static string TalkStandardRadio { get { return Get("ui_create_mode_standard", "Group conversation"); } }
+        internal static string TalkDeleteRoomOnEventDeleteCheck { get { return Get("options_talk_delete_room_on_event_delete_label", "Delete Talk room when deleting a saved event"); } }
+        internal static string TooltipDeleteRoomOnEventDelete { get { return Get("options_talk_delete_room_on_event_delete_tooltip", "Requires NC Connector Talk metadata and this opt-in. Unsaved appointment cleanup remains active."); } }
         internal static string TalkModeratorGroup { get { return Get("ui_create_moderator_label", "Moderator (optional)"); } }
         internal static string TalkModeratorClear { get { return Get("ui_button_clear", "Clear"); } }
         internal static string TalkModeratorHint { get { return Get("ui_create_moderator_hint", "If provided, moderation is transferred to this user after creation and you leave the room."); } }
@@ -905,6 +915,7 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string FileLinkWizardStatusSuccess { get { return Get("sharing_status_done_row", "Done"); } }
         internal static string FileLinkWizardStatusError { get { return Get("sharing_status_error_row", "Error"); } }
         internal static string FileLinkWizardStatusCancelled { get { return Get("outlook_sharing_status_cancelled", "Cancelled"); } }
+        internal static string FileLinkWizardStatusSpeedKbpsFormat { get { return Get("sharing_status_speed_kbps", "$1 KB/s"); } }
         internal static string FileLinkWizardUploadCancelledMessage { get { return Get("outlook_sharing_upload_cancelled", "Upload was cancelled."); } }
         internal static string FileLinkWizardUploadFailed { get { return Get("outlook_sharing_upload_failed", "Upload failed."); } }
         internal static string FileLinkWizardUploadFailedFormat { get { return Get("outlook_sharing_upload_failed_format", "Upload failed: {0}"); } }
@@ -934,4 +945,3 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string DialogTitle { get { return Get("extName", "NC Connector for Outlook"); } }
     }
 }
-

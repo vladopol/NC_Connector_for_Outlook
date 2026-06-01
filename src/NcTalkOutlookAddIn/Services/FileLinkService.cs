@@ -21,6 +21,10 @@ namespace NcTalkOutlookAddIn.Services
     internal sealed class FileLinkService
     {
         private const int ShareTypePublicLink = 3;
+        private const long DirectUploadLimitBytes = 20L * 1024L * 1024L;
+        private const long ChunkUploadChunkSizeBytes = 20L * 1024L * 1024L;
+        private const long ChunkUploadMinChunkBytes = 5L * 1024L * 1024L;
+        private const int ChunkUploadMaxChunks = 10000;
         private readonly TalkServiceConfiguration _configuration;
         private readonly NcHttpClient _httpClient;
         private static void LogFileLink(string message)
@@ -415,19 +419,40 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return;
             }
-            string url = BuildDavUrl(context.NormalizedBaseUrl, context.Username, remotePath);
-            DiagnosticsLogger.LogApi("PUT " + url);
+            string targetUrl = BuildDavUrl(context.NormalizedBaseUrl, context.Username, remotePath);
+            if (ShouldUseChunkedUpload(fileInfo))
+            {
+                UploadFileContentChunked(context, targetUrl, fileInfo, tracker, progress, selection, cancellationToken);
+                return;
+            }
+
+            UploadFileContentDirect(targetUrl, localPath, fileInfo, tracker, progress, selection, cancellationToken);
+        }
+
+        private void UploadFileContentDirect(
+            string targetUrl,
+            string localPath,
+            FileInfo fileInfo,
+            SelectionUploadTracker tracker,
+            IProgress<FileLinkUploadItemProgress> progress,
+            FileLinkSelection selection,
+            CancellationToken cancellationToken)
+        {
+            DiagnosticsLogger.LogApi("PUT " + targetUrl);
+            LogFileLink("Upload method selected (method=put, file=\"" + fileInfo.Name + "\", bytes=" + fileInfo.Length.ToString(CultureInfo.InvariantCulture) + ").");
 
             cancellationToken.ThrowIfCancellationRequested();
 
             NcHttpResponse response = _httpClient.Send(new NcHttpRequestOptions
             {
                 Method = "PUT",
-                Url = url,
+                Url = targetUrl,
                 TimeoutMs = 120000,
                 IncludeAuthHeader = true,
                 IncludeOcsApiHeader = false,
                 ParseJson = false,
+                ContentLength = fileInfo.Length,
+                ContentType = "application/octet-stream",
                 BodyWriter = requestStream =>
                 {
                     using (FileStream fileStream = fileInfo.OpenRead())
@@ -455,7 +480,218 @@ namespace NcTalkOutlookAddIn.Services
                 throw new TalkServiceException("File could not be uploaded: " + localPath, false, response.StatusCode, response.ResponseText);
             }
 
-            DiagnosticsLogger.LogApi("PUT " + url + " -> " + response.StatusCode);
+            DiagnosticsLogger.LogApi("PUT " + targetUrl + " -> " + response.StatusCode);
+        }
+
+        private void UploadFileContentChunked(
+            FileLinkUploadContext context,
+            string targetUrl,
+            FileInfo fileInfo,
+            SelectionUploadTracker tracker,
+            IProgress<FileLinkUploadItemProgress> progress,
+            FileLinkSelection selection,
+            CancellationToken cancellationToken)
+        {
+            long totalSize = fileInfo.Length;
+            long chunkSize = GetChunkSize(totalSize);
+            long chunkCount = (totalSize + chunkSize - 1) / chunkSize;
+            if (chunkCount > ChunkUploadMaxChunks)
+            {
+                throw new TalkServiceException("File could not be uploaded: too many chunks.", false, 0, null);
+            }
+
+            string uploadFolderUrl = BuildChunkUploadFolderUrl(context.NormalizedBaseUrl, context.Username);
+            LogFileLink(
+                "Upload method selected (method=chunked-v2, file=\""
+                + fileInfo.Name
+                + "\", bytes="
+                + totalSize.ToString(CultureInfo.InvariantCulture)
+                + ", chunks="
+                + chunkCount.ToString(CultureInfo.InvariantCulture)
+                + ", chunkSize="
+                + chunkSize.ToString(CultureInfo.InvariantCulture)
+                + ").");
+
+            bool cleanupRequired = false;
+            CreateChunkUploadFolder(uploadFolderUrl, targetUrl, cancellationToken);
+            cleanupRequired = true;
+            try
+            {
+                using (FileStream fileStream = fileInfo.OpenRead())
+                {
+                    byte[] buffer = new byte[81920];
+                    for (long index = 0; index < chunkCount; index++)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        long offset = index * chunkSize;
+                        long length = Math.Min(chunkSize, totalSize - offset);
+                        string chunkName = (index + 1).ToString("00000", CultureInfo.InvariantCulture);
+                        string chunkUrl = uploadFolderUrl + "/" + chunkName;
+                        UploadChunk(chunkUrl, targetUrl, totalSize, fileStream, offset, length, buffer, tracker, progress, selection, cancellationToken);
+                    }
+                }
+
+                MoveChunkedUpload(uploadFolderUrl, targetUrl, totalSize, cancellationToken);
+                cleanupRequired = false;
+                LogFileLink("Chunked upload completed (file=\"" + fileInfo.Name + "\", bytes=" + totalSize.ToString(CultureInfo.InvariantCulture) + ").");
+            }
+            catch
+            {
+                if (cleanupRequired)
+                {
+                    CleanupChunkUploadFolder(uploadFolderUrl);
+                }
+                throw;
+            }
+        }
+
+        private void CreateChunkUploadFolder(string uploadFolderUrl, string targetUrl, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            DiagnosticsLogger.LogApi("MKCOL " + uploadFolderUrl);
+            NcHttpResponse response = _httpClient.Send(new NcHttpRequestOptions
+            {
+                Method = "MKCOL",
+                Url = uploadFolderUrl,
+                TimeoutMs = 60000,
+                IncludeAuthHeader = true,
+                IncludeOcsApiHeader = false,
+                ParseJson = false,
+                Headers = new Dictionary<string, string> { { "Destination", targetUrl } }
+            });
+
+            if (!response.HasHttpResponse)
+            {
+                Exception transport = response.TransportException;
+                throw new TalkServiceException("File could not be uploaded: " + (transport != null ? transport.Message : "no HTTP response"), false, 0, null);
+            }
+            if (response.StatusCode != HttpStatusCode.Created)
+            {
+                throw new TalkServiceException("File could not be uploaded: chunk folder could not be created.", false, response.StatusCode, response.ResponseText);
+            }
+            DiagnosticsLogger.LogApi("MKCOL " + uploadFolderUrl + " -> " + response.StatusCode);
+        }
+
+        private void UploadChunk(
+            string chunkUrl,
+            string targetUrl,
+            long totalSize,
+            FileStream fileStream,
+            long offset,
+            long length,
+            byte[] buffer,
+            SelectionUploadTracker tracker,
+            IProgress<FileLinkUploadItemProgress> progress,
+            FileLinkSelection selection,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            DiagnosticsLogger.LogApi("PUT " + chunkUrl);
+            NcHttpResponse response = _httpClient.Send(new NcHttpRequestOptions
+            {
+                Method = "PUT",
+                Url = chunkUrl,
+                TimeoutMs = 120000,
+                IncludeAuthHeader = true,
+                IncludeOcsApiHeader = false,
+                ParseJson = false,
+                ContentLength = length,
+                ContentType = "application/octet-stream",
+                Headers = new Dictionary<string, string>
+                {
+                    { "Destination", targetUrl },
+                    { "OC-Total-Length", totalSize.ToString(CultureInfo.InvariantCulture) }
+                },
+                BodyWriter = requestStream =>
+                {
+                    fileStream.Seek(offset, SeekOrigin.Begin);
+                    long remaining = length;
+                    while (remaining > 0)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        int toRead = (int)Math.Min(buffer.Length, remaining);
+                        int bytesRead = fileStream.Read(buffer, 0, toRead);
+                        if (bytesRead <= 0)
+                        {
+                            throw new EndOfStreamException("Unexpected end of file during chunked upload.");
+                        }
+                        requestStream.Write(buffer, 0, bytesRead);
+                        remaining -= bytesRead;
+                        tracker.AddBytes(bytesRead);
+                        ReportProgress(progress, selection, tracker, FileLinkUploadStatus.Uploading, null, bytesRead);
+                    }
+                }
+            });
+
+            if (!response.HasHttpResponse)
+            {
+                Exception transport = response.TransportException;
+                throw new TalkServiceException("File could not be uploaded: " + (transport != null ? transport.Message : "no HTTP response"), false, 0, null);
+            }
+            if (!IsSuccessStatus(response.StatusCode))
+            {
+                throw new TalkServiceException("File could not be uploaded: chunk upload failed.", false, response.StatusCode, response.ResponseText);
+            }
+            DiagnosticsLogger.LogApi("PUT " + chunkUrl + " -> " + response.StatusCode);
+        }
+
+        private void MoveChunkedUpload(string uploadFolderUrl, string targetUrl, long totalSize, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            string sourceUrl = uploadFolderUrl + "/.file";
+            DiagnosticsLogger.LogApi("MOVE " + sourceUrl);
+            NcHttpResponse response = _httpClient.Send(new NcHttpRequestOptions
+            {
+                Method = "MOVE",
+                Url = sourceUrl,
+                TimeoutMs = 120000,
+                IncludeAuthHeader = true,
+                IncludeOcsApiHeader = false,
+                ParseJson = false,
+                Headers = new Dictionary<string, string>
+                {
+                    { "Destination", targetUrl },
+                    { "OC-Total-Length", totalSize.ToString(CultureInfo.InvariantCulture) }
+                }
+            });
+
+            if (!response.HasHttpResponse)
+            {
+                Exception transport = response.TransportException;
+                throw new TalkServiceException("File could not be uploaded: " + (transport != null ? transport.Message : "no HTTP response"), false, 0, null);
+            }
+            if (!IsSuccessStatus(response.StatusCode))
+            {
+                throw new TalkServiceException("File could not be uploaded: chunk assembly failed.", false, response.StatusCode, response.ResponseText);
+            }
+            DiagnosticsLogger.LogApi("MOVE " + sourceUrl + " -> " + response.StatusCode);
+        }
+
+        private void CleanupChunkUploadFolder(string uploadFolderUrl)
+        {
+            try
+            {
+                DiagnosticsLogger.LogApi("DELETE " + uploadFolderUrl);
+                NcHttpResponse response = _httpClient.Send(new NcHttpRequestOptions
+                {
+                    Method = "DELETE",
+                    Url = uploadFolderUrl,
+                    TimeoutMs = 60000,
+                    IncludeAuthHeader = true,
+                    IncludeOcsApiHeader = false,
+                    ParseJson = false
+                });
+                if (response.HasHttpResponse && (IsSuccessStatus(response.StatusCode) || response.StatusCode == HttpStatusCode.NotFound))
+                {
+                    DiagnosticsLogger.LogApi("DELETE " + uploadFolderUrl + " -> " + response.StatusCode);
+                    return;
+                }
+                LogFileLink("Chunked upload cleanup failed (status=" + (response.HasHttpResponse ? ((int)response.StatusCode).ToString(CultureInfo.InvariantCulture) : "n/a") + ").");
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.FileLink, "Chunked upload cleanup failed.", ex);
+            }
         }
 
         private string EnsureUniqueName(
@@ -723,6 +959,38 @@ namespace NcTalkOutlookAddIn.Services
                 baseUrl.TrimEnd('/'),
                 Uri.EscapeDataString(username ?? string.Empty),
                 encoded);
+        }
+
+        private static string BuildChunkUploadFolderUrl(string baseUrl, string username)
+        {
+            return string.Format(
+                CultureInfo.InvariantCulture,
+                "{0}/remote.php/dav/uploads/{1}/{2}",
+                baseUrl.TrimEnd('/'),
+                Uri.EscapeDataString(username ?? string.Empty),
+                Uri.EscapeDataString(BuildChunkUploadId()));
+        }
+
+        private static string BuildChunkUploadId()
+        {
+            return "ncconnector-" + Guid.NewGuid().ToString("N");
+        }
+
+        private static bool ShouldUseChunkedUpload(FileInfo fileInfo)
+        {
+            return fileInfo != null && fileInfo.Length > DirectUploadLimitBytes;
+        }
+
+        private static long GetChunkSize(long fileSize)
+        {
+            long minimumForChunkLimit = (long)Math.Ceiling((double)Math.Max(0, fileSize) / ChunkUploadMaxChunks);
+            return Math.Max(ChunkUploadChunkSizeBytes, Math.Max(ChunkUploadMinChunkBytes, minimumForChunkLimit));
+        }
+
+        private static bool IsSuccessStatus(HttpStatusCode statusCode)
+        {
+            int status = (int)statusCode;
+            return status >= 200 && status < 300;
         }
 
         private static ShareData ParseShareData(IDictionary<string, object> parsedJson, string responseText)

@@ -536,6 +536,30 @@
   "options_tab_sharing": {
     "message": "Megosztás"
   },
+  "options_tab_signature": {
+    "message": "Aláírás"
+  },
+  "options_signature_defaults_heading": {
+    "message": "E-mail aláírás"
+  },
+  "options_signature_identity_hint": {
+    "message": "A központi aláírás csak akkor kerül alkalmazásra, ha az Outlook feladói fiókja megegyezik a Nextcloud-felhasználó e-mail-címével."
+  },
+  "options_signature_on_compose_label": {
+    "message": "Aláírás hozzáadása új levél írásakor"
+  },
+  "options_signature_on_reply_label": {
+    "message": "Aláírás hozzáadása válaszkor"
+  },
+  "options_signature_on_forward_label": {
+    "message": "Aláírás hozzáadása továbbításkor"
+  },
+  "options_signature_backend_inactive_tooltip": {
+    "message": "A központi aláírási házirend inaktív vagy hiányos."
+  },
+  "options_signature_backend_update_required_tooltip": {
+    "message": "Kérjük, frissítse az NC Connector backendet. Ez a backendverzió még nem támogatja a központi e-mail aláírásokat."
+  },
   "options_tab_talklink": {
     "message": "Talk-link"
   },
@@ -606,7 +630,7 @@
     "message": "https://nc-connector.de"
   },
   "options_about_overview_text": {
-    "message": "Több mint fájllinkek\n\nAz NC Connector a biztonságos fájlmegosztást, a Talk megbeszéléseket és a mellékletautomatizálást közvetlenül a Thunderbirdhöz és az Outlookhoz kapcsolja. Így a fontos csapatmunkafolyamatok ott maradnak, ahová valók: a levelező- és naptárkliensben.\n\nMit fed le az NC Connector\n- Fájlmegosztás jelszóval, lejárati dátummal és opcionális külön jelszóküldéssel\n- Talk megbeszélések létrehozása és frissítése közvetlenül a naptárbejegyzésekből\n- Mellékletautomatizálás világos szabályokkal a kézi egyedi lépések helyett\n- Egységes megosztási és meghívóblokkok közvetlenül a megszokott munkafolyamatban\n\nOpcionálisan Nextcloud backenddel\n- Központi Seat-kiosztás és szabályzatkezelés\n- Saját sablonok és megjelenések a megosztásokhoz és a Talk meghívókhoz\n- Külön jelszóküldés és központi vezérlés szervezetek számára\n- 1 Seat = 1 Nextcloud felhasználó\n\nBackend nélkül a bővítmények közvetlenül használhatók maradnak. Backenddel központi vezérlés érhető el csapatok és szervezetek számára."
+    "message": "Több mint fájllinkek\n\nAz NC Connector a biztonságos fájlmegosztást, a Talk megbeszéléseket, a mellékletautomatizálást és a központilag kezelt e-mail-aláírásokat közvetlenül a Thunderbirdhöz és az Outlookhoz kapcsolja. Így a fontos csapatmunkafolyamatok ott maradnak, ahová valók: a levelező- és naptárkliensben.\n\nMit fed le az NC Connector\n- Fájlmegosztás jelszóval, lejárati dátummal és opcionális külön jelszóküldéssel\n- Talk megbeszélések létrehozása és frissítése közvetlenül a naptárbejegyzésekből\n- Mellékletautomatizálás világos szabályokkal a kézi egyedi lépések helyett\n- Egységes megosztási és meghívóblokkok közvetlenül a megszokott munkafolyamatban\n- Központi e-mail-aláírások levélíráshoz, válaszhoz és továbbításhoz Nextcloud-profiladatok alapján\n\nOpcionálisan Nextcloud backenddel\n- Központi Seat-kiosztás és szabályzatkezelés\n- Saját sablonok és megjelenések a megosztásokhoz, Talk-meghívókhoz és e-mail-aláírásokhoz\n- Külön jelszóküldés és központi vezérlés szervezetek számára\n- 1 Seat = 1 Nextcloud felhasználó\n\nBackend nélkül a bővítmények közvetlenül használhatók maradnak. Backenddel központi vezérlés érhető el csapatok és szervezetek számára."
   },
   "options_about_more_info_label": {
     "message": "Tovabbi informaciok -->"
@@ -697,6 +721,12 @@
   },
   "options_talk_default_password_label": {
     "message": "Jelszó beállítása"
+  },
+  "options_talk_delete_room_on_event_delete_label": {
+    "message": "Talk-szoba torlese mentett esemeny torlesekor"
+  },
+  "options_talk_delete_room_on_event_delete_tooltip": {
+    "message": "NC Connector Talk metaadatokat es ezt az explicit engedelyezest igenyli. A nem mentett esemenyek tisztitasa aktiv marad."
   },
   "options_talk_default_roomtype_label": {
     "message": "Szobatípus"
@@ -929,6 +959,9 @@
   "sharing_status_uploading_bulk": {
     "message": "Fájlok feltöltése..."
   },
+  "sharing_status_speed_kbps": {
+    "message": "$1 KB/s"
+  },
   "sharing_message_invalid_share_name": {
     "message": "Kérjük, adjon meg megosztásnevet."
   },
@@ -979,7 +1012,8 @@
   },
   "outlook_ifb_port_label": {
     "message": "Helyi IFB-port:"
-  },  "outlook_ifb_cache_hours_label": {
+  },
+  "outlook_ifb_cache_hours_label": {
     "message": "Címjegyzék gyorsítótár (órák):"
   },
   "outlook_debug_file_label": {
@@ -1391,6 +1425,3 @@
     "message": "Ha az operációs rendszer alapértelmezett TLS-házirendje ki van kapcsolva, engedélyezzen legalább egy TLS-verziót (1.2 vagy 1.3)."
   }
 }
-
-
-
