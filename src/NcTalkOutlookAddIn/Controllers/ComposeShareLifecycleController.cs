@@ -113,7 +113,6 @@ namespace NcTalkOutlookAddIn.Controllers
                     passwordMail.Subject = BuildSeparatePasswordMailSubject(dispatch);
                     ApplySeparatePasswordSender(passwordMail, dispatch, composeKey);
                     ApplySeparatePasswordBody(passwordMail, dispatch);
-                    ApplySeparatePasswordBackendSignature(passwordMail, dispatch, composeKey);
                     List<string> resolvedRecipients = ApplySeparatePasswordRecipientsForSend(passwordMail, dispatch, composeKey);
                     int resolvedRecipientCount = resolvedRecipients.Count;
 
@@ -319,7 +318,6 @@ namespace NcTalkOutlookAddIn.Controllers
                 fallback.Subject = BuildSeparatePasswordMailSubject(dispatch);
                 ApplySeparatePasswordSender(fallback, dispatch, composeKey);
                 ApplySeparatePasswordBody(fallback, dispatch);
-                ApplySeparatePasswordBackendSignature(fallback, dispatch, composeKey);
                 fallback.Display(false);
                 NextcloudTalkAddIn.LogFileLinkMessage(
                     "Separate password mail manual fallback opened (composeKey="
@@ -481,6 +479,11 @@ namespace NcTalkOutlookAddIn.Controllers
             mail.HTMLBody = dispatch.Html ?? string.Empty;
         }
 
+        private static string NormalizeEmail(string value)
+        {
+            return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim().ToLowerInvariant();
+        }
+
         private void ApplySeparatePasswordSender(Outlook.MailItem mail, SeparatePasswordDispatchEntry dispatch, string composeKey)
         {
             if (mail == null || dispatch == null)
@@ -488,7 +491,7 @@ namespace NcTalkOutlookAddIn.Controllers
                 return;
             }
 
-            string accountSmtp = EmailSignaturePolicyService.NormalizeEmail(dispatch.SendUsingAccountSmtpAddress);
+            string accountSmtp = NormalizeEmail(dispatch.SendUsingAccountSmtpAddress);
             if (!string.IsNullOrWhiteSpace(accountSmtp))
             {
                 TrySetSeparatePasswordSendUsingAccount(mail, accountSmtp, composeKey);
@@ -543,7 +546,7 @@ namespace NcTalkOutlookAddIn.Controllers
                     try
                     {
                         account = accounts[i];
-                        string accountSmtp = EmailSignaturePolicyService.NormalizeEmail(account != null ? account.SmtpAddress : string.Empty);
+                        string accountSmtp = NormalizeEmail(account != null ? account.SmtpAddress : string.Empty);
                         if (!string.Equals(accountSmtp, smtpAddress, StringComparison.OrdinalIgnoreCase))
                         {
                             continue;
@@ -584,106 +587,6 @@ namespace NcTalkOutlookAddIn.Controllers
                 ComInteropScope.TryRelease(accounts, LogCategories.FileLink, "Failed to release separate password Accounts COM object.");
                 ComInteropScope.TryRelease(session, LogCategories.FileLink, "Failed to release separate password Session COM object.");
             }
-        }
-
-        private void ApplySeparatePasswordBackendSignature(Outlook.MailItem mail, SeparatePasswordDispatchEntry dispatch, string composeKey)
-        {
-            if (mail == null || dispatch == null)
-            {
-                return;
-            }
-            _owner.EnsureSettingsLoaded();
-            if (_owner.CurrentSettings == null || !_owner.SettingsAreComplete())
-            {
-                LogSeparatePasswordSignatureSkipped(composeKey, "settings_incomplete");
-                return;
-            }
-
-            AddinSettings settings = _owner.CurrentSettings ?? new AddinSettings();
-            var configuration = new TalkServiceConfiguration(settings.ServerUrl, settings.Username, settings.AppPassword);
-            BackendPolicyStatus policyStatus = _owner.FetchBackendPolicyStatus(configuration, "separate_password_email_signature");
-            var policy = new EmailSignaturePolicyService(policyStatus, settings).Resolve();
-            if (!policy.Active)
-            {
-                LogSeparatePasswordSignatureSkipped(composeKey, policy.Reason);
-                return;
-            }
-
-            string senderEmail = EmailSignaturePolicyService.NormalizeEmail(dispatch.SenderEmail);
-            if (!string.Equals(senderEmail, policy.UserEmail, StringComparison.OrdinalIgnoreCase))
-            {
-                LogSeparatePasswordSignatureSkipped(composeKey, "identity_mismatch");
-                return;
-            }
-
-            string sanitized = HtmlTemplateSanitizer.SanitizeEmailSignatureTemplateHtml(policy.TemplateHtml);
-            if (string.IsNullOrWhiteSpace(sanitized))
-            {
-                LogSeparatePasswordSignatureSkipped(composeKey, "sanitized_empty");
-                return;
-            }
-
-            if (dispatch.IsPlainText)
-            {
-                string plainText = HtmlToPlainTextConverter.Convert(sanitized);
-                if (string.IsNullOrWhiteSpace(plainText))
-                {
-                    LogSeparatePasswordSignatureSkipped(composeKey, "plain_text_empty");
-                    return;
-                }
-
-                mail.BodyFormat = Outlook.OlBodyFormat.olFormatPlain;
-                mail.Body = CombinePlainTextSegments(mail.Body, plainText);
-            }
-            else
-            {
-                mail.BodyFormat = Outlook.OlBodyFormat.olFormatHTML;
-                mail.HTMLBody = AppendHtmlSignature(mail.HTMLBody, sanitized);
-            }
-
-            NextcloudTalkAddIn.LogFileLinkMessage(
-                "Separate password backend signature applied (composeKey="
-                + (composeKey ?? string.Empty)
-                + ", plainText="
-                + dispatch.IsPlainText.ToString(CultureInfo.InvariantCulture)
-                + ").");
-        }
-
-        private static string CombinePlainTextSegments(string body, string signature)
-        {
-            string normalizedBody = PlainTextUtilities.NormalizeCrLfAndTrim(body);
-            string normalizedSignature = PlainTextUtilities.NormalizeCrLfAndTrim(signature);
-            if (string.IsNullOrWhiteSpace(normalizedBody))
-            {
-                return normalizedSignature;
-            }
-            if (string.IsNullOrWhiteSpace(normalizedSignature))
-            {
-                return normalizedBody;
-            }
-            return normalizedBody + "\r\n\r\n" + normalizedSignature;
-        }
-
-        private static string AppendHtmlSignature(string html, string sanitizedSignature)
-        {
-            string existing = html ?? string.Empty;
-            string signatureBlock = "<br><br><div data-nc-connector-signature=\"true\">" + (sanitizedSignature ?? string.Empty) + "</div>";
-            int bodyEnd = existing.LastIndexOf("</body>", StringComparison.OrdinalIgnoreCase);
-            if (bodyEnd >= 0)
-            {
-                return existing.Insert(bodyEnd, signatureBlock);
-            }
-            return existing + signatureBlock;
-        }
-
-        private static void LogSeparatePasswordSignatureSkipped(string composeKey, string reason)
-        {
-            NextcloudTalkAddIn.LogFileLinkMessage(
-                "Separate password backend signature skipped (composeKey="
-                + (composeKey ?? string.Empty)
-                + ", reason="
-                + (reason ?? "n/a")
-                + ").");
         }
 
         private static string BuildSeparatePasswordMailSubject(SeparatePasswordDispatchEntry dispatch)

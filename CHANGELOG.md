@@ -4,6 +4,29 @@ All notable changes to **NC Connector for Outlook** will be documented in this f
 
 This project follows the principles of **Keep a Changelog** and **Semantic Versioning**.
 
+## [3.1.0.2] - 2026-07-05
+
+Fork patch on upstream 3.1.0.
+
+---
+
+### Upstream bugs fixed
+
+- **UI thread blocked during compose attachment policy check** — `OnAttachmentEvalTimerTick` (a WinForms `Timer` tick, running on the UI thread) called `ReadAttachmentAutomationSettings`, which fetched `FetchBackendPolicyStatus` synchronously — a blocking HTTP request with a 60s timeout. Split into `ReadAttachmentAutomationSettingsAsync` (awaited via `Task.Run`) for the timer-driven evaluation path; a synchronous wrapper is kept only where `BeforeAttachmentAdd`'s COM contract requires Outlook to receive an immediate decision.
+
+---
+
+### Bug fixed: Reading Pane inline-reply losing Send/Discard/PopOut
+
+Diagnosed root cause: every inline reply started a 250ms debounce timer (`MailComposeSubscription`, Email Signature feature) that fetched `FetchBackendPolicyStatus` — a blocking, uncached HTTP request (60s timeout) — synchronously on the UI thread, right as Outlook finished constructing the embedded inline-compose command bar. Removing the Email Signature feature (below) eliminates both call sites responsible for this (`MailComposeSubscription.Signature.cs` and `ComposeShareLifecycleController.ApplySeparatePasswordBackendSignature`).
+
+---
+
+### Fork-specific changes
+
+- **Email Signature feature removed** — Requires a server-side Nextcloud plugin never installed in this deployment. The settings tab was already hidden, but the runtime still fired a real network policy check on every compose, reply, and forward. Removed entirely: `NextcloudTalkAddIn.MailComposeSubscription.Signature.cs`, `EmailSignaturePolicyService`, `EmailSignaturePlainTextController`, the `EmailSignaturePolicy` model, the hidden Signature settings tab, and the `EmailSignatureOn*` settings fields (old settings XML files with these keys still load fine — unknown keys are ignored).
+- **Local IFB Free/Busy HTTP listener removed** — Already force-disabled on every startup since Exchange handles Free/Busy natively for this deployment. Removed the dead `FreeBusyServer` listener and the `IfbEnabled` / `IfbPort` / `IfbDays` settings and hidden settings tab. Kept `IfbAddressBookCache` and `IfbCacheHours` — still actively used by Talk and FileLink for the Nextcloud user picker — and a narrow one-time registry-restore safety net in `FreeBusyManager`, in case an earlier build ever ran with the listener enabled and hijacked Outlook's native free/busy registry paths.
+
 ## [3.1.0.1] - 2026-06-01
 
 Fork patch on upstream 3.1.0.

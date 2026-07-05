@@ -93,7 +93,6 @@ namespace NcTalkOutlookAddIn
             private readonly System.Windows.Forms.Timer _attachmentEvalTimer = new System.Windows.Forms.Timer();
             private readonly System.Windows.Forms.Timer _beforeAddShareTimer = new System.Windows.Forms.Timer();
             private readonly System.Windows.Forms.Timer _cleanupGraceTimer = new System.Windows.Forms.Timer();
-            private readonly System.Windows.Forms.Timer _emailSignatureTimer = new System.Windows.Forms.Timer();
             private readonly List<AttachmentBatchEntry> _pendingAddedBatch = new List<AttachmentBatchEntry>();
             private readonly List<BeforeAddShareEntry> _pendingBeforeAddShareEntries = new List<BeforeAddShareEntry>();
             private readonly List<ComposeShareCleanupEntry> _cleanupEntries = new List<ComposeShareCleanupEntry>();
@@ -105,15 +104,9 @@ namespace NcTalkOutlookAddIn
             private bool _sendPending;
             private DateTime _sendPendingAtUtc;
             private bool _awaitingGraceCloseResolution;
-            private bool _emailSignatureManaged;
-            private bool _emailSignatureInitialSlotHandled;
-            private bool _emailSignatureApplying;
             private bool _isInlineResponse;
-            private string _pendingEmailSignatureReason = string.Empty;
             private bool _disposed;
             private const int BeforeAddShareBatchDebounceMs = 3000;
-            private const int EmailSignatureApplyDebounceMs = 900;
-            private const int EmailSignatureInlineApplyDebounceMs = 250;
 
             internal MailComposeSubscription(NextcloudTalkAddIn owner, Outlook.MailItem mail, string mailIdentityKey, string inspectorIdentityKey, bool isInlineResponse)
             {
@@ -139,9 +132,6 @@ namespace NcTalkOutlookAddIn
                 _cleanupGraceTimer.Interval = ComposeShareCleanupSendGraceMs;
                 _cleanupGraceTimer.Tick += OnCleanupGraceTimerTick;
 
-                _emailSignatureTimer.Interval = isInlineResponse ? EmailSignatureInlineApplyDebounceMs : EmailSignatureApplyDebounceMs;
-                _emailSignatureTimer.Tick += OnEmailSignatureTimerTick;
-
                 _events = mail as Outlook.ItemEvents_10_Event;                if (_events != null)
                 {
                     _events.BeforeAttachmentAdd += OnBeforeAttachmentAdd;
@@ -161,8 +151,6 @@ namespace NcTalkOutlookAddIn
                     + ", inline="
                     + _isInlineResponse.ToString(CultureInfo.InvariantCulture)
                     + ").");
-
-                ScheduleEmailSignatureApplication("compose_open");
             }
 
             internal void MarkInlineResponse()
@@ -171,13 +159,7 @@ namespace NcTalkOutlookAddIn
                 {
                     return;
                 }
-                if (_isInlineResponse)
-                {
-                    return;
-                }
                 _isInlineResponse = true;
-                _emailSignatureTimer.Interval = EmailSignatureInlineApplyDebounceMs;
-                ScheduleEmailSignatureApplication("inline_response");
             }
 
             internal bool IsFor(Outlook.MailItem mail, string mailIdentityKey, string inspectorIdentityKey)
@@ -405,7 +387,6 @@ namespace NcTalkOutlookAddIn
                 _attachmentEvalTimer.Stop();
                 _beforeAddShareTimer.Stop();
                 _cleanupGraceTimer.Stop();
-                _emailSignatureTimer.Stop();
 
                 if (_pendingBeforeAddShareEntries.Count > 0)
                 {
@@ -428,11 +409,9 @@ namespace NcTalkOutlookAddIn
                     _attachmentEvalTimer.Tick -= OnAttachmentEvalTimerTick;
                     _beforeAddShareTimer.Tick -= OnBeforeAddShareTimerTick;
                     _cleanupGraceTimer.Tick -= OnCleanupGraceTimerTick;
-                    _emailSignatureTimer.Tick -= OnEmailSignatureTimerTick;
                     _attachmentEvalTimer.Dispose();
                     _beforeAddShareTimer.Dispose();
                     _cleanupGraceTimer.Dispose();
-                    _emailSignatureTimer.Dispose();
                 }
                 catch (Exception ex)
                 {

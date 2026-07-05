@@ -27,12 +27,6 @@ namespace NcTalkOutlookAddIn
             string outlookProfileName = ResolveCurrentOutlookProfileName();
             _settingsStorage = new NcTalkOutlookAddIn.Settings.SettingsStorage(outlookProfileName);
             _currentSettings = _settingsStorage.Load();
-            if (_currentSettings != null && _currentSettings.IfbEnabled)
-            {
-                _currentSettings.IfbEnabled = false;
-                _settingsStorage.Save(_currentSettings);
-                LogCore("IFB was enabled — force-disabled and saved.");
-            }
             if (_currentSettings != null && !_currentSettings.TalkDeleteRoomOnEventDelete)
             {
                 _currentSettings.TalkDeleteRoomOnEventDelete = true;
@@ -55,7 +49,7 @@ namespace NcTalkOutlookAddIn
             }
             if (_currentSettings != null)
             {
-                LogSettings("Settings loaded (AuthMode=" + _currentSettings.AuthMode + ", IFB=" + _currentSettings.IfbEnabled + ", IfbPort=" + _currentSettings.IfbPort + ", Debug=" + _currentSettings.DebugLoggingEnabled + ", LogAnonymize=" + _currentSettings.LogAnonymizationEnabled + ").");
+                LogSettings("Settings loaded (AuthMode=" + _currentSettings.AuthMode + ", Debug=" + _currentSettings.DebugLoggingEnabled + ", LogAnonymize=" + _currentSettings.LogAnonymizationEnabled + ").");
             }
 
             _freeBusyManager = new FreeBusyManager(_settingsStorage.DataDirectory);
@@ -162,26 +156,7 @@ namespace NcTalkOutlookAddIn
         {
             UnhookApplication();
             UnhookInspector();
-            UnhookMailComposeSubscriptions();            if (_freeBusyManager != null && _currentSettings != null && _currentSettings.IfbEnabled)
-            {
-                try
-                {
-                    var clone = _currentSettings.Clone();
-                    clone.IfbEnabled = false;
-                    _freeBusyManager.ApplySettings(clone);
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(
-                        LogCategories.Ifb,
-                        "Failed to disable IFB during add-in " + (origin ?? "teardown") + ".",
-                        ex);
-                }
-            }
-            if (_freeBusyManager != null)
-            {
-                _freeBusyManager.Dispose();
-            }
+            UnhookMailComposeSubscriptions();
             _freeBusyManager = null;
 
             if (_calDavCalendarSync != null)

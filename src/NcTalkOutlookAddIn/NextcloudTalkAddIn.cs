@@ -510,21 +510,19 @@ namespace NcTalkOutlookAddIn
 
         private void ApplyIfbSettings()
         {
-            // Diagnostics logger configuration is intentionally handled by the caller
-            // (startup/settings save) to avoid duplicate reconfiguration on normal settings saves.
+            // Restores Outlook's native free/busy registry paths if an older build ever
+            // ran with the (now removed) local IFB listener enabled and hijacked them.
             if (_freeBusyManager == null || _currentSettings == null)
             {
                 return;
             }
             try
             {
-                LogCore("Applying IFB (Enabled=" + _currentSettings.IfbEnabled + ", Days=" + _currentSettings.IfbDays + ", Port=" + _currentSettings.IfbPort + ", CacheHours=" + _currentSettings.IfbCacheHours + ").");
                 _freeBusyManager.ApplySettings(_currentSettings);
             }
             catch (Exception ex)
             {
-                LogCore("Failed to start IFB: " + ex.Message);
-                ShowWarning(string.Format(Strings.WarningIfbStartFailed, ex.Message));
+                DiagnosticsLogger.LogException(LogCategories.Ifb, "Failed to restore native free/busy registry settings.", ex);
             }
         }
 
