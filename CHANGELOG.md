@@ -4,6 +4,18 @@ All notable changes to **NC Connector for Outlook** will be documented in this f
 
 This project follows the principles of **Keep a Changelog** and **Semantic Versioning**.
 
+## [3.1.0.6] - 2026-07-05 — BISECTION BUILD, not for general deployment
+
+Fork patch on upstream 3.1.0.
+
+---
+
+### 3.1.0.5 fixed the bug — bisecting which change actually mattered
+
+3.1.0.5 removed 4 things simultaneously: the Explorer ribbon tab (Settings button), the Mail.Compose ribbon group (FileLink button), the `Explorer.InlineResponse`/`Explorers.NewExplorer` hooks, and `NewInspector`'s mail branch. The bug disappeared, but it's unknown which change(s) were responsible.
+
+This build restores **both ribbon customizations** (Settings + FileLink buttons, still without the `TabComposeTools/TabMessage` contextualTabs group removed back in 3.1.0.3) while keeping the **event hooks disabled** (`EnsureApplicationHook` not called, `NewInspector`'s mail branch skipped). If the bug returns here, the ribbon XML is the cause. If it stays fixed, the event hooks (`Explorer.InlineResponse` / `Inspectors.NewInspector` touching the mail COM object) are the cause instead.
+
 ## [3.1.0.5] - 2026-07-05 — DIAGNOSTIC BUILD, not for general deployment
 
 Fork patch on upstream 3.1.0.
