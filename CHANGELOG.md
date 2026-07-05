@@ -4,6 +4,22 @@ All notable changes to **NC Connector for Outlook** will be documented in this f
 
 This project follows the principles of **Keep a Changelog** and **Semantic Versioning**.
 
+## [3.1.0.8] - 2026-07-05
+
+Fork patch on upstream 3.1.0.
+
+---
+
+### RESOLVED: Reading Pane inline-reply losing Send/Discard/PopOut
+
+Root cause confirmed by bisection across 3.1.0.2–3.1.0.7: subscribing to the `ExplorerEvents_10_Event.InlineResponse` event — regardless of what the handler does — breaks Outlook's rendering of the inline-reply command bar on the affected builds (16.0.0.14334 / 17932.20842). Neither the ribbon XML customizations, nor `Inspectors.NewInspector`, nor the handler's contents (network calls, COM property reads, event subscription timing) were responsible; the mere act of hooking `InlineResponse` was enough.
+
+**Fix:** `Explorer.InlineResponse` is no longer hooked at all. Removed the now-dead supporting code: `EnsureApplicationHook`, `EnsureExplorerInlineResponseHooks`, `HookInlineResponseExplorer`, `UnhookExplorerInlineResponseHooks`, `OnNewExplorer`, `OnExplorerInlineResponse`, and the associated `_explorers`/`_explorersEvents`/`_inlineResponseExplorers`/`_inlineResponseExplorerEvents` fields.
+
+**Trade-off:** automatic FileLink attachment-sharing no longer triggers for attachments added during a Reading Pane inline reply. It still works normally for popped-out compose windows (New Mail, Reply/Forward opened in a separate window) via `Inspectors.NewInspector`, and the Settings/FileLink ribbon buttons are unaffected — both were proven innocent during the investigation and are fully restored.
+
+**Investigation trail** (each build ruled out one variable): 3.1.0.2 removed a synchronous network call suspected of blocking the UI thread — no effect. 3.1.0.3 removed a `TabComposeTools/TabMessage` ribbon customization — no effect. 3.1.0.4 deferred event-handler COM work to the next message-loop tick — no effect. 3.1.0.5 disabled all mail/Explorer ribbon customization and event hooks simultaneously — fixed. 3.1.0.6 restored the ribbon while keeping event hooks disabled — stayed fixed, clearing the ribbon. 3.1.0.7 restored `NewInspector`'s mail branch while keeping `Explorer.InlineResponse` disabled — stayed fixed, isolating the cause to `Explorer.InlineResponse` specifically.
+
 ## [3.1.0.7] - 2026-07-05 — BISECTION BUILD, not for general deployment
 
 Fork patch on upstream 3.1.0.

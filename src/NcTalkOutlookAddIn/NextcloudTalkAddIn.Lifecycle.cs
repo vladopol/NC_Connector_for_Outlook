@@ -54,12 +54,12 @@ namespace NcTalkOutlookAddIn
 
             _freeBusyManager = new FreeBusyManager();
             _freeBusyManager.Initialize(_outlookApplication);
-            // DIAGNOSTIC BUILD: EnsureApplicationHook (Explorer.InlineResponse / Explorers.NewExplorer)
-            // is intentionally not called, to isolate whether these event hooks are involved in the
-            // Reading Pane inline-reply Send/Discard/PopOut bug. EnsureInspectorHook stays enabled
-            // (needed for Talk's appointment subscription tracking); its mail-compose branch is
-            // separately disabled in Hooks.cs. Revert once the diagnostic result is in.
-            LogCore("DIAGNOSTIC: EnsureApplicationHook skipped (Explorer.InlineResponse hook disabled).");
+            // Explorer.InlineResponse is deliberately never hooked: subscribing to it — regardless of
+            // what the handler does — breaks Outlook's rendering of the inline-reply command bar
+            // (Send/Discard/PopOut) on some builds (confirmed 16.0.0.14334 / 17932.20842). Bisected across
+            // 3.1.0.2-3.1.0.7: ribbon XML and NewInspector are not implicated, only this specific event.
+            // Automatic FileLink attachment sharing is unavailable for Reading Pane inline replies as a
+            // result; it still works for popped-out compose windows via NewInspector.
             EnsureInspectorHook();
             ApplyIfbSettings();
             ApplyCalDavSyncSettings();
@@ -159,7 +159,6 @@ namespace NcTalkOutlookAddIn
         // This path must be idempotent, because Outlook can call both callbacks.
         private void TearDownAddInState(string origin, bool clearOutlookApplication)
         {
-            UnhookApplication();
             UnhookInspector();
             UnhookMailComposeSubscriptions();
             _freeBusyManager = null;

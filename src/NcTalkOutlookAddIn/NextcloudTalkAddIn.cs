@@ -43,10 +43,6 @@ namespace NcTalkOutlookAddIn
         private FreeBusyManager _freeBusyManager;
         private CalDavCalendarSync _calDavCalendarSync;
         private Outlook.Inspectors _inspectors;
-        private Outlook.Explorers _explorers;
-        private Outlook.ExplorersEvents_Event _explorersEvents;
-        private readonly Dictionary<string, Outlook.Explorer> _inlineResponseExplorers = new Dictionary<string, Outlook.Explorer>(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, Outlook.ExplorerEvents_10_Event> _inlineResponseExplorerEvents = new Dictionary<string, Outlook.ExplorerEvents_10_Event>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, AppointmentSubscription> _subscriptionByEntryId = new Dictionary<string, AppointmentSubscription>(StringComparer.OrdinalIgnoreCase);
         private readonly MailComposeSubscriptionRegistryController _mailComposeSubscriptionRegistry = new MailComposeSubscriptionRegistryController();
         private readonly OutlookAttachmentAutomationGuardService _attachmentGuardService = new OutlookAttachmentAutomationGuardService();
@@ -127,10 +123,9 @@ namespace NcTalkOutlookAddIn
                     EscapeXml(Strings.RibbonTalkButtonScreenTip),
                     EscapeXml(Strings.RibbonTalkButtonSuperTip));
             }
-            // BISECTION BUILD: ribbon customizations restored (Settings + FileLink buttons, still without
-            // the TabComposeTools/TabMessage contextualTabs group). Explorer.InlineResponse / NewInspector
-            // event hooks remain fully disabled (see Lifecycle.cs / Hooks.cs). 3.1.0.5 removed both ribbon
-            // AND event hooks simultaneously and fixed the bug — this build isolates which one mattered.
+            // No <contextualTabs> customization of TabComposeTools/TabMessage here — that was ruled out as
+            // the cause of the inline-reply command bar bug during investigation (the actual cause was the
+            // Explorer.InlineResponse event hook itself, never wired up at all — see Lifecycle.cs).
             if (string.Equals(ribbonID, "Microsoft.Outlook.Explorer", StringComparison.OrdinalIgnoreCase))
             {
                 return string.Format(
