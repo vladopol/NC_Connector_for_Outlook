@@ -44,7 +44,13 @@ jobs:
           $dll = "src\NcTalkOutlookAddIn\bin\Release\NcTalkOutlookAddIn.dll"
           $v = [System.Reflection.AssemblyName]::GetAssemblyName($dll).Version
           echo "full=$v" >> $env:GITHUB_OUTPUT
-          echo "short=$($v.Major).$($v.Minor).$($v.Build)" >> $env:GITHUB_OUTPUT
+          # MSI ProductVersion only supports 3 numeric fields, so every fork patch
+          # (major.minor.patch.forkPatch) would otherwise collapse to the same
+          # "major.minor.patch" string in Add/Remove Programs. Fold the fork patch
+          # into the build field (patch*100 + forkPatch) so each release stays
+          # distinguishable and version comparisons remain monotonically ordered.
+          $displayBuild = $v.Build * 100 + $v.Revision
+          echo "short=$($v.Major).$($v.Minor).$displayBuild" >> $env:GITHUB_OUTPUT
         shell: pwsh
 
       - name: Build MSI
