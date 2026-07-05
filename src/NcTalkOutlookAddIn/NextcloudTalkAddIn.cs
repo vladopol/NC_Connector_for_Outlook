@@ -100,6 +100,7 @@ namespace NcTalkOutlookAddIn
 
         public string GetCustomUI(string ribbonID)
         {
+            LogCore("GetCustomUI requested (ribbonID=" + (ribbonID ?? "n/a") + ").");
             if (string.Equals(ribbonID, "Microsoft.Outlook.Appointment", StringComparison.OrdinalIgnoreCase))
             {
                 return string.Format(
@@ -126,64 +127,12 @@ namespace NcTalkOutlookAddIn
                     EscapeXml(Strings.RibbonTalkButtonScreenTip),
                     EscapeXml(Strings.RibbonTalkButtonSuperTip));
             }
-            if (string.Equals(ribbonID, "Microsoft.Outlook.Explorer", StringComparison.OrdinalIgnoreCase))
-            {
-                // No <contextualTabs> customization of the native TabMessage/TabComposeTools tab here.
-                // That tab is what Outlook shows for Reading Pane inline replies; customizing it was the
-                // suspected cause of inline replies losing their Send/Discard/PopOut command bar on some
-                // Outlook builds. The FileLink button remains available via the popped-out compose ribbon
-                // and via the automatic attachment-triggered share flow.
-                return string.Format(
-                    CultureInfo.InvariantCulture,
-                    @"<customUI xmlns='http://schemas.microsoft.com/office/2009/07/customui' onLoad='OnRibbonLoad'>
-  <ribbon>
-    <tabs>
-      <tab id='NcTalkExplorerTab' label='{0}' insertAfterMso='TabMail'>
-        <group id='NcTalkExplorerGroup' label='{1}'>
-          <button id='NcTalkSettingsExplorerButton'
-                  label='{2}'
-                  size='large'
-                  getImage='OnGetButtonImage'
-                  onAction='OnSettingsButtonPressed'
-                  screentip='{3}'
-                  supertip='{4}' />
-        </group>
-      </tab>
-    </tabs>
-  </ribbon>
-</customUI>",
-                    EscapeXml(Strings.RibbonExplorerTabLabel),
-                    EscapeXml(Strings.RibbonExplorerGroupLabel),
-                    EscapeXml(Strings.RibbonSettingsButtonLabel),
-                    EscapeXml(Strings.RibbonSettingsScreenTip),
-                    EscapeXml(Strings.RibbonSettingsSuperTip));
-            }
-            if (string.Equals(ribbonID, "Microsoft.Outlook.Mail.Compose", StringComparison.OrdinalIgnoreCase))
-            {
-                return string.Format(
-                    CultureInfo.InvariantCulture,
-                    @"<customUI xmlns='http://schemas.microsoft.com/office/2009/07/customui' onLoad='OnRibbonLoad'>
-  <ribbon>
-    <tabs>
-      <tab idMso='TabNewMailMessage'>
-        <group id='NcTalkMailGroup' label='{0}'>
-          <button id='NcTalkFileLinkButton'
-                  label='{1}'
-                  size='large'
-                  getImage='OnGetButtonImage'
-                  onAction='OnFileLinkButtonPressed'
-                  screentip='{2}'
-                  supertip='{3}' />
-        </group>
-      </tab>
-    </tabs>
-  </ribbon>
-</customUI>",
-                    EscapeXml(Strings.RibbonMailGroupLabel),
-                    EscapeXml(Strings.RibbonFileLinkButtonLabel),
-                    EscapeXml(Strings.RibbonFileLinkButtonScreenTip),
-                    EscapeXml(Strings.RibbonFileLinkButtonSuperTip));
-            }
+            // DIAGNOSTIC BUILD: Microsoft.Outlook.Explorer and Microsoft.Outlook.Mail.Compose ribbon
+            // customizations (Settings button, FileLink button, and the already-removed TabMessage
+            // group) are intentionally disabled here to isolate whether ANY ribbon customization touching
+            // mail/Explorer contexts is involved in the Reading Pane inline-reply Send/Discard/PopOut bug.
+            // Microsoft.Outlook.Appointment (Talk button) is left untouched since it's a separate,
+            // unrelated ribbon context. Revert this once the diagnostic result is in.
             return null;
         }
 
@@ -191,6 +140,7 @@ namespace NcTalkOutlookAddIn
         // Stores the instance for later refresh operations.
         public void OnRibbonLoad(IRibbonUI ribbonUI)
         {
+            LogCore("OnRibbonLoad fired (ribbonUiInstance=" + (ribbonUI != null ? ribbonUI.GetHashCode().ToString(CultureInfo.InvariantCulture) : "null") + ").");
             // Keep a stable handle so future dynamic ribbon refreshes can call Invalidate/InvalidateControl.
             if (!ReferenceEquals(_ribbonUi, ribbonUI))
             {
