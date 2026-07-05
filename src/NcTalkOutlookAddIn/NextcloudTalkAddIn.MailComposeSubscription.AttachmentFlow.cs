@@ -189,10 +189,6 @@ namespace NcTalkOutlookAddIn
                     return;
                 }
                 string propertyName = string.IsNullOrWhiteSpace(name) ? string.Empty : name.Trim();
-                if (IsEmailSignaturePropertyChange(propertyName))
-                {
-                    ScheduleEmailSignatureApplication("property_" + propertyName);
-                }
                 if (propertyName.IndexOf("Attach", StringComparison.OrdinalIgnoreCase) < 0
                     && !string.Equals(propertyName, "HasAttachment", StringComparison.OrdinalIgnoreCase))
                 {
@@ -276,7 +272,7 @@ namespace NcTalkOutlookAddIn
                     return;
                 }
 
-                AttachmentAutomationSettings settings = ReadAttachmentAutomationSettings();
+                AttachmentAutomationSettings settings = await ReadAttachmentAutomationSettingsAsync();
                 if (!settings.AlwaysConnector && !settings.OfferAboveEnabled)
                 {
                     _pendingAddedBatch.Clear();
@@ -390,18 +386,26 @@ namespace NcTalkOutlookAddIn
 
             private AttachmentAutomationSettings ReadAttachmentAutomationSettings()
             {
+                // BeforeAttachmentAdd must hand a decision back to Outlook synchronously.
+                return ReadAttachmentAutomationSettingsAsync().GetAwaiter().GetResult();
+            }
+
+            private async Task<AttachmentAutomationSettings> ReadAttachmentAutomationSettingsAsync()
+            {
                 _owner.EnsureSettingsLoaded();
 
                 var settings = _owner._currentSettings ?? new AddinSettings();
                 int thresholdMb = OutlookAttachmentAutomationGuardService.NormalizeThresholdMb(settings.SharingAttachmentsOfferAboveMb);
                 bool alwaysConnector = settings.SharingAttachmentsAlwaysConnector;
-                bool offerAboveEnabled = settings.SharingAttachmentsOfferAboveEnabled && !alwaysConnector;                if (_owner._currentSettings != null)
+                bool offerAboveEnabled = settings.SharingAttachmentsOfferAboveEnabled && !alwaysConnector;
+                if (_owner._currentSettings != null)
                 {
                     var configuration = new TalkServiceConfiguration(
                         _owner._currentSettings.ServerUrl,
                         _owner._currentSettings.Username,
                         _owner._currentSettings.AppPassword);
-                    BackendPolicyStatus policyStatus = _owner.FetchBackendPolicyStatus(configuration, "compose_attachment_evaluate");                    if (policyStatus != null && policyStatus.IsDomainActive("share"))
+                    BackendPolicyStatus policyStatus = await Task.Run(() => _owner.FetchBackendPolicyStatus(configuration, "compose_attachment_evaluate")).ConfigureAwait(false);
+                    if (policyStatus != null && policyStatus.IsDomainActive("share"))
                     {
                         bool policyBool;
                         int policyInt;

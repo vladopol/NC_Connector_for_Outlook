@@ -351,6 +351,11 @@ namespace NcTalkOutlookAddIn
                     + ").");
             }
 
+            private static string NormalizeEmail(string value)
+            {
+                return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim().ToLowerInvariant();
+            }
+
             private void CapturePasswordDispatchSender()
             {
                 if (_passwordDispatchQueue.Count == 0)
@@ -358,8 +363,8 @@ namespace NcTalkOutlookAddIn
                     return;
                 }
 
-                string senderEmail = EmailSignaturePolicyService.NormalizeEmail(ResolveCurrentSenderEmail());
-                string accountSmtp = EmailSignaturePolicyService.NormalizeEmail(ResolveSendUsingAccountSmtpAddress());
+                string senderEmail = NormalizeEmail(ResolveCurrentSenderEmail());
+                string accountSmtp = NormalizeEmail(ResolveSendUsingAccountSmtpAddress());
                 string sentOnBehalfOfName = ReadCurrentSentOnBehalfOfName();
                 for (int i = 0; i < _passwordDispatchQueue.Count; i++)
                 {

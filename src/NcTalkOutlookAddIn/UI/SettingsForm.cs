@@ -32,14 +32,12 @@ namespace NcTalkOutlookAddIn.UI
 
         private readonly TabControl _tabControl = new SettingsTabControl();
         private readonly TabPage _generalTab = new TabPage(Strings.TabGeneral);
-        private readonly TabPage _ifbTab = new TabPage(Strings.TabIfb);
         private readonly TabPage _advancedTab = new TabPage(Strings.TabAdvanced);
         private readonly TabPage _debugTab = new TabPage(Strings.TabDebug);
         private readonly TabPage _aboutTab = new TabPage(Strings.TabAbout);
         private const string NcConnectorHomepageUrl = "https://nc-connector.de";
         private readonly TabPage _fileLinkTab = new TabPage(Strings.TabFileLink);
         private readonly TabPage _talkTab = new TabPage(Strings.TabTalkLink);
-        private readonly TabPage _signatureTab = new TabPage(Strings.TabSignature);
         private readonly ToolTip _toolTip = new ToolTip();
         private readonly DisabledControlTooltipHintHelper _disabledTooltipHints;
         private readonly Panel _policyWarningPanel = new Panel();
@@ -54,13 +52,6 @@ namespace NcTalkOutlookAddIn.UI
         private readonly RadioButton _loginFlowRadio = new RadioButton();
         private readonly Button _loginFlowButton = new Button();
         private readonly Button _testButton = new Button();
-        private readonly CheckBox _ifbEnabledCheckBox = new CheckBox();
-        private readonly ComboBox _ifbDaysCombo = new ComboBox();
-        private readonly Label _ifbDaysLabel = new Label();
-        private readonly Label _ifbPortLabel = new Label();
-        private readonly NumericUpDown _ifbPortUpDown = new NumericUpDown();
-        private readonly ComboBox _ifbCacheHoursCombo = new ComboBox();
-        private readonly Label _ifbCacheHoursLabel = new Label();
         private readonly CheckBox _debugLogCheckBox = new CheckBox();
         private readonly CheckBox _debugAnonymizeCheckBox = new CheckBox();
         private readonly Label _debugPathLabel = new Label();
@@ -114,11 +105,6 @@ namespace NcTalkOutlookAddIn.UI
         private readonly ComboBox _shareBlockLangCombo = new ComboBox();
         private readonly Label _eventDescriptionLangLabel = new Label();
         private readonly ComboBox _eventDescriptionLangCombo = new ComboBox();
-        private readonly GroupBox _signatureDefaultsGroup = new GroupBox();
-        private readonly Label _signatureIdentityHintLabel = new Label();
-        private readonly CheckBox _emailSignatureOnComposeCheckBox = new CheckBox();
-        private readonly CheckBox _emailSignatureOnReplyCheckBox = new CheckBox();
-        private readonly CheckBox _emailSignatureOnForwardCheckBox = new CheckBox();
         private readonly GroupBox _tlsSettingsGroup = new GroupBox();
         private readonly CheckBox _tlsUseSystemDefaultCheckBox = new CheckBox();
         private readonly CheckBox _tlsEnable12CheckBox = new CheckBox();
@@ -134,8 +120,6 @@ namespace NcTalkOutlookAddIn.UI
         private bool _isBusy;
         private AddinSettings _result;
         private string _lastKnownServerVersion = string.Empty;
-        private bool _initialIfbEnabled;
-        private bool _ifbDefaultApplied;
         private readonly OutlookAttachmentAutomationGuardService _attachmentGuardService = new OutlookAttachmentAutomationGuardService();
         private bool _sharingAttachmentLockActive;
         private int _sharingAttachmentLockThresholdMb = 5;
@@ -196,8 +180,6 @@ namespace NcTalkOutlookAddIn.UI
 
             InitializeGeneralTab();
             InitializeTalkTab();
-            InitializeSignatureTab();
-            InitializeIfbTab();
             InitializeAdvancedTab();
             InitializeDebugTab();
             InitializeAboutTab();
@@ -226,7 +208,7 @@ namespace NcTalkOutlookAddIn.UI
             Controls.Add(_cancelButton);
 
             Resize += (s, e) => ApplyResponsiveLayout(false);
-            AttachResponsiveResizeHandlers(_generalTab, _fileLinkTab, _talkTab, _signatureTab);
+            AttachResponsiveResizeHandlers(_generalTab, _fileLinkTab, _talkTab);
 
             AcceptButton = _saveButton;
             CancelButton = _cancelButton;
@@ -513,8 +495,6 @@ namespace NcTalkOutlookAddIn.UI
 
                 ApplyGeneralTabFieldSizing();
                 ApplyTalkDefaultsTabLayout();
-                ApplySignatureTabLayout();
-                ApplyIfbTabLayout();
                 ApplyAdvancedTabLayout();
                 ApplyDebugTabLayout();
                 ApplyAboutTabLayout();
@@ -579,66 +559,6 @@ namespace NcTalkOutlookAddIn.UI
             }
 
             _talkDefaultsGroup.Height = Math.Max(ScaleLogical(200), y);
-        }
-
-        private void ApplySignatureTabLayout()
-        {
-            int groupLeft = ScaleLogical(24);
-            int groupTop = ScaleLogical(20);
-            int groupWidth = Math.Max(ScaleLogical(360), _signatureTab.ClientSize.Width - (groupLeft * 2));
-            _signatureDefaultsGroup.SetBounds(groupLeft, groupTop, groupWidth, _signatureDefaultsGroup.Height);
-
-            int innerPadding = ScaleLogical(12);
-            int contentWidth = Math.Max(ScaleLogical(180), _signatureDefaultsGroup.ClientSize.Width - (innerPadding * 2));
-            int y = ScaleLogical(26);
-            int checkGap = ScaleLogical(8);
-
-            _signatureIdentityHintLabel.Location = new Point(innerPadding, y);
-            _signatureIdentityHintLabel.MaximumSize = new Size(contentWidth, 0);
-            _signatureIdentityHintLabel.AutoSize = true;
-            y = _signatureIdentityHintLabel.Bottom + ScaleLogical(16);
-
-            _emailSignatureOnComposeCheckBox.Location = new Point(innerPadding, y);
-            y = _emailSignatureOnComposeCheckBox.Bottom + checkGap;
-
-            _emailSignatureOnReplyCheckBox.Location = new Point(innerPadding + ScaleLogical(18), y);
-            y = _emailSignatureOnReplyCheckBox.Bottom + checkGap;
-
-            _emailSignatureOnForwardCheckBox.Location = new Point(innerPadding + ScaleLogical(18), y);
-            y = _emailSignatureOnForwardCheckBox.Bottom + innerPadding;
-
-            _signatureDefaultsGroup.Height = Math.Max(ScaleLogical(150), y);
-        }
-
-        private void ApplyIfbTabLayout()
-        {
-            int left = ScaleLogical(24);
-            int top = ScaleLogical(20);
-            int rowGap = ScaleLogical(18);
-            int labelToComboGap = ScaleLogical(14);
-
-            _ifbEnabledCheckBox.Location = new Point(left, top);
-
-            // Position all labels first so we can compute the correct comboLeft from their widths.
-            int daysLabelTop = _ifbEnabledCheckBox.Bottom + rowGap;
-            _ifbDaysLabel.Location = new Point(left, daysLabelTop);
-
-            int portLabelTop = _ifbDaysLabel.Bottom + rowGap;
-            _ifbPortLabel.Location = new Point(left, portLabelTop);
-
-            int cacheLabelTop = _ifbPortLabel.Bottom + rowGap;
-            _ifbCacheHoursLabel.Location = new Point(left, cacheLabelTop);
-
-            int comboLeft = Math.Max(Math.Max(_ifbDaysLabel.Right, _ifbPortLabel.Right), _ifbCacheHoursLabel.Right) + labelToComboGap;
-
-            int comboHeight = Math.Max(_ifbDaysCombo.Height, _ifbDaysCombo.PreferredHeight + ScaleLogical(2));
-            _ifbDaysCombo.SetBounds(comboLeft, daysLabelTop - ScaleLogical(2), Math.Max(ScaleLogical(90), _ifbDaysCombo.Width), comboHeight);
-
-            int portHeight = Math.Max(_ifbPortUpDown.Height, _ifbPortUpDown.PreferredHeight + ScaleLogical(2));
-            _ifbPortUpDown.SetBounds(comboLeft, portLabelTop - ScaleLogical(2), Math.Max(ScaleLogical(110), _ifbPortUpDown.Width), portHeight);
-
-            int cacheComboHeight = Math.Max(_ifbCacheHoursCombo.Height, _ifbCacheHoursCombo.PreferredHeight + ScaleLogical(2));
-            _ifbCacheHoursCombo.SetBounds(comboLeft, cacheLabelTop - ScaleLogical(2), Math.Max(ScaleLogical(90), _ifbCacheHoursCombo.Width), cacheComboHeight);
         }
 
         private void ApplyAdvancedTabLayout()
@@ -757,58 +677,6 @@ namespace NcTalkOutlookAddIn.UI
             UpdateSharingAttachmentOptionsState();
             int sharingDefaultsHeight = _sharingAttachmentAutomationGroup.Bottom + ScaleLogical(12);
             _sharingDefaultsGroup.Height = Math.Max(ScaleLogical(300), sharingDefaultsHeight);
-        }
-
-        private void InitializeIfbTab()
-        {
-            _ifbTab.AutoScroll = true;
-            _ifbTab.Padding = new Padding(12);
-
-            _ifbEnabledCheckBox.Text = Strings.CheckIfbEnabled;
-            _ifbEnabledCheckBox.AutoSize = true;
-            _ifbEnabledCheckBox.Location = new Point(24, 20);
-            _ifbEnabledCheckBox.CheckedChanged += OnIfbEnabledChanged;
-            _ifbTab.Controls.Add(_ifbEnabledCheckBox);
-
-            _ifbDaysLabel.Text = Strings.LabelIfbDays;
-            _ifbDaysLabel.Location = new Point(24, 60);
-            _ifbDaysLabel.AutoSize = true;
-            _ifbTab.Controls.Add(_ifbDaysLabel);
-
-            _ifbDaysCombo.DropDownStyle = ComboBoxStyle.DropDownList;
-            _ifbDaysCombo.IntegralHeight = false;
-            _ifbDaysCombo.Location = new Point(200, 58);
-            _ifbDaysCombo.Width = 100;
-            _ifbDaysCombo.Items.AddRange(new object[] { "10", "30", "60", "90" });
-            _ifbTab.Controls.Add(_ifbDaysCombo);
-
-            _ifbPortLabel.Text = Strings.LabelIfbPort;
-            _ifbPortLabel.Location = new Point(24, 94);
-            _ifbPortLabel.AutoSize = true;
-            _ifbTab.Controls.Add(_ifbPortLabel);
-
-            _ifbPortUpDown.Location = new Point(200, 92);
-            _ifbPortUpDown.Width = 110;
-            _ifbPortUpDown.Minimum = AddinSettings.MinIfbPort;
-            _ifbPortUpDown.Maximum = AddinSettings.MaxIfbPort;
-            _ifbPortUpDown.Value = AddinSettings.DefaultIfbPort;
-            _ifbTab.Controls.Add(_ifbPortUpDown);
-
-            _ifbCacheHoursLabel.Text = Strings.LabelIfbCacheHours;
-            _ifbCacheHoursLabel.Location = new Point(24, 128);
-            _ifbCacheHoursLabel.AutoSize = true;
-            _ifbTab.Controls.Add(_ifbCacheHoursLabel);
-
-            _ifbCacheHoursCombo.DropDownStyle = ComboBoxStyle.DropDownList;
-            _ifbCacheHoursCombo.IntegralHeight = false;
-            _ifbCacheHoursCombo.Location = new Point(200, 126);
-            _ifbCacheHoursCombo.Width = 80;
-            _ifbCacheHoursCombo.Anchor = AnchorStyles.Top | AnchorStyles.Left;
-            for (int i = 1; i <= 24; i++)
-            {
-                _ifbCacheHoursCombo.Items.Add(i.ToString());
-            }
-            _ifbTab.Controls.Add(_ifbCacheHoursCombo);
         }
 
         private void InitializeAdvancedTab()
@@ -956,37 +824,6 @@ namespace NcTalkOutlookAddIn.UI
             _toolTip.SetToolTip(_talkDefaultSearchCheckBox, Strings.TooltipSearchVisible);
             _toolTip.SetToolTip(_talkDeleteRoomOnEventDeleteCheckBox, Strings.TooltipDeleteRoomOnEventDelete);
             UpdateTalkRoomTypeTooltip();
-        }
-
-        private void InitializeSignatureTab()
-        {
-            _signatureTab.AutoScroll = true;
-            _signatureTab.Padding = new Padding(12);
-
-            _signatureDefaultsGroup.Text = Strings.SignatureDefaultsHeading;
-            _signatureDefaultsGroup.Location = new Point(24, 20);
-            _signatureDefaultsGroup.Size = new Size(480, 170);
-            _signatureTab.Controls.Add(_signatureDefaultsGroup);
-
-            _signatureIdentityHintLabel.Text = Strings.SignatureIdentityHint;
-            _signatureIdentityHintLabel.ForeColor = Color.DimGray;
-            _signatureIdentityHintLabel.AutoSize = true;
-            _signatureDefaultsGroup.Controls.Add(_signatureIdentityHintLabel);
-
-            _emailSignatureOnComposeCheckBox.Text = Strings.SignatureOnComposeLabel;
-            _emailSignatureOnComposeCheckBox.AutoSize = true;
-            _emailSignatureOnComposeCheckBox.CheckedChanged += (s, e) => UpdateControlState();
-            _signatureDefaultsGroup.Controls.Add(_emailSignatureOnComposeCheckBox);
-
-            _emailSignatureOnReplyCheckBox.Text = Strings.SignatureOnReplyLabel;
-            _emailSignatureOnReplyCheckBox.AutoSize = true;
-            _signatureDefaultsGroup.Controls.Add(_emailSignatureOnReplyCheckBox);
-
-            _emailSignatureOnForwardCheckBox.Text = Strings.SignatureOnForwardLabel;
-            _emailSignatureOnForwardCheckBox.AutoSize = true;
-            _signatureDefaultsGroup.Controls.Add(_emailSignatureOnForwardCheckBox);
-
-            ApplySignatureTabLayout();
         }
 
         private void InitializeDebugTab()
@@ -1201,20 +1038,12 @@ namespace NcTalkOutlookAddIn.UI
             _suppressImmediateTlsApply = true;
             try
             {
-                _initialIfbEnabled = Result.IfbEnabled;
-                _ifbDefaultApplied = _initialIfbEnabled || !string.IsNullOrEmpty(Result.IfbPreviousFreeBusyPath);
                 _lastKnownServerVersion = Result.LastKnownServerVersion ?? string.Empty;
                 _serverUrlTextBox.Text = Result.ServerUrl;
                 _usernameTextBox.Text = Result.Username;
                 _appPasswordTextBox.Text = Result.AppPassword;
                 _manualRadio.Checked = Result.AuthMode == AuthenticationMode.Manual;
                 _loginFlowRadio.Checked = !_manualRadio.Checked;
-                _ifbEnabledCheckBox.Checked = Result.IfbEnabled;
-                SelectComboValue(_ifbDaysCombo, Result.IfbDays, 30);
-                _ifbPortUpDown.Value = Math.Max(
-                    _ifbPortUpDown.Minimum,
-                    Math.Min(_ifbPortUpDown.Maximum, AddinSettings.NormalizeIfbPort(Result.IfbPort)));
-                SelectComboValue(_ifbCacheHoursCombo, Result.IfbCacheHours, 24);
                 _debugLogCheckBox.Checked = Result.DebugLoggingEnabled;
                 _debugAnonymizeCheckBox.Checked = Result.LogAnonymizationEnabled;
                 _tlsUseSystemDefaultCheckBox.Checked = Result.TransportTlsUseSystemDefault;
@@ -1251,9 +1080,6 @@ namespace NcTalkOutlookAddIn.UI
                 _talkDefaultLobbyCheckBox.Checked = Result.TalkDefaultLobbyEnabled;
                 _talkDefaultSearchCheckBox.Checked = Result.TalkDefaultSearchVisible;
                 _talkDeleteRoomOnEventDeleteCheckBox.Checked = Result.TalkDeleteRoomOnEventDelete;
-                _emailSignatureOnComposeCheckBox.Checked = ResolveEmailSignatureFlag("email_signature_on_compose", Result.EmailSignatureOnCompose);
-                _emailSignatureOnReplyCheckBox.Checked = ResolveEmailSignatureFlag("email_signature_on_reply", Result.EmailSignatureOnReply);
-                _emailSignatureOnForwardCheckBox.Checked = ResolveEmailSignatureFlag("email_signature_on_forward", Result.EmailSignatureOnForward);
                 SelectTalkRoomType(Result.TalkDefaultRoomType);
                 UpdateTalkRoomTypeTooltip();
                 RefreshLanguageOverrideCombos(Result.ShareBlockLang, Result.EventDescriptionLang);
@@ -1280,26 +1106,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private void OnSaveButtonClick(object sender, EventArgs e)
         {
-            bool requestedSignatureOnCompose = _emailSignatureOnComposeCheckBox.Checked;
-            bool requestedSignatureOnReply = _emailSignatureOnReplyCheckBox.Checked;
-            bool requestedSignatureOnForward = _emailSignatureOnForwardCheckBox.Checked;
-
             RefreshBackendPolicyStatus("settings_save");
-            if (IsEmailSignaturePolicyAvailable())
-            {
-                if (!IsPolicyLocked("email_signature", "email_signature_on_compose"))
-                {
-                    _emailSignatureOnComposeCheckBox.Checked = requestedSignatureOnCompose;
-                }
-                if (!IsPolicyLocked("email_signature", "email_signature_on_reply"))
-                {
-                    _emailSignatureOnReplyCheckBox.Checked = requestedSignatureOnReply;
-                }
-                if (!IsPolicyLocked("email_signature", "email_signature_on_forward"))
-                {
-                    _emailSignatureOnForwardCheckBox.Checked = requestedSignatureOnForward;
-                }
-            }
 
             RefreshTalkSystemAddressbookState(true, "settings_save");
 
@@ -1319,10 +1126,6 @@ namespace NcTalkOutlookAddIn.UI
             Result.Username = _usernameTextBox.Text.Trim();
             Result.AppPassword = _appPasswordTextBox.Text;
             Result.AuthMode = _loginFlowRadio.Checked ? AuthenticationMode.LoginFlow : AuthenticationMode.Manual;
-            Result.IfbEnabled = _ifbEnabledCheckBox.Checked;
-            Result.IfbDays = ParseComboValue(_ifbDaysCombo, 30);
-            Result.IfbPort = AddinSettings.NormalizeIfbPort((int)_ifbPortUpDown.Value);
-            Result.IfbCacheHours = ParseComboValue(_ifbCacheHoursCombo, 24);
             Result.DebugLoggingEnabled = _debugLogCheckBox.Checked;
             Result.LogAnonymizationEnabled = _debugAnonymizeCheckBox.Checked;
             Result.TransportTlsUseSystemDefault = _tlsUseSystemDefaultCheckBox.Checked;
@@ -1348,12 +1151,6 @@ namespace NcTalkOutlookAddIn.UI
             Result.TalkDefaultSearchVisible = _talkDefaultSearchCheckBox.Checked;
             Result.TalkDeleteRoomOnEventDelete = _talkDeleteRoomOnEventDeleteCheckBox.Checked;
             Result.TalkDefaultRoomType = GetSelectedTalkRoomType();
-            if (IsEmailSignaturePolicyAvailable())
-            {
-                Result.EmailSignatureOnCompose = _emailSignatureOnComposeCheckBox.Checked;
-                Result.EmailSignatureOnReply = _emailSignatureOnReplyCheckBox.Checked;
-                Result.EmailSignatureOnForward = _emailSignatureOnForwardCheckBox.Checked;
-            }
             Result.ShareBlockLang = GetSelectedLanguageChoice(_shareBlockLangCombo);
             Result.EventDescriptionLang = GetSelectedLanguageChoice(_eventDescriptionLangCombo);
             Result.CalDavSyncEnabled = _calDavSyncCheckBox.Checked;
@@ -1597,18 +1394,6 @@ namespace NcTalkOutlookAddIn.UI
             UpdateControlState();
         }
 
-        private void OnIfbEnabledChanged(object sender, EventArgs e)
-        {
-            _ifbDefaultApplied = true;
-
-            if (_isBusy)
-            {
-                return;
-            }
-
-            UpdateControlState();
-        }
-
         private void OnGeneralValueChanged(object sender, EventArgs e)
         {
             if (_isBusy)
@@ -1636,47 +1421,6 @@ namespace NcTalkOutlookAddIn.UI
         private bool IsPolicyLocked(string domain, string key)
         {
             return _backendPolicyStatus != null && _backendPolicyStatus.IsLocked(domain, key);
-        }
-
-        private bool ResolveEmailSignatureFlag(string policyKey, bool? localValue)
-        {
-            bool backendValue;
-            if (_backendPolicyStatus == null
-                || !_backendPolicyStatus.TryGetPolicyBool("email_signature", policyKey, out backendValue))
-            {
-                backendValue = false;
-            }
-            if (IsPolicyLocked("email_signature", policyKey))
-            {
-                return backendValue;
-            }
-            return localValue.HasValue ? localValue.Value : backendValue;
-        }
-
-        private bool IsEmailSignaturePolicyAvailable()
-        {
-            bool backendOnCompose;
-            return PolicyUiHelper.HasBackendSeatEntitlement(_backendPolicyStatus)
-                   && _backendPolicyStatus != null
-                   && PolicyUiHelper.IsPolicyDomainActive(_backendPolicyStatus, "email_signature")
-                   && _backendPolicyStatus.TryGetPolicyBool("email_signature", "email_signature_on_compose", out backendOnCompose)
-                   && backendOnCompose
-                   && !string.IsNullOrWhiteSpace(_backendPolicyStatus.GetPolicyString("email_signature", "email_signature_template"))
-                   && !string.IsNullOrWhiteSpace(_backendPolicyStatus.GetPolicyString("email_signature", "user_email"));
-        }
-
-        private string GetEmailSignatureUnavailableTooltip()
-        {
-            string entitlementTooltip = PolicyUiHelper.GetSeparatePasswordUnavailableTooltip(_backendPolicyStatus);
-            if (!string.IsNullOrWhiteSpace(entitlementTooltip))
-            {
-                return entitlementTooltip;
-            }
-            if (!PolicyUiHelper.IsPolicyDomainAvailable(_backendPolicyStatus, "email_signature"))
-            {
-                return Strings.SignatureBackendUpdateRequiredTooltip;
-            }
-            return Strings.SignatureBackendInactiveTooltip;
         }
 
         private void RefreshBackendPolicyStatus(string trigger)
@@ -1722,7 +1466,6 @@ namespace NcTalkOutlookAddIn.UI
                 + ", active=" + PolicyUiHelper.IsPolicyActive(_backendPolicyStatus).ToString(CultureInfo.InvariantCulture)
                 + ", share=" + PolicyUiHelper.IsPolicyDomainActive(_backendPolicyStatus, "share").ToString(CultureInfo.InvariantCulture)
                 + ", talk=" + PolicyUiHelper.IsPolicyDomainActive(_backendPolicyStatus, "talk").ToString(CultureInfo.InvariantCulture)
-                + ", emailSignature=" + PolicyUiHelper.IsPolicyDomainActive(_backendPolicyStatus, "email_signature").ToString(CultureInfo.InvariantCulture)
                 + ", warningVisible=" + warningVisible.ToString(CultureInfo.InvariantCulture)
                 + ", mode=" + (_backendPolicyStatus != null ? _backendPolicyStatus.Mode : "local")
                 + ", reason=" + (_backendPolicyStatus != null ? _backendPolicyStatus.Reason : "n/a")
@@ -1829,24 +1572,6 @@ namespace NcTalkOutlookAddIn.UI
             if (_backendPolicyStatus.TryGetPolicyBool("talk", "talk_delete_room_on_event_delete", out policyBool))
             {
                 _talkDeleteRoomOnEventDeleteCheckBox.Checked = policyBool;
-            }
-            if (_backendPolicyStatus.TryGetPolicyBool("email_signature", "email_signature_on_compose", out policyBool))
-            {
-                _emailSignatureOnComposeCheckBox.Checked = IsPolicyLocked("email_signature", "email_signature_on_compose")
-                    ? policyBool
-                    : ResolveEmailSignatureFlag("email_signature_on_compose", Result.EmailSignatureOnCompose);
-            }
-            if (_backendPolicyStatus.TryGetPolicyBool("email_signature", "email_signature_on_reply", out policyBool))
-            {
-                _emailSignatureOnReplyCheckBox.Checked = IsPolicyLocked("email_signature", "email_signature_on_reply")
-                    ? policyBool
-                    : ResolveEmailSignatureFlag("email_signature_on_reply", Result.EmailSignatureOnReply);
-            }
-            if (_backendPolicyStatus.TryGetPolicyBool("email_signature", "email_signature_on_forward", out policyBool))
-            {
-                _emailSignatureOnForwardCheckBox.Checked = IsPolicyLocked("email_signature", "email_signature_on_forward")
-                    ? policyBool
-                    : ResolveEmailSignatureFlag("email_signature_on_forward", Result.EmailSignatureOnForward);
             }
 
             policyString = _backendPolicyStatus.GetPolicyString("talk", "talk_room_type");
@@ -1994,7 +1719,7 @@ namespace NcTalkOutlookAddIn.UI
             string serverUrl = _serverUrlTextBox.Text.Trim();
             string username = _usernameTextBox.Text.Trim();
             string appPassword = _appPasswordTextBox.Text ?? string.Empty;
-            int cacheHours = ParseComboValue(_ifbCacheHoursCombo, 24);
+            int cacheHours = Result.IfbCacheHours;
             var configuration = new TalkServiceConfiguration(serverUrl, username, appPassword);
             var cache = new IfbAddressBookCache(AppDataPaths.EnsureLocalRootDirectory());
 
@@ -2220,35 +1945,6 @@ namespace NcTalkOutlookAddIn.UI
             _loginFlowButton.Enabled = !manual && !_isBusy;
             _testButton.Enabled = !_isBusy;
 
-            bool credentialsAvailable =
-                !string.IsNullOrWhiteSpace(_serverUrlTextBox.Text) &&
-                !string.IsNullOrWhiteSpace(_usernameTextBox.Text) &&
-                !string.IsNullOrEmpty(_appPasswordTextBox.Text);
-
-            if (credentialsAvailable && !_ifbDefaultApplied && !_initialIfbEnabled && !_ifbEnabledCheckBox.Checked)
-            {
-                _ifbEnabledCheckBox.Checked = true;
-                _ifbDefaultApplied = true;
-            }
-            if (!credentialsAvailable && _ifbEnabledCheckBox.Checked)
-            {
-                _ifbEnabledCheckBox.Checked = false;
-            }
-
-            _ifbEnabledCheckBox.Enabled = credentialsAvailable && !_isBusy;
-
-            bool showDays = _ifbEnabledCheckBox.Checked;
-            _ifbDaysCombo.Visible = showDays;
-            _ifbDaysLabel.Visible = showDays;
-            _ifbDaysCombo.Enabled = showDays && !_isBusy && _ifbEnabledCheckBox.Enabled;
-            _ifbDaysLabel.Enabled = showDays && !_isBusy && _ifbEnabledCheckBox.Enabled;
-            _ifbPortUpDown.Visible = showDays;
-            _ifbPortLabel.Visible = showDays;
-            _ifbPortUpDown.Enabled = showDays && !_isBusy && _ifbEnabledCheckBox.Enabled;
-            _ifbPortLabel.Enabled = showDays && !_isBusy && _ifbEnabledCheckBox.Enabled;
-
-            _ifbCacheHoursCombo.Enabled = !_isBusy;
-            _ifbCacheHoursLabel.Enabled = !_isBusy;
             _debugLogCheckBox.Enabled = !_isBusy;
             _debugAnonymizeCheckBox.Enabled = !_isBusy;
             _debugOpenLink.Enabled = !_isBusy;
@@ -2271,13 +1967,8 @@ namespace NcTalkOutlookAddIn.UI
             bool lockTalkUsers = IsPolicyLocked("talk", "talk_add_users");
             bool lockTalkGuests = IsPolicyLocked("talk", "talk_add_guests");
             bool lockTalkDeleteRoomOnEventDelete = IsPolicyLocked("talk", "talk_delete_room_on_event_delete");
-            bool lockSignatureOnCompose = IsPolicyLocked("email_signature", "email_signature_on_compose");
-            bool lockSignatureOnReply = IsPolicyLocked("email_signature", "email_signature_on_reply");
-            bool lockSignatureOnForward = IsPolicyLocked("email_signature", "email_signature_on_forward");
             bool separatePasswordAvailable = PolicyUiHelper.HasBackendSeatEntitlement(_backendPolicyStatus);
             string separatePasswordUnavailableTooltip = PolicyUiHelper.GetSeparatePasswordUnavailableTooltip(_backendPolicyStatus);
-            bool emailSignatureAvailable = IsEmailSignaturePolicyAvailable();
-            string emailSignatureUnavailableTooltip = GetEmailSignatureUnavailableTooltip();
 
             _fileLinkBaseTextBox.Enabled = !lockShareBase && !_isBusy;
             _sharingDefaultShareNameTextBox.Enabled = !lockShareName && !_isBusy;
@@ -2306,9 +1997,6 @@ namespace NcTalkOutlookAddIn.UI
             _talkDefaultAddUsersCheckBox.Enabled = !_talkAddressbookLockActive && !lockTalkUsers && !_isBusy;
             _talkDefaultAddGuestsCheckBox.Enabled = !_talkAddressbookLockActive && !lockTalkGuests && !_isBusy;
             _talkDeleteRoomOnEventDeleteCheckBox.Enabled = !lockTalkDeleteRoomOnEventDelete && !_isBusy;
-            _emailSignatureOnComposeCheckBox.Enabled = emailSignatureAvailable && !lockSignatureOnCompose && !_isBusy;
-            _emailSignatureOnReplyCheckBox.Enabled = emailSignatureAvailable && _emailSignatureOnComposeCheckBox.Checked && !lockSignatureOnReply && !_isBusy;
-            _emailSignatureOnForwardCheckBox.Enabled = emailSignatureAvailable && _emailSignatureOnComposeCheckBox.Checked && !lockSignatureOnForward && !_isBusy;
 
             _disabledTooltipHints.Apply(_fileLinkBaseTextBox, lockShareBase ? Strings.PolicyAdminControlledTooltip : string.Empty, lockShareBase, _fileLinkBaseHintLabel);
             _disabledTooltipHints.Apply(_sharingDefaultShareNameTextBox, lockShareName ? Strings.PolicyAdminControlledTooltip : string.Empty, lockShareName, _sharingDefaultShareNameLabel);
@@ -2328,24 +2016,6 @@ namespace NcTalkOutlookAddIn.UI
             _disabledTooltipHints.Apply(_talkDefaultLobbyCheckBox, lockTalkLobby ? Strings.PolicyAdminControlledTooltip : Strings.TooltipLobby, lockTalkLobby);
             _disabledTooltipHints.Apply(_talkDefaultSearchCheckBox, lockTalkSearch ? Strings.PolicyAdminControlledTooltip : Strings.TooltipSearchVisible, lockTalkSearch);
             _disabledTooltipHints.Apply(_talkDeleteRoomOnEventDeleteCheckBox, lockTalkDeleteRoomOnEventDelete ? Strings.PolicyAdminControlledTooltip : Strings.TooltipDeleteRoomOnEventDelete, lockTalkDeleteRoomOnEventDelete);
-            _disabledTooltipHints.Apply(
-                _emailSignatureOnComposeCheckBox,
-                !emailSignatureAvailable
-                    ? emailSignatureUnavailableTooltip
-                    : (lockSignatureOnCompose ? Strings.PolicyAdminControlledTooltip : string.Empty),
-                !emailSignatureAvailable || lockSignatureOnCompose);
-            _disabledTooltipHints.Apply(
-                _emailSignatureOnReplyCheckBox,
-                !emailSignatureAvailable
-                    ? emailSignatureUnavailableTooltip
-                    : (lockSignatureOnReply ? Strings.PolicyAdminControlledTooltip : string.Empty),
-                !emailSignatureAvailable || lockSignatureOnReply);
-            _disabledTooltipHints.Apply(
-                _emailSignatureOnForwardCheckBox,
-                !emailSignatureAvailable
-                    ? emailSignatureUnavailableTooltip
-                    : (lockSignatureOnForward ? Strings.PolicyAdminControlledTooltip : string.Empty),
-                !emailSignatureAvailable || lockSignatureOnForward);
             TalkRoomTypeOption selectedTalkRoomTypeOption = _talkDefaultRoomTypeCombo.SelectedItem as TalkRoomTypeOption;
             bool standardTalkRoomTypeSelected =
                 selectedTalkRoomTypeOption != null &&

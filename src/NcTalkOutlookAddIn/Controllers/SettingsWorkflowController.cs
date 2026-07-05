@@ -103,8 +103,6 @@ namespace NcTalkOutlookAddIn.Controllers
 
                     _logSettings(
                         "Settings applied (AuthMode=" + nextSettings.AuthMode
-                        + ", IFB=" + nextSettings.IfbEnabled
-                        + ", IfbPort=" + nextSettings.IfbPort
                         + ", Debug=" + nextSettings.DebugLoggingEnabled
                         + ", LogAnonymize=" + nextSettings.LogAnonymizationEnabled
                         + ").");

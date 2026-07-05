@@ -12,9 +12,6 @@ namespace NcTalkOutlookAddIn.Settings
         // Persistent add-in settings (credentials, sharing/IFB options, etc.).
     internal class AddinSettings
     {
-        internal const int DefaultIfbPort = 7777;
-        internal const int MinIfbPort = 1024;
-        internal const int MaxIfbPort = 49151;
         internal const string DefaultFileLinkBasePath = "Outlook";
 
         internal const string DefaultCalDavCalendarName = "personal";
@@ -25,10 +22,7 @@ namespace NcTalkOutlookAddIn.Settings
             Username = string.Empty;
             AppPassword = string.Empty;
             AuthMode = AuthenticationMode.LoginFlow;
-            IfbEnabled = false;
-            IfbDays = 30;
             IfbCacheHours = 24;
-            IfbPort = DefaultIfbPort;
             IfbPreviousFreeBusyPath = string.Empty;
             DebugLoggingEnabled = false;
             LogAnonymizationEnabled = true;
@@ -58,9 +52,6 @@ namespace NcTalkOutlookAddIn.Settings
             CalDavSyncEnabled = false;
             CalDavCalendarName = DefaultCalDavCalendarName;
             TalkDeleteRoomOnEventDelete = false;
-            EmailSignatureOnCompose = null;
-            EmailSignatureOnReply = null;
-            EmailSignatureOnForward = null;
         }
 
         public string ServerUrl { get; set; }
@@ -71,13 +62,7 @@ namespace NcTalkOutlookAddIn.Settings
 
         public AuthenticationMode AuthMode { get; set; }
 
-        public bool IfbEnabled { get; set; }
-
-        public int IfbDays { get; set; }
-
         public int IfbCacheHours { get; set; }
-
-        public int IfbPort { get; set; }
 
         public string IfbPreviousFreeBusyPath { get; set; }
 
@@ -137,25 +122,10 @@ namespace NcTalkOutlookAddIn.Settings
 
         public bool TalkDeleteRoomOnEventDelete { get; set; }
 
-        public bool? EmailSignatureOnCompose { get; set; }
-
-        public bool? EmailSignatureOnReply { get; set; }
-
-        public bool? EmailSignatureOnForward { get; set; }
-
         public AddinSettings Clone()
         {
             var copy = (AddinSettings)MemberwiseClone();
             return copy;
-        }
-
-        internal static int NormalizeIfbPort(int port)
-        {
-            if (port < MinIfbPort || port > MaxIfbPort)
-            {
-                return DefaultIfbPort;
-            }
-            return port;
         }
     }
 }

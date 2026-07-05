@@ -3,28 +3,19 @@
 // See LICENSE.txt for details.
 
 using System;
-using System.Text;
 using Microsoft.Win32;
 using Outlook = Microsoft.Office.Interop.Outlook;
 using NcTalkOutlookAddIn.Settings;
 using NcTalkOutlookAddIn.Utilities;
-using System.Net;
 
 namespace NcTalkOutlookAddIn.Services
 {
-        // Coordinates the local IFB server and Outlook-specific registry settings.
-    internal sealed class FreeBusyManager : IDisposable
+        // The local IFB (Free/Busy) HTTP listener has been removed — Exchange handles Free/Busy
+        // natively in this deployment. This class now only restores Outlook's native free/busy
+        // registry paths, in case an older build ever ran with the listener enabled and hijacked them.
+    internal sealed class FreeBusyManager
     {
-        private readonly IfbAddressBookCache _addressBookCache;
-        private readonly FreeBusyServer _server;
-
         private Outlook.Application _application;
-
-        internal FreeBusyManager(string dataDirectory)
-        {
-            _addressBookCache = new IfbAddressBookCache(dataDirectory);
-            _server = new FreeBusyServer(_addressBookCache);
-        }
 
         internal void Initialize(Outlook.Application application)
         {
@@ -36,56 +27,7 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return;
             }
-            bool credentialsComplete = !string.IsNullOrWhiteSpace(settings.ServerUrl)
-                                       && !string.IsNullOrWhiteSpace(settings.Username)
-                                       && !string.IsNullOrEmpty(settings.AppPassword);
-
-            if (!settings.IfbEnabled || !credentialsComplete)
-            {
-                StopServer();
-                RestoreFreeBusyPath(settings);
-                return;
-            }
-            var configuration = new TalkServiceConfiguration(settings.ServerUrl, settings.Username, settings.AppPassword);
-            if (!configuration.IsComplete())
-            {
-                StopServer();
-                RestoreFreeBusyPath(settings);
-                return;
-            }
-
-            _server.UpdateSettings(configuration, settings.IfbDays, settings.IfbCacheHours);
-            int ifbPort = AddinSettings.NormalizeIfbPort(settings.IfbPort);
-            try
-            {
-                _server.Start(ifbPort);
-            }
-            catch (HttpListenerException ex)
-            {
-                throw new InvalidOperationException(BuildIfbStartFailureMessage(ifbPort, ex), ex);
-            }
-            catch (Exception ex)
-            {
-                throw new InvalidOperationException("IFB server could not be started: " + ex.Message, ex);
-            }
-
-            EnsureFreeBusyPath(settings);
-        }
-
-        private void EnsureFreeBusyPath(AddinSettings settings)
-        {
-            string desired = BuildIfbUrl(settings);
-
-            bool primaryUpdated = TryUpdateKey(BuildCalendarOptionsKey(), "FreeBusySearchPath", desired, settings, true);
-            if (!primaryUpdated)
-            {
-                throw new InvalidOperationException("IFB path could not be set: access denied or key not available.");
-            }
-
-            TryUpdateKey(BuildPolicyCalendarOptionsKey(), "FreeBusySearchPath", desired, settings, false);
-
-            TryUpdateKey(BuildInternetFreeBusyKey(), "Read URL", desired, settings, true);
-            TryUpdateKey(BuildPolicyInternetFreeBusyKey(), "Read URL", desired, settings, false);
+            RestoreFreeBusyPath(settings);
         }
 
         private void RestoreFreeBusyPath(AddinSettings settings)
@@ -142,143 +84,6 @@ namespace NcTalkOutlookAddIn.Services
                 version = "16.0";
             }
             return version;
-        }
-
-        private static string BuildIfbUrl(AddinSettings settings)
-        {
-            string domain = GuessDefaultDomain(settings);
-            int ifbPort = AddinSettings.NormalizeIfbPort(settings.IfbPort);
-            var builder = new StringBuilder(
-                "http://127.0.0.1:"
-                + ifbPort.ToString(System.Globalization.CultureInfo.InvariantCulture)
-                + "/nc-ifb/freebusy/%NAME%");
-            if (!string.IsNullOrEmpty(domain))
-            {
-                builder.Append("@").Append(domain);
-            }
-            builder.Append(".vfb");
-            return builder.ToString();
-        }
-
-        private static string BuildIfbStartFailureMessage(int ifbPort, HttpListenerException ex)
-        {
-            // HTTP.sys URLACL is missing or blocked by policy.
-            if (ex != null && ex.ErrorCode == 5)
-            {
-                return "IFB server could not be started on port "
-                       + ifbPort.ToString()
-                       + ": access denied (URL reservation missing).";
-            }
-
-            // Prefix is already bound by another process.
-            if (ex != null && ex.ErrorCode == 32)
-            {
-                return "IFB server could not be started on port "
-                       + ifbPort.ToString()
-                       + ": port/prefix is already in use.";
-            }
-            return "IFB server could not be started: " + (ex != null ? ex.Message : "Unknown listener error.");
-        }
-
-        private static string GuessDefaultDomain(AddinSettings settings)
-        {
-            if (!string.IsNullOrWhiteSpace(settings.Username) && settings.Username.Contains("@"))
-            {
-                var parts = settings.Username.Split('@');
-                if (parts.Length == 2 && !string.IsNullOrWhiteSpace(parts[1]))
-                {
-                    return parts[1].Trim();
-                }
-            }
-            try
-            {
-                var uri = new Uri(settings.ServerUrl);
-                string host = uri.Host ?? string.Empty;
-                var segments = host.Split('.');
-                if (segments.Length >= 2)
-                {
-                    return segments[segments.Length - 2] + "." + segments[segments.Length - 1];
-                }
-                return host;
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Ifb, "Failed to derive IFB default domain from server URL.", ex);
-                return string.Empty;
-            }
-        }
-
-        private bool TryUpdateKey(string path, string valueName, string desired, AddinSettings settings, bool critical)
-        {
-            if (string.IsNullOrEmpty(path))
-            {
-                return false;
-            }
-            string current;
-            bool hasCurrent = TryReadValue(path, valueName, out current);
-            if (hasCurrent && string.IsNullOrEmpty(settings.IfbPreviousFreeBusyPath) && !string.IsNullOrEmpty(current))
-            {
-                settings.IfbPreviousFreeBusyPath = current;
-            }
-            if (hasCurrent && string.Equals(current, desired, StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-            if (!hasCurrent && !critical)
-            {
-                return true;
-            }
-            try
-            {
-                using (var key = OpenOrCreateSubKey(path))
-                {                    if (key == null)
-                    {
-                        DiagnosticsLogger.Log(LogCategories.Ifb, "No access to registry '" + path + "' (value '" + valueName + "').");
-                        if (critical)
-                        {
-                            throw new InvalidOperationException("IFB path could not be set: access to '" + path + "' denied.");
-                        }
-                        return false;
-                    }
-                    string writableCurrent = key.GetValue(valueName, string.Empty) as string ?? string.Empty;
-                    if (string.IsNullOrEmpty(settings.IfbPreviousFreeBusyPath) && !string.IsNullOrEmpty(writableCurrent))
-                    {
-                        settings.IfbPreviousFreeBusyPath = writableCurrent;
-                    }
-                    if (!string.Equals(writableCurrent, desired, StringComparison.OrdinalIgnoreCase))
-                    {
-                        key.SetValue(valueName, desired, RegistryValueKind.String);
-                    }
-                    return true;
-                }
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-                DiagnosticsLogger.Log(LogCategories.Ifb, "No access to registry '" + path + "': " + ex.Message);
-                if (critical)
-                {
-                    throw new InvalidOperationException("IFB path could not be set: access denied.", ex);
-                }
-                return false;
-            }
-            catch (System.Security.SecurityException ex)
-            {
-                DiagnosticsLogger.Log(LogCategories.Ifb, "Security exception for registry '" + path + "': " + ex.Message);
-                if (critical)
-                {
-                    throw new InvalidOperationException("IFB path could not be set: a security policy prevented access.", ex);
-                }
-                return false;
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.Log(LogCategories.Ifb, "Registry '" + path + "' could not be updated: " + ex.Message);
-                if (critical)
-                {
-                    throw new InvalidOperationException("IFB path could not be set: " + ex.Message, ex);
-                }
-                return false;
-            }
         }
 
         private void TryRestoreKey(string path, string valueName, string previous)
@@ -400,16 +205,5 @@ namespace NcTalkOutlookAddIn.Services
                 return null;
             }
         }
-
-        internal void StopServer()
-        {
-            _server.Stop();
-        }
-
-        public void Dispose()
-        {
-            StopServer();
-        }
     }
 }
-

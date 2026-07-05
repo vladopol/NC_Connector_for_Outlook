@@ -444,10 +444,7 @@ namespace NcTalkOutlookAddIn.Settings
             AppendElement(document, root, "Username", Safe(settings.Username));
             AppendElement(document, root, "AppPasswordProtected", ProtectPassword(settings.AppPassword));
             AppendElement(document, root, "AuthMode", settings.AuthMode.ToString());
-            AppendElement(document, root, "IfbEnabled", settings.IfbEnabled.ToString(CultureInfo.InvariantCulture));
-            AppendElement(document, root, "IfbDays", settings.IfbDays.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "IfbCacheHours", settings.IfbCacheHours.ToString(CultureInfo.InvariantCulture));
-            AppendElement(document, root, "IfbPort", AddinSettings.NormalizeIfbPort(settings.IfbPort).ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "IfbPreviousFreeBusyPath", Safe(settings.IfbPreviousFreeBusyPath));
             AppendElement(document, root, "DebugLoggingEnabled", settings.DebugLoggingEnabled.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "LogAnonymizationEnabled", settings.LogAnonymizationEnabled.ToString(CultureInfo.InvariantCulture));
@@ -477,9 +474,6 @@ namespace NcTalkOutlookAddIn.Settings
             AppendElement(document, root, "CalDavSyncEnabled", settings.CalDavSyncEnabled.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "CalDavCalendarName", Safe(settings.CalDavCalendarName));
             AppendElement(document, root, "TalkDeleteRoomOnEventDelete", settings.TalkDeleteRoomOnEventDelete.ToString(CultureInfo.InvariantCulture));
-            AppendOptionalBoolElement(document, root, "EmailSignatureOnCompose", settings.EmailSignatureOnCompose);
-            AppendOptionalBoolElement(document, root, "EmailSignatureOnReply", settings.EmailSignatureOnReply);
-            AppendOptionalBoolElement(document, root, "EmailSignatureOnForward", settings.EmailSignatureOnForward);
 
             var writerSettings = new XmlWriterSettings
             {
@@ -517,32 +511,11 @@ namespace NcTalkOutlookAddIn.Settings
                         settings.AuthMode = mode;
                     }
                     break;
-                case "IfbEnabled":
-                    bool ifbEnabled;
-                    if (bool.TryParse(value, out ifbEnabled))
-                    {
-                        settings.IfbEnabled = ifbEnabled;
-                    }
-                    break;
-                case "IfbDays":
-                    int ifbDays;
-                    if (int.TryParse(value, out ifbDays))
-                    {
-                        settings.IfbDays = ifbDays;
-                    }
-                    break;
                 case "IfbCacheHours":
                     int cacheHours;
                     if (int.TryParse(value, out cacheHours))
                     {
                         settings.IfbCacheHours = cacheHours;
-                    }
-                    break;
-                case "IfbPort":
-                    int ifbPort;
-                    if (int.TryParse(value, out ifbPort))
-                    {
-                        settings.IfbPort = AddinSettings.NormalizeIfbPort(ifbPort);
                     }
                     break;
                 case "IfbPreviousFreeBusyPath":
@@ -722,39 +695,9 @@ namespace NcTalkOutlookAddIn.Settings
                         settings.TalkDeleteRoomOnEventDelete = talkDeleteRoomOnEventDelete;
                     }
                     break;
-                case "EmailSignatureOnCompose":
-                    bool emailSignatureOnCompose;
-                    if (bool.TryParse(value, out emailSignatureOnCompose))
-                    {
-                        settings.EmailSignatureOnCompose = emailSignatureOnCompose;
-                    }
-                    break;
-                case "EmailSignatureOnReply":
-                    bool emailSignatureOnReply;
-                    if (bool.TryParse(value, out emailSignatureOnReply))
-                    {
-                        settings.EmailSignatureOnReply = emailSignatureOnReply;
-                    }
-                    break;
-                case "EmailSignatureOnForward":
-                    bool emailSignatureOnForward;
-                    if (bool.TryParse(value, out emailSignatureOnForward))
-                    {
-                        settings.EmailSignatureOnForward = emailSignatureOnForward;
-                    }
-                    break;
                 default:
                     break;
             }
-        }
-
-        private static void AppendOptionalBoolElement(XmlDocument document, XmlElement root, string name, bool? value)
-        {
-            if (!value.HasValue)
-            {
-                return;
-            }
-            AppendElement(document, root, name, value.Value.ToString(CultureInfo.InvariantCulture));
         }
 
         private static void AppendElement(XmlDocument document, XmlElement root, string name, string value)
