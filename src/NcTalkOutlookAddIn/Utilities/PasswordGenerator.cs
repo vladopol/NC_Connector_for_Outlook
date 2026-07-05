@@ -12,11 +12,22 @@ namespace NcTalkOutlookAddIn.Utilities
     internal static class PasswordGenerator
     {
         private const string Alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+        private const string NumericAlphabet = "0123456789";
         private const int MinLength = 8;
 
         internal static string GenerateLocalPassword(int minLength)
         {
-            int length = Math.Max(MinLength, minLength);
+            return GenerateFromAlphabet(Alphabet, Math.Max(MinLength, minLength));
+        }
+
+        // Digits-only PIN, e.g. for Talk room passwords read aloud or typed by meeting guests.
+        internal static string GenerateNumericLocalPassword(int minLength)
+        {
+            return GenerateFromAlphabet(NumericAlphabet, Math.Max(1, minLength));
+        }
+
+        private static string GenerateFromAlphabet(string alphabet, int length)
+        {
             var chars = new char[length];
             using (var rng = RandomNumberGenerator.Create())
             {
@@ -24,8 +35,8 @@ namespace NcTalkOutlookAddIn.Utilities
                 for (int i = 0; i < chars.Length; i++)
                 {
                     rng.GetBytes(data);
-                    int index = (int)(BitConverter.ToUInt32(data, 0) % Alphabet.Length);
-                    chars[i] = Alphabet[index];
+                    int index = (int)(BitConverter.ToUInt32(data, 0) % alphabet.Length);
+                    chars[i] = alphabet[index];
                 }
             }
             return new string(chars);

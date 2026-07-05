@@ -4,6 +4,16 @@ All notable changes to **NC Connector for Outlook** will be documented in this f
 
 This project follows the principles of **Keep a Changelog** and **Semantic Versioning**.
 
+## [3.1.0.9] - 2026-07-05
+
+Fork patch on upstream 3.1.0.
+
+---
+
+### Fork-specific changes
+
+- **Talk room passwords are now simple numeric PINs** — generated and regenerated passwords for Talk rooms are now digits-only (e.g. `48213`), generated locally instead of via Nextcloud's server-side password generator (which could return long strings with special characters). Still respects the server's minimum-length policy if one is configured. FileLink share passwords are unchanged.
+
 ## [3.1.0.8] - 2026-07-05
 
 Fork patch on upstream 3.1.0.
