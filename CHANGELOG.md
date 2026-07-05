@@ -4,6 +4,16 @@ All notable changes to **NC Connector for Outlook** will be documented in this f
 
 This project follows the principles of **Keep a Changelog** and **Semantic Versioning**.
 
+## [3.1.0.7] - 2026-07-05 — BISECTION BUILD, not for general deployment
+
+Fork patch on upstream 3.1.0.
+
+---
+
+### 3.1.0.6 confirmed: not the ribbon. Narrowing to Explorer.InlineResponse vs. NewInspector
+
+3.1.0.6 restored both ribbon customizations while keeping `Explorer.InlineResponse` and `NewInspector`'s mail branch disabled — the bug did not reproduce, ruling out the ribbon XML entirely. This build restores `NewInspector`'s mail-compose branch (relevant to popped-out compose windows) while keeping `Explorer.InlineResponse` disabled, to determine whether `NewInspector` is also implicated or whether `Explorer.InlineResponse` alone is the cause.
+
 ## [3.1.0.6] - 2026-07-05 — BISECTION BUILD, not for general deployment
 
 Fork patch on upstream 3.1.0.
