@@ -356,6 +356,127 @@ namespace NcTalkOutlookAddIn
                 return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim().ToLowerInvariant();
             }
 
+            private string ResolveCurrentSenderEmail()
+            {
+                string sentOnBehalfOf;
+                bool hasSentOnBehalfOf;
+                if (TryResolveSentOnBehalfOfSmtpAddress(out sentOnBehalfOf, out hasSentOnBehalfOf))
+                {
+                    return sentOnBehalfOf;
+                }
+                if (hasSentOnBehalfOf)
+                {
+                    return string.Empty;
+                }
+
+                return ResolveSendUsingAccountSmtpAddress();
+            }
+
+            private string ResolveSendUsingAccountSmtpAddress()
+            {
+                Outlook.Account account = null;
+                try
+                {
+                    account = _mail.SendUsingAccount;
+                    if (account != null)
+                    {
+                        string smtpAddress = account.SmtpAddress;
+                        if (IsSmtpEmailCandidate(smtpAddress))
+                        {
+                            return smtpAddress.Trim();
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to resolve compose sender account SMTP address.", ex);
+                }
+                finally
+                {
+                    ComInteropScope.TryRelease(account, LogCategories.Core, "Failed to release compose sender account COM object.");
+                }
+
+                return string.Empty;
+            }
+
+            private bool TryResolveSentOnBehalfOfSmtpAddress(out string smtpAddress, out bool hasSentOnBehalfOf)
+            {
+                smtpAddress = string.Empty;
+                hasSentOnBehalfOf = false;
+
+                string sentOnBehalfOfName;
+                try
+                {
+                    sentOnBehalfOfName = _mail.SentOnBehalfOfName;
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read compose sent-on-behalf identity.", ex);
+                    return false;
+                }
+
+                if (string.IsNullOrWhiteSpace(sentOnBehalfOfName))
+                {
+                    return false;
+                }
+
+                hasSentOnBehalfOf = true;
+                sentOnBehalfOfName = sentOnBehalfOfName.Trim();
+                if (IsSmtpEmailCandidate(sentOnBehalfOfName))
+                {
+                    smtpAddress = sentOnBehalfOfName;
+                    return true;
+                }
+
+                Outlook.NameSpace session = null;
+                Outlook.Recipient recipient = null;
+                try
+                {
+                    Outlook.Application application = _owner != null ? _owner.OutlookApplication : null;
+                    if (application == null)
+                    {
+                        return false;
+                    }
+
+                    session = application.Session;
+                    if (session == null)
+                    {
+                        return false;
+                    }
+
+                    recipient = session.CreateRecipient(sentOnBehalfOfName);
+                    if (recipient == null || !recipient.Resolve())
+                    {
+                        return false;
+                    }
+
+                    string resolved = OutlookRecipientResolverController.TryResolveRecipientSmtpAddress(recipient);
+                    if (!IsSmtpEmailCandidate(resolved))
+                    {
+                        return false;
+                    }
+
+                    smtpAddress = resolved.Trim();
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to resolve compose sent-on-behalf SMTP address.", ex);
+                    return false;
+                }
+                finally
+                {
+                    ComInteropScope.TryRelease(recipient, LogCategories.Core, "Failed to release sent-on-behalf Recipient COM object.");
+                    ComInteropScope.TryRelease(session, LogCategories.Core, "Failed to release sent-on-behalf Session COM object.");
+                }
+            }
+
+            private static bool IsSmtpEmailCandidate(string value)
+            {
+                return !string.IsNullOrWhiteSpace(value)
+                       && value.IndexOf("@", StringComparison.Ordinal) > 0;
+            }
+
             private void CapturePasswordDispatchSender()
             {
                 if (_passwordDispatchQueue.Count == 0)
