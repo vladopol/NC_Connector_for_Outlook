@@ -32,141 +32,6 @@ namespace NcTalkOutlookAddIn
             }
         }
 
-        private void EnsureApplicationHook()
-        {            if (_outlookApplication == null)
-            {
-                return;
-            }
-            try
-            {
-                EnsureExplorerInlineResponseHooks();
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to hook Explorer.InlineResponse.", ex);
-            }
-        }
-
-        private void UnhookApplication()
-        {
-            UnhookExplorerInlineResponseHooks();
-        }
-
-        private void EnsureExplorerInlineResponseHooks()
-        {
-            if (_outlookApplication == null)
-            {
-                return;
-            }
-            try
-            {
-                if (_explorers == null)
-                {
-                    _explorers = _outlookApplication.Explorers;
-                    _explorersEvents = _explorers as Outlook.ExplorersEvents_Event;
-                    if (_explorersEvents != null)
-                    {
-                        _explorersEvents.NewExplorer += OnNewExplorer;
-                    }
-
-                    int count = _explorers != null ? _explorers.Count : 0;
-                    for (int i = 1; i <= count; i++)
-                    {
-                        Outlook.Explorer explorer = null;
-                        try
-                        {
-                            explorer = _explorers[i];
-                            HookInlineResponseExplorer(explorer);
-                        }
-                        catch (Exception ex)
-                        {
-                            DiagnosticsLogger.LogException(LogCategories.Core, "Failed to hook existing Explorer.InlineResponse.", ex);
-                            ComInteropScope.TryRelease(explorer, LogCategories.Core, "Failed to release Explorer after hook failure.");
-                        }
-                    }
-                }
-
-                Outlook.Explorer activeExplorer = null;
-                try
-                {
-                    activeExplorer = _outlookApplication.ActiveExplorer();
-                    HookInlineResponseExplorer(activeExplorer);
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to hook active Explorer.InlineResponse.", ex);
-                    ComInteropScope.TryRelease(activeExplorer, LogCategories.Core, "Failed to release ActiveExplorer after hook failure.");
-                }
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to ensure Explorer.InlineResponse hooks.", ex);
-            }
-        }
-
-        private bool HookInlineResponseExplorer(Outlook.Explorer explorer)
-        {
-            if (explorer == null)
-            {
-                return false;
-            }
-            string explorerKey = ComInteropScope.ResolveIdentityKey(explorer, LogCategories.Core, "Explorer");
-            if (string.IsNullOrWhiteSpace(explorerKey) || _inlineResponseExplorerEvents.ContainsKey(explorerKey))
-            {
-                return false;
-            }
-
-            var explorerEvents = explorer as Outlook.ExplorerEvents_10_Event;
-            if (explorerEvents == null)
-            {
-                return false;
-            }
-
-            explorerEvents.InlineResponse += OnExplorerInlineResponse;
-            _inlineResponseExplorerEvents[explorerKey] = explorerEvents;
-            _inlineResponseExplorers[explorerKey] = explorer;
-            LogCore("Explorer.InlineResponse hooked (explorerKey=" + explorerKey + ").");
-            return true;
-        }
-
-        private void UnhookExplorerInlineResponseHooks()
-        {
-            foreach (var pair in _inlineResponseExplorerEvents)
-            {
-                try
-                {
-                    pair.Value.InlineResponse -= OnExplorerInlineResponse;
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to unhook Explorer.InlineResponse.", ex);
-                }
-            }
-            _inlineResponseExplorerEvents.Clear();
-
-            foreach (var pair in _inlineResponseExplorers)
-            {
-                ComInteropScope.TryRelease(pair.Value, LogCategories.Core, "Failed to release tracked Explorer COM object.");
-            }
-            _inlineResponseExplorers.Clear();
-
-            if (_explorersEvents != null)
-            {
-                try
-                {
-                    _explorersEvents.NewExplorer -= OnNewExplorer;
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to unhook Explorers.NewExplorer.", ex);
-                }
-                _explorersEvents = null;
-            }
-
-            ComInteropScope.TryFinalRelease(_explorers, LogCategories.Core, "Failed to release Explorers COM object.");
-            _explorers = null;
-        }
-
         private void UnhookInspector()
         {            if (_inspectors == null)
             {
@@ -198,9 +63,6 @@ namespace NcTalkOutlookAddIn
                 {
                     EnsureSubscriptionForAppointment(appointment);
                 }
-                // BISECTION BUILD: NewInspector's mail-compose branch restored (popped-out compose
-                // windows only — Explorer.InlineResponse stays disabled below). 3.1.0.6 confirmed the
-                // ribbon XML is not the cause; this isolates NewInspector vs. Explorer.InlineResponse.
                 var mail = inspector.CurrentItem as Outlook.MailItem;                if (mail != null && IsMailComposeCandidate(mail, "new_inspector"))
                 {
                     string inspectorIdentityKey = ComInteropScope.ResolveIdentityKey(inspector, LogCategories.FileLink, "Inspector");
@@ -213,32 +75,9 @@ namespace NcTalkOutlookAddIn
             }
         }
 
-        private void OnNewExplorer(Outlook.Explorer explorer)
-        {
-            try
-            {
-                HookInlineResponseExplorer(explorer);
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to hook new Explorer.InlineResponse.", ex);
-            }
-        }
-
-        private void OnExplorerInlineResponse(object item)
-        {
-            var mail = item as Outlook.MailItem;
-            if (mail == null || !IsMailComposeCandidate(mail, "inline_response"))
-            {
-                return;
-            }
-            DeferMailComposeSubscriptionEnsure(mail, string.Empty, true, "inline_response");
-        }
-
-        // Outlook fires InlineResponse/NewInspector while it is still constructing the inline-compose
-        // command bar. Doing COM work synchronously inside that window is a known source of ribbon
-        // rendering glitches (missing Send/Discard/PopOut), even without exceptions or delays. Defer the
-        // subscription setup to the next message-loop iteration via the captured UI SynchronizationContext.
+        // Deferring this off NewInspector's own callback isn't required for correctness (the ribbon bug
+        // traced back to Explorer.InlineResponse, not NewInspector — see NextcloudTalkAddIn.Lifecycle.cs),
+        // but it's kept as a defensive pattern matching QueueDeferredAppointmentSubscriptionEnsure.
         private void DeferMailComposeSubscriptionEnsure(Outlook.MailItem mail, string inspectorIdentityKey, bool isInlineResponse, string reason)
         {
             SynchronizationContext context = _uiSynchronizationContext;
