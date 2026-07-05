@@ -4,6 +4,21 @@ All notable changes to **NC Connector for Outlook** will be documented in this f
 
 This project follows the principles of **Keep a Changelog** and **Semantic Versioning**.
 
+## [3.1.0.3] - 2026-07-05
+
+Fork patch on upstream 3.1.0.
+
+---
+
+### Fix attempt: Reading Pane inline-reply still losing Send/Discard/PopOut after 3.1.0.2
+
+The threading fix in 3.1.0.2 made no observable difference — a debug log captured during a live repro showed no exceptions, no delays, and normal compose-subscription lifecycle timing (all under ~200ms), ruling out the addin's own runtime code as the cause. The only remaining untested part of the original hypothesis is the ribbon XML: `GetCustomUI("Microsoft.Outlook.Explorer")` added a custom group to the **native `TabMessage` tab under the `TabComposeTools` contextual tab set** — exactly the tab Outlook shows for Reading Pane inline replies. Removed this customization; the FileLink button remains available via the popped-out compose ribbon and the automatic attachment-triggered share flow. This is a targeted test, not a confirmed fix.
+
+### Installer fixes
+
+- **Publisher corrected** — `Manufacturer` in the WiX package was still "Bastian Kleinschmidt" (upstream author, uninvolved in this fork's builds). Changed to "Vladimir Poluliashenko".
+- **Fork patch not visible in Add/Remove Programs** — MSI `ProductVersion` only supports 3 numeric fields, so every fork patch collapsed to the same 3-part version (e.g. both 3.1.0.1 and 3.1.0.2 showed as "3.1.0"). The CI workflow now folds the fork-patch digit into the build field (`upstream_patch * 100 + fork_patch`), so each release is distinguishable and correctly ordered in Windows Installer's version comparisons. Not a regression from this fork's recent changes — it affected every previous release too.
+
 ## [3.1.0.2] - 2026-07-05
 
 Fork patch on upstream 3.1.0.

@@ -128,6 +128,11 @@ namespace NcTalkOutlookAddIn
             }
             if (string.Equals(ribbonID, "Microsoft.Outlook.Explorer", StringComparison.OrdinalIgnoreCase))
             {
+                // No <contextualTabs> customization of the native TabMessage/TabComposeTools tab here.
+                // That tab is what Outlook shows for Reading Pane inline replies; customizing it was the
+                // suspected cause of inline replies losing their Send/Discard/PopOut command bar on some
+                // Outlook builds. The FileLink button remains available via the popped-out compose ribbon
+                // and via the automatic attachment-triggered share flow.
                 return string.Format(
                     CultureInfo.InvariantCulture,
                     @"<customUI xmlns='http://schemas.microsoft.com/office/2009/07/customui' onLoad='OnRibbonLoad'>
@@ -145,31 +150,13 @@ namespace NcTalkOutlookAddIn
         </group>
       </tab>
     </tabs>
-    <contextualTabs>
-      <tabSet idMso='TabComposeTools'>
-        <tab idMso='TabMessage'>
-          <group id='NcTalkInlineMailGroup' label='{1}'>
-            <button id='NcTalkInlineFileLinkButton'
-                    label='{5}'
-                    size='large'
-                    getImage='OnGetButtonImage'
-                    onAction='OnFileLinkButtonPressed'
-                    screentip='{6}'
-                    supertip='{7}' />
-          </group>
-        </tab>
-      </tabSet>
-    </contextualTabs>
   </ribbon>
 </customUI>",
                     EscapeXml(Strings.RibbonExplorerTabLabel),
                     EscapeXml(Strings.RibbonExplorerGroupLabel),
                     EscapeXml(Strings.RibbonSettingsButtonLabel),
                     EscapeXml(Strings.RibbonSettingsScreenTip),
-                    EscapeXml(Strings.RibbonSettingsSuperTip),
-                    EscapeXml(Strings.RibbonFileLinkButtonLabel),
-                    EscapeXml(Strings.RibbonFileLinkButtonScreenTip),
-                    EscapeXml(Strings.RibbonFileLinkButtonSuperTip));
+                    EscapeXml(Strings.RibbonSettingsSuperTip));
             }
             if (string.Equals(ribbonID, "Microsoft.Outlook.Mail.Compose", StringComparison.OrdinalIgnoreCase))
             {
