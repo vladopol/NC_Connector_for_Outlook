@@ -4,6 +4,18 @@ All notable changes to **NC Connector for Outlook** will be documented in this f
 
 This project follows the principles of **Keep a Changelog** and **Semantic Versioning**.
 
+## [3.1.0.4] - 2026-07-05
+
+Fork patch on upstream 3.1.0.
+
+---
+
+### Fix attempt: Reading Pane inline-reply still losing Send/Discard/PopOut after 3.1.0.3
+
+Confirmed via Programs & Features (version/publisher now correctly shown) that 3.1.0.3 was the build actually tested, and the bug still reproduced with the `TabMessage` ribbon customization removed — ruling that out too.
+
+New hypothesis: `Explorer.InlineResponse` and `Inspectors.NewInspector` fire *while Outlook is still constructing* the embedded inline-compose command bar. Both handlers did synchronous COM work (`EnsureMailComposeSubscription`, resolving identity keys, subscribing to `ItemEvents_10`) directly inside the event callback. Re-entrant COM calls into the object model during that specific construction window are a known class of Outlook ribbon-rendering glitch, independent of exceptions or delays — consistent with the clean debug logs from the last two attempts. Deferred this work to the next message-loop iteration via the already-established `_uiSynchronizationContext.Post` pattern (used elsewhere for `QueueDeferredAppointmentSubscriptionEnsure`), so Outlook finishes building the inline-compose UI before the addin touches the mail item's COM interface. Another targeted test, not a confirmed fix.
+
 ## [3.1.0.3] - 2026-07-05
 
 Fork patch on upstream 3.1.0.
