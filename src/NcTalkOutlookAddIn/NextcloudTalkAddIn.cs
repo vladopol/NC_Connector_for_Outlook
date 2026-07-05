@@ -127,12 +127,63 @@ namespace NcTalkOutlookAddIn
                     EscapeXml(Strings.RibbonTalkButtonScreenTip),
                     EscapeXml(Strings.RibbonTalkButtonSuperTip));
             }
-            // DIAGNOSTIC BUILD: Microsoft.Outlook.Explorer and Microsoft.Outlook.Mail.Compose ribbon
-            // customizations (Settings button, FileLink button, and the already-removed TabMessage
-            // group) are intentionally disabled here to isolate whether ANY ribbon customization touching
-            // mail/Explorer contexts is involved in the Reading Pane inline-reply Send/Discard/PopOut bug.
-            // Microsoft.Outlook.Appointment (Talk button) is left untouched since it's a separate,
-            // unrelated ribbon context. Revert this once the diagnostic result is in.
+            // BISECTION BUILD: ribbon customizations restored (Settings + FileLink buttons, still without
+            // the TabComposeTools/TabMessage contextualTabs group). Explorer.InlineResponse / NewInspector
+            // event hooks remain fully disabled (see Lifecycle.cs / Hooks.cs). 3.1.0.5 removed both ribbon
+            // AND event hooks simultaneously and fixed the bug — this build isolates which one mattered.
+            if (string.Equals(ribbonID, "Microsoft.Outlook.Explorer", StringComparison.OrdinalIgnoreCase))
+            {
+                return string.Format(
+                    CultureInfo.InvariantCulture,
+                    @"<customUI xmlns='http://schemas.microsoft.com/office/2009/07/customui' onLoad='OnRibbonLoad'>
+  <ribbon>
+    <tabs>
+      <tab id='NcTalkExplorerTab' label='{0}' insertAfterMso='TabMail'>
+        <group id='NcTalkExplorerGroup' label='{1}'>
+          <button id='NcTalkSettingsExplorerButton'
+                  label='{2}'
+                  size='large'
+                  getImage='OnGetButtonImage'
+                  onAction='OnSettingsButtonPressed'
+                  screentip='{3}'
+                  supertip='{4}' />
+        </group>
+      </tab>
+    </tabs>
+  </ribbon>
+</customUI>",
+                    EscapeXml(Strings.RibbonExplorerTabLabel),
+                    EscapeXml(Strings.RibbonExplorerGroupLabel),
+                    EscapeXml(Strings.RibbonSettingsButtonLabel),
+                    EscapeXml(Strings.RibbonSettingsScreenTip),
+                    EscapeXml(Strings.RibbonSettingsSuperTip));
+            }
+            if (string.Equals(ribbonID, "Microsoft.Outlook.Mail.Compose", StringComparison.OrdinalIgnoreCase))
+            {
+                return string.Format(
+                    CultureInfo.InvariantCulture,
+                    @"<customUI xmlns='http://schemas.microsoft.com/office/2009/07/customui' onLoad='OnRibbonLoad'>
+  <ribbon>
+    <tabs>
+      <tab idMso='TabNewMailMessage'>
+        <group id='NcTalkMailGroup' label='{0}'>
+          <button id='NcTalkFileLinkButton'
+                  label='{1}'
+                  size='large'
+                  getImage='OnGetButtonImage'
+                  onAction='OnFileLinkButtonPressed'
+                  screentip='{2}'
+                  supertip='{3}' />
+        </group>
+      </tab>
+    </tabs>
+  </ribbon>
+</customUI>",
+                    EscapeXml(Strings.RibbonMailGroupLabel),
+                    EscapeXml(Strings.RibbonFileLinkButtonLabel),
+                    EscapeXml(Strings.RibbonFileLinkButtonScreenTip),
+                    EscapeXml(Strings.RibbonFileLinkButtonSuperTip));
+            }
             return null;
         }
 
