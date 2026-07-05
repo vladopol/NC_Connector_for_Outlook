@@ -52,7 +52,7 @@ namespace NcTalkOutlookAddIn
                 LogSettings("Settings loaded (AuthMode=" + _currentSettings.AuthMode + ", Debug=" + _currentSettings.DebugLoggingEnabled + ", LogAnonymize=" + _currentSettings.LogAnonymizationEnabled + ").");
             }
 
-            _freeBusyManager = new FreeBusyManager(_settingsStorage.DataDirectory);
+            _freeBusyManager = new FreeBusyManager();
             _freeBusyManager.Initialize(_outlookApplication);
             EnsureApplicationHook();
             EnsureInspectorHook();
