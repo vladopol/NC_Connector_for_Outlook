@@ -62,6 +62,15 @@ namespace NcTalkOutlookAddIn.Utilities
             return GenerateWithServerPolicyFallback(configuration, passwordPolicy, minLength, logCategory);
         }
 
+        // Simple digits-only PIN generated locally, without calling Nextcloud's server-side
+        // password generator (which can return long strings with special characters). Still
+        // respects the server's minimum-length policy, if any.
+        internal static string GenerateSimpleNumeric(PasswordPolicyInfo passwordPolicy, int defaultMinLength)
+        {
+            int minLength = ResolveMinLength(passwordPolicy, defaultMinLength);
+            return PasswordGenerator.GenerateNumericLocalPassword(minLength);
+        }
+
         internal static bool MeetsMinimumLength(
             string password,
             PasswordPolicyInfo passwordPolicy,

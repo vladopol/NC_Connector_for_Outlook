@@ -656,11 +656,7 @@ namespace NcTalkOutlookAddIn.UI
             _passwordTextBox.Text = string.Empty;
             if (_passwordToggleCheckBox.Checked)
             {
-                TalkPassword = PasswordGenerationHelper.GenerateWithPolicyDefaults(
-                    _configuration,
-                    _passwordPolicy,
-                    DefaultMinPasswordLength,
-                    LogCategories.Talk);
+                TalkPassword = PasswordGenerationHelper.GenerateSimpleNumeric(_passwordPolicy, DefaultMinPasswordLength);
                 _passwordTextBox.Text = TalkPassword;
             }
 
@@ -894,11 +890,7 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-            _passwordTextBox.Text = PasswordGenerationHelper.GenerateWithPolicyDefaults(
-                _configuration,
-                _passwordPolicy,
-                DefaultMinPasswordLength,
-                LogCategories.Talk);
+            _passwordTextBox.Text = PasswordGenerationHelper.GenerateSimpleNumeric(_passwordPolicy, DefaultMinPasswordLength);
         }
 
         private void SelectRoomType(TalkRoomType type)
