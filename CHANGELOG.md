@@ -4,6 +4,26 @@ All notable changes to **NC Connector for Outlook** will be documented in this f
 
 This project follows the principles of **Keep a Changelog** and **Semantic Versioning**.
 
+## [3.1.0.5] - 2026-07-05 — DIAGNOSTIC BUILD, not for general deployment
+
+Fork patch on upstream 3.1.0.
+
+---
+
+### Diagnostic isolation test: Reading Pane inline-reply Send/Discard/PopOut bug
+
+Three targeted fixes (3.1.0.2 threading, 3.1.0.3 ribbon TabMessage removal, 3.1.0.4 deferred event handling) made zero observable difference, confirmed via clean debug logs and Programs & Features version checks each time. This build performs the most aggressive isolation possible short of uninstalling the add-in:
+
+- `GetCustomUI` returns `null` for `Microsoft.Outlook.Explorer` and `Microsoft.Outlook.Mail.Compose` (no Settings/FileLink ribbon buttons anywhere for mail). `Microsoft.Outlook.Appointment` (Talk button) is untouched — different, unrelated ribbon context.
+- `EnsureApplicationHook` (which wires `Explorer.InlineResponse` / `Explorers.NewExplorer`) is not called at all.
+- `Inspectors.NewInspector`'s mail-compose branch is skipped entirely, including the `mail.Sent` COM property read that previously happened synchronously inside the event handler even after the 3.1.0.4 deferral fix.
+- Talk (appointment subscriptions, room creation) and CalDAV sync are untouched.
+- Added diagnostics: every `GetCustomUI` call now logs the requested `ribbonID`; `OnRibbonLoad` now logs each firing. This will reveal whether Outlook queries a ribbon context we don't even handle, and how ribbon-load timing correlates with `InlineResponse`/`NewInspector` events.
+
+If the bug still reproduces with mail items receiving **zero** addin COM interaction and **zero** mail-related ribbon customization, the cause is not in this add-in's mail-compose/ribbon subsystem at all — likely the mere presence of an `IRibbonExtensibility`-implementing COM add-in interacting with this specific Outlook build (16.0.0.14334 / 17932.20842), which would need a different remediation strategy entirely.
+
+**This build sacrifices FileLink automation and the Settings/FileLink ribbon buttons for mail — diagnostic only, not for general rollout.**
+
 ## [3.1.0.4] - 2026-07-05
 
 Fork patch on upstream 3.1.0.

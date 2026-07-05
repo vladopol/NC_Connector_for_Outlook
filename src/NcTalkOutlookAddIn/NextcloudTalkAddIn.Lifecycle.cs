@@ -54,7 +54,12 @@ namespace NcTalkOutlookAddIn
 
             _freeBusyManager = new FreeBusyManager();
             _freeBusyManager.Initialize(_outlookApplication);
-            EnsureApplicationHook();
+            // DIAGNOSTIC BUILD: EnsureApplicationHook (Explorer.InlineResponse / Explorers.NewExplorer)
+            // is intentionally not called, to isolate whether these event hooks are involved in the
+            // Reading Pane inline-reply Send/Discard/PopOut bug. EnsureInspectorHook stays enabled
+            // (needed for Talk's appointment subscription tracking); its mail-compose branch is
+            // separately disabled in Hooks.cs. Revert once the diagnostic result is in.
+            LogCore("DIAGNOSTIC: EnsureApplicationHook skipped (Explorer.InlineResponse hook disabled).");
             EnsureInspectorHook();
             ApplyIfbSettings();
             ApplyCalDavSyncSettings();

@@ -198,10 +198,13 @@ namespace NcTalkOutlookAddIn
                 {
                     EnsureSubscriptionForAppointment(appointment);
                 }
-                var mail = inspector.CurrentItem as Outlook.MailItem;                if (mail != null && IsMailComposeCandidate(mail, "new_inspector"))
+                // DIAGNOSTIC BUILD: mail-compose subscription setup (including the IsMailComposeCandidate
+                // mail.Sent COM read) is intentionally skipped here to isolate whether any addin COM
+                // interaction with the mail item during Inspector creation affects inline-reply rendering.
+                // Revert once the diagnostic result is in.
+                var mail = inspector.CurrentItem as Outlook.MailItem;                if (mail != null)
                 {
-                    string inspectorIdentityKey = ComInteropScope.ResolveIdentityKey(inspector, LogCategories.FileLink, "Inspector");
-                    DeferMailComposeSubscriptionEnsure(mail, inspectorIdentityKey, false, "new_inspector");
+                    LogCore("DIAGNOSTIC: NewInspector fired for a mail item; compose subscription skipped.");
                 }
             }
             catch (Exception ex)
