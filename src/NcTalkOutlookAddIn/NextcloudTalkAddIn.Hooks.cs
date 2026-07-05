@@ -3,6 +3,7 @@
 // See LICENSE.txt for details.
 
 using System;
+using System.Threading;
 using NcTalkOutlookAddIn.Controllers;
 using NcTalkOutlookAddIn.Utilities;
 using Outlook = Microsoft.Office.Interop.Outlook;
@@ -200,7 +201,7 @@ namespace NcTalkOutlookAddIn
                 var mail = inspector.CurrentItem as Outlook.MailItem;                if (mail != null && IsMailComposeCandidate(mail, "new_inspector"))
                 {
                     string inspectorIdentityKey = ComInteropScope.ResolveIdentityKey(inspector, LogCategories.FileLink, "Inspector");
-                    EnsureMailComposeSubscription(mail, inspectorIdentityKey);
+                    DeferMailComposeSubscriptionEnsure(mail, inspectorIdentityKey, false, "new_inspector");
                 }
             }
             catch (Exception ex)
@@ -228,17 +229,37 @@ namespace NcTalkOutlookAddIn
             {
                 return;
             }
+            DeferMailComposeSubscriptionEnsure(mail, string.Empty, true, "inline_response");
+        }
+
+        // Outlook fires InlineResponse/NewInspector while it is still constructing the inline-compose
+        // command bar. Doing COM work synchronously inside that window is a known source of ribbon
+        // rendering glitches (missing Send/Discard/PopOut), even without exceptions or delays. Defer the
+        // subscription setup to the next message-loop iteration via the captured UI SynchronizationContext.
+        private void DeferMailComposeSubscriptionEnsure(Outlook.MailItem mail, string inspectorIdentityKey, bool isInlineResponse, string reason)
+        {
+            SynchronizationContext context = _uiSynchronizationContext;
+            if (context == null)
+            {
+                RunDeferredMailComposeSubscriptionEnsure(mail, inspectorIdentityKey, isInlineResponse, reason);
+                return;
+            }
+            context.Post(_ => RunDeferredMailComposeSubscriptionEnsure(mail, inspectorIdentityKey, isInlineResponse, reason), null);
+        }
+
+        private void RunDeferredMailComposeSubscriptionEnsure(Outlook.MailItem mail, string inspectorIdentityKey, bool isInlineResponse, string reason)
+        {
             try
             {
-                EnsureMailComposeSubscription(mail, string.Empty, true);
+                EnsureMailComposeSubscription(mail, inspectorIdentityKey, isInlineResponse);
                 if (DiagnosticsLogger.IsEnabled)
                 {
-                    LogFileLink("Compose subscription ensured via Explorer.InlineResponse.");
+                    LogFileLink("Compose subscription ensured (reason=" + (reason ?? "n/a") + ", deferred=True).");
                 }
             }
             catch (Exception ex)
             {
-                DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to ensure compose subscription on Explorer.InlineResponse.", ex);
+                DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to ensure deferred compose subscription (reason=" + (reason ?? "n/a") + ").", ex);
             }
         }
 
