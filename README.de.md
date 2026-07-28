@@ -5,6 +5,10 @@
 
 # NC Connector for Outlook
 
+> **Dieses Repository ist ein Fork** für eine Infosuite-Installation (Exchange + Nextcloud).
+> Diese deutsche Fassung wird im Fork **nicht gepflegt** und beschreibt weiterhin das
+> Upstream-Verhalten. Maßgeblich für diesen Build ist [`docs/FORK.md`](docs/FORK.md) (englisch).
+
 NC Connector for Outlook verbindet Outlook nahtlos mit Ihrer Nextcloud. Das Add-in automatisiert Talk-Raeume fuer Termine, stellt einen lokalen Free/Busy-Proxy bereit und liefert einen leistungsfaehigen Filelink-Assistenten fuer E-Mails. Ziel ist ein professioneller Workflow vom Kalender bis zur Dateiablage -- ohne Medienbruch und mit klarer Administrierbarkeit.
 
 Dies ist ein Community-Projekt und kein offizielles Produkt der Nextcloud GmbH.

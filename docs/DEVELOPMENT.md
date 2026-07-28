@@ -2,6 +2,11 @@
 
 This document is a newcomer-friendly guide for building, debugging, and extending **NC Connector for Outlook** (Outlook classic COM add-in).
 
+> **Fork note:** this guide describes the upstream architecture. This repository is a fork with
+> removed features, additional synchronization, and a set of hard invariants around Outlook's UI
+> thread. Read [`FORK.md`](FORK.md) alongside it — where the two disagree, `FORK.md` is correct for
+> this build.
+
 ## Contents
 
 - [Project purpose](#project-purpose)

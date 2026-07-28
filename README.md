@@ -9,18 +9,23 @@ NC Connector for Outlook connects Outlook seamlessly with your Nextcloud. The ad
 
 This is a community project and is not an official Nextcloud GmbH product.
 
+> **This repository is a fork**, maintained for an Infosuite deployment (Exchange + Nextcloud).
+> Several upstream features are removed or fixed here, and some behaviour described below differs.
+> **See [`docs/FORK.md`](docs/FORK.md) for the authoritative description of this build** — feature
+> differences, architecture of the fork-specific synchronization, and the invariants that must not
+> be broken. Where this README and `docs/FORK.md` disagree, `docs/FORK.md` is correct.
+
 ## Highlights
 
 - **One-click Nextcloud Talk**
-Open an appointment, choose Nextcloud Talk, configure the room, and select a moderator. Optionally, invited attendees can be added to the room automatically (separately for internal Nextcloud users and external email guests). The wizard writes title, location, and a description block (including help link) into the appointment.
+Open an appointment, choose Nextcloud Talk, configure the room, and optionally tick additional moderators from the meeting's attendees. Invited attendees can be added to the room automatically. The wizard writes location and a description block (including help link) into the appointment. *(Fork: the room name follows the meeting subject and is never written back over it; moderators are additions, not a handover. See [`docs/FORK.md`](docs/FORK.md).)*
 - **Sharing deluxe**
 The “Insert Nextcloud share” button starts the sharing wizard with upload queue, password generator, expiration date, note field, attachment automation, and optional separate password follow-up mail. It is available in compose windows and inline replies/forwards. The finished share is inserted into the current editor as formatted HTML/RTF or, for plain-text mail, as a framed text block.
 - **Enterprise-grade security**
-Lobby until start time, moderator delegation, automatic cleanup of discarded appointments, mandatory passwords, and expiration policies help protect sensitive meetings and files.
+Lobby until start time, automatic cleanup of discarded appointments, room passwords, and expiration policies help protect sensitive meetings and files. *(Fork: moderator delegation is replaced by additional moderators; the room password is a policy-aware PIN offered per room.)*
 - **Central backend policies (optional)**
 If the optional NC Connector backend is installed, Talk, Sharing, and central email-signature defaults can be controlled centrally. On wizard open and in Settings, the add-in checks the backend status, applies valid seat policies, and locks admin-controlled options while still showing their effective values.
-- **Internet Free/Busy Gateway (IFB)**
-A local HTTP listener answers Outlook free/busy requests directly from Nextcloud. The installer configures registry values for search path and read URL. If the direct fetch returns HTTP 404, the add-in falls back to a scheduling POST so availability data is still provided.
+- **Internet Free/Busy Gateway (IFB)** — *removed in this fork.* Exchange serves free/busy natively here, so the local listener and its settings are gone. See [`docs/FORK.md`](docs/FORK.md).
 - **Debug logging at the press of a button**
 Enable it in the Debug tab. Writes structured logs (authentication, appointment and filelink flows, IFB) to `%LOCALAPPDATA%\NC4OL\addin-runtime.log_YYYYMMDD`. Runtime exceptions are still written there even when the debug switch is off. The path is displayed in the UI. A new `Anonymize logs` option (default: enabled) masks NC URL, tokens/secrets, emails, and local user path fragments.
 
@@ -35,15 +40,14 @@ Bundled third-party sanitizer/runtime dependencies and their licenses are docume
 ## Feature overview
 
 ### Nextcloud Talk directly from the appointment
-- Talk dialog with lobby, password, listable scope, room type, and moderator search.
-- Automatically writes title, location and a description block (incl. help link and password) into the appointment.
-- Room tracking, lobby updates, delegation workflow, and cleanup when an appointment is discarded or moved.
+- Talk dialog with lobby, password, listable scope, and additional moderators. *(Fork: the room type selector is hidden — Event Conversation is always used — and the title field is removed.)*
+- Automatically writes location and a description block (incl. help link and password) into the appointment. *(Fork: the meeting subject is **not** overwritten; it is the source of the room name.)*
+- Room tracking, lobby updates, and cleanup when an appointment is discarded or moved.
 - Deleting saved appointments only removes the remote Talk room after explicit opt-in and NC Connector metadata verification.
-- Calendar changes (drag & drop or dialog edits) keep the Talk room lobby/start time in sync.
+- Calendar changes keep the Talk room in sync. *(Fork: subject, agenda, start **and** end time, and attendee additions and removals all propagate — from the meeting window and from the calendar grid alike. See [`docs/FORK.md`](docs/FORK.md).)*
 - Talk metadata is persisted locally in Outlook using explicit `X-NCTALK-*` MAPI/UserProperties so restart/edit/delete flows remain stable inside Outlook.
-- If moderator delegation is enabled, NC Connector first updates room name, lobby time, description, and participants when you save the appointment, then hands moderation over.
 - Live system-addressbook availability checks (on Talk click, settings open/save, wizard open) with deterministic lock behavior:
-  - `Add users`, `Add guests`, and moderator controls are disabled when unavailable.
+  - `Add users` and moderator controls are disabled when unavailable. *(Fork: `Add guests` is hidden.)*
   - Settings show a red warning block with setup guide link.
   - Talk wizard shows an inline red warning block in the moderator section.
 - Optional participant sync after saving the appointment:
@@ -64,7 +68,7 @@ Bundled third-party sanitizer/runtime dependencies and their licenses are docume
   - `Share with NC Connector`
   - `Remove last selected attachments` (batch-aware, not single-file only).
 - Attachment-mode specifics:
-  - fixed share base name `email_attachment` with deterministic suffixes (`_1`, `_2`, ...)
+  - share base name with deterministic suffixes (`_1`, `_2`, ...) *(Fork: derived from the mail subject, falling back to `email_attachment`.)*
   - recipient permission is always read-only
   - HTML output uses ZIP download URL `/s/<token>/download` and hides the permissions row.
 - File queue input now accepts Explorer drag & drop for files and folders across the full file step (queue and action area), not only through the add buttons.
