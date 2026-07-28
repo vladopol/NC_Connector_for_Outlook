@@ -139,7 +139,7 @@ namespace NcTalkOutlookAddIn.Services
             {
                 Method = "DELETE",
                 Url = url,
-                TimeoutMs = 90000,
+                TimeoutMs = NcTimeouts.BackgroundMs,
                 IncludeAuthHeader = true,
                 IncludeOcsApiHeader = false,
                 ParseJson = false
@@ -257,7 +257,7 @@ namespace NcTalkOutlookAddIn.Services
                 Method = "PROPFIND",
                 Url = url,
                 ContentType = "application/xml; charset=utf-8",
-                TimeoutMs = 60000,
+                TimeoutMs = NcTimeouts.InteractiveMs,
                 IncludeAuthHeader = true,
                 IncludeOcsApiHeader = false,
                 ParseJson = false,
@@ -447,7 +447,7 @@ namespace NcTalkOutlookAddIn.Services
             {
                 Method = "PUT",
                 Url = targetUrl,
-                TimeoutMs = 120000,
+                TimeoutMs = NcTimeouts.BulkTransferMs,
                 IncludeAuthHeader = true,
                 IncludeOcsApiHeader = false,
                 ParseJson = false,
@@ -553,7 +553,7 @@ namespace NcTalkOutlookAddIn.Services
             {
                 Method = "MKCOL",
                 Url = uploadFolderUrl,
-                TimeoutMs = 60000,
+                TimeoutMs = NcTimeouts.BackgroundMs,
                 IncludeAuthHeader = true,
                 IncludeOcsApiHeader = false,
                 ParseJson = false,
@@ -591,7 +591,7 @@ namespace NcTalkOutlookAddIn.Services
             {
                 Method = "PUT",
                 Url = chunkUrl,
-                TimeoutMs = 120000,
+                TimeoutMs = NcTimeouts.BulkTransferMs,
                 IncludeAuthHeader = true,
                 IncludeOcsApiHeader = false,
                 ParseJson = false,
@@ -644,7 +644,7 @@ namespace NcTalkOutlookAddIn.Services
             {
                 Method = "MOVE",
                 Url = sourceUrl,
-                TimeoutMs = 120000,
+                TimeoutMs = NcTimeouts.BulkTransferMs,
                 IncludeAuthHeader = true,
                 IncludeOcsApiHeader = false,
                 ParseJson = false,
@@ -676,7 +676,7 @@ namespace NcTalkOutlookAddIn.Services
                 {
                     Method = "DELETE",
                     Url = uploadFolderUrl,
-                    TimeoutMs = 60000,
+                    TimeoutMs = NcTimeouts.BackgroundMs,
                     IncludeAuthHeader = true,
                     IncludeOcsApiHeader = false,
                     ParseJson = false
@@ -782,7 +782,7 @@ namespace NcTalkOutlookAddIn.Services
                 {
                     Method = "MKCOL",
                     Url = url,
-                    TimeoutMs = 60000,
+                    TimeoutMs = NcTimeouts.InteractiveMs,
                     IncludeAuthHeader = true,
                     IncludeOcsApiHeader = false,
                     ParseJson = false
@@ -882,7 +882,7 @@ namespace NcTalkOutlookAddIn.Services
                 Payload = formPayload ?? string.Empty,
                 Accept = "application/json",
                 ContentType = "application/x-www-form-urlencoded",
-                TimeoutMs = 90000,
+                TimeoutMs = NcTimeouts.BackgroundMs,
                 IncludeAuthHeader = true,
                 IncludeOcsApiHeader = true,
                 ParseJson = true
@@ -922,7 +922,7 @@ namespace NcTalkOutlookAddIn.Services
                 Payload = formPayload ?? string.Empty,
                 Accept = "application/json",
                 ContentType = "application/x-www-form-urlencoded",
-                TimeoutMs = 90000,
+                TimeoutMs = NcTimeouts.BackgroundMs,
                 IncludeAuthHeader = true,
                 IncludeOcsApiHeader = true,
                 ParseJson = true

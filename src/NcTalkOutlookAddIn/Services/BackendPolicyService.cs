@@ -139,7 +139,7 @@ namespace NcTalkOutlookAddIn.Services
             {
                 Method = "GET",
                 Url = url,
-                TimeoutMs = 45000,
+                TimeoutMs = NcTimeouts.PolicyMs,
                 IncludeAuthHeader = true,
                 IncludeOcsApiHeader = true,
                 ParseJson = true

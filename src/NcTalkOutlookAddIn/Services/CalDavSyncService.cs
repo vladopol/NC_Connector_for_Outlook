@@ -26,7 +26,7 @@ namespace NcTalkOutlookAddIn.Services
                 IncludeAuthHeader = true,
                 IncludeOcsApiHeader = false,
                 ParseJson = false,
-                TimeoutMs = 30000
+                TimeoutMs = NcTimeouts.BackgroundMs
             });
             if (!response.HasHttpResponse)
             {
@@ -54,7 +54,7 @@ namespace NcTalkOutlookAddIn.Services
                 IncludeAuthHeader = true,
                 IncludeOcsApiHeader = false,
                 ParseJson = false,
-                TimeoutMs = 30000
+                TimeoutMs = NcTimeouts.BackgroundMs
             });
             if (!response.HasHttpResponse)
             {

@@ -4,6 +4,41 @@ All notable changes to **NC Connector for Outlook** will be documented in this f
 
 This project follows the principles of **Keep a Changelog** and **Semantic Versioning**.
 
+## [3.1.0.12] - 2026-07-28
+
+Fork patch on upstream 3.1.0.
+
+---
+
+### HTTP timeouts sized to what the caller is waiting for
+
+The Talk wizard and the FileLink wizard still issue some requests synchronously on Outlook's UI
+thread, and those requests carried 45-120 s ceilings inherited from upstream. Because the calls run
+in sequence, the ceilings add up per user action: a Talk button click against a server that accepts
+the connection and then goes quiet could freeze Outlook for roughly 3 minutes, or 6 with an existing
+room being replaced (verify 60 s + delete chain 180 s + create chain 120 s).
+
+Timeouts are now named by purpose in `NcTimeouts` and applied accordingly:
+
+- **Connectivity probe** (`VerifyConnection`, runs on the UI thread on every Talk click and forces a
+  fresh TLS handshake): 60 s → **10 s**. Its entire job is to answer "is the server reachable?".
+- **Policy fetches** that gate a dialog opening and fall back to local defaults on failure: 45-60 s →
+  **10 s**.
+- **Interactive control-plane calls** — Talk room create/delete/update, WebDAV folder existence
+  checks, share folder creation: 60 s → **15 s**. These are cheap server-side; the ceiling only ever
+  applies to a stalled server.
+- **Background control-plane calls** — share creation/metadata, chunk folder setup and cleanup,
+  CalDAV sync: 45-90 s → **30 s**, so a stalled server cannot pin a thread-pool thread either.
+- **User directory download**: 60 s → **30 s** (legitimately larger than a control-plane call).
+- **Unchanged:** file uploads and the server-side assembly of a chunked upload keep their 120 s
+  ceiling — they are the only calls whose duration scales with user data. The Login Flow v2 poll
+  keeps 60 s and is annotated: that wait is the user authenticating in a browser, not a stalled
+  server.
+
+Worst-case freeze for a Talk click drops from ~3 minutes to ~40 seconds (~1.5 minutes with room
+replacement). This bounds the symptom rather than removing it — the remaining fix is to move those
+calls off the UI thread, which requires making the wizard navigation asynchronous.
+
 ## [3.1.0.11] - 2026-07-28
 
 Fork patch on upstream 3.1.0.

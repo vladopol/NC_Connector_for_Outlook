@@ -198,7 +198,7 @@ namespace NcTalkOutlookAddIn.Services
             IDictionary<string, object> data;
             // Force a fresh connection for connectivity diagnostics so TLS mode changes
             // are validated against a new handshake and not masked by pooled keep-alive sockets.
-            ExecuteJsonRequest("GET", url, (string)null, out statusCode, out data, true);
+            ExecuteJsonRequest("GET", url, (string)null, out statusCode, out data, true, NcTimeouts.ConnectivityProbeMs);
 
             if (!IsSuccessStatus(statusCode))
             {
@@ -665,6 +665,14 @@ namespace NcTalkOutlookAddIn.Services
 
         private string ExecuteJsonRequest(string method, string url, object payload, out HttpStatusCode statusCode, out IDictionary<string, object> parsedData, bool forceFreshConnection)
         {
+            // Talk's OCS calls are all cheap control-plane operations, and the room
+            // create/delete/update chains run in sequence on Outlook's UI thread — so this per-call
+            // ceiling is what bounds how long a stalled server can freeze a button click.
+            return ExecuteJsonRequest(method, url, payload, out statusCode, out parsedData, forceFreshConnection, NcTimeouts.InteractiveMs);
+        }
+
+        private string ExecuteJsonRequest(string method, string url, object payload, out HttpStatusCode statusCode, out IDictionary<string, object> parsedData, bool forceFreshConnection, int timeoutMs)
+        {
             string payloadText = null;
             if (payload is string)
             {
@@ -682,7 +690,7 @@ namespace NcTalkOutlookAddIn.Services
                 Url = url,
                 Payload = payloadText,
                 Accept = "application/json",
-                TimeoutMs = 60000,
+                TimeoutMs = timeoutMs,
                 IncludeAuthHeader = true,
                 IncludeOcsApiHeader = true,
                 ParseJson = true,
