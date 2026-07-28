@@ -524,6 +524,8 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string TalkFormTitle { get { return Get("talk_button_create_room", "Create Talk room"); } }
         internal static string TalkTitleLabel { get { return Get("ui_create_title_label", "Title"); } }
         internal static string TalkPasswordSetCheck { get { return Get("talk_password_toggle_label", "Set password"); } }
+        internal static string TalkPasswordAdd { get { return Get("talk_password_add", "Add password"); } }
+        internal static string TalkPasswordRemove { get { return Get("talk_password_remove", "Remove password"); } }
         internal static string TalkPasswordLabel { get { return Get("sharing_password_label", "Password"); } }
         internal static string TalkPasswordGenerate { get { return Get("ui_password_generate_label", "Generate"); } }
         internal static string TalkLobbyCheck { get { return Get("ui_create_lobby_label", "Lobby until start time"); } }

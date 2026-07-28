@@ -41,6 +41,12 @@
   "talk_password_policy_error": {
     "message": "Password must be at least $1 characters long."
   },
+  "talk_password_add": {
+    "message": "Add password"
+  },
+  "talk_password_remove": {
+    "message": "Remove password"
+  },
   "talk_password_needs_upper_lower": {
     "message": "The server requires the password to contain both uppercase and lowercase letters."
   },

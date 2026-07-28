@@ -46,7 +46,9 @@ namespace NcTalkOutlookAddIn.Settings
             TalkDefaultLobbyEnabled = true;
             TalkDefaultSearchVisible = true;
             TalkDefaultRoomType = TalkRoomType.EventConversation;
-            TalkDefaultPasswordEnabled = true;
+            // A room password is the exception, not the rule: the meeting link plus the lobby
+            // already gate entry, and the dialog now offers the password as an explicit action.
+            TalkDefaultPasswordEnabled = false;
             TalkDefaultAddUsers = true;
             TalkDefaultAddGuests = false;
             CalDavSyncEnabled = false;
