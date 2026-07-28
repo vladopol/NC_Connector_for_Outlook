@@ -764,6 +764,31 @@ namespace NcTalkOutlookAddIn
             });
         }
 
+        // Pushes a freshly created room's description. Runs in the background: room creation happens
+        // on the UI thread from the ribbon flow, and this is one more network round-trip.
+        internal void QueueRoomDescriptionUpdate(string roomToken, string description, bool isEventConversation)
+        {
+            if (string.IsNullOrWhiteSpace(roomToken))
+            {
+                return;
+            }
+
+            string normalizedRoomToken = roomToken.Trim();
+            string payload = description ?? string.Empty;
+            Task.Run(() =>
+            {
+                try
+                {
+                    CreateTalkService().UpdateDescription(normalizedRoomToken, payload, isEventConversation);
+                    LogTalk("Room description set after creation (token=" + normalizedRoomToken + ").");
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to set the room description after creation (token=" + normalizedRoomToken + ").", ex);
+                }
+            });
+        }
+
         // Deletes a room that was created for an appointment the user then discarded. Unlike
         // QueueSavedEventRoomDeletion this is unconditional — the appointment never existed as far
         // as anyone else is concerned — but it must still not run on the UI thread: it is triggered
