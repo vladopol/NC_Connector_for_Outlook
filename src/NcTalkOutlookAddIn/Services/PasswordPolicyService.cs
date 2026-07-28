@@ -17,6 +17,12 @@ namespace NcTalkOutlookAddIn.Services
         private readonly TalkServiceConfiguration _configuration;
         private readonly NcHttpClient _httpClient;
         private static readonly string[] MinLengthKeys = { "minLength", "min_length", "minimumLength", "minimum_length" };
+        // The password_policy app has used both singular and plural spellings across versions, and
+        // occ shows snake_case for some keys — accept every variant rather than silently reading
+        // "no complexity required" from a key name mismatch.
+        private static readonly string[] UpperLowerKeys = { "enforceUpperLowerCase", "enforce_upper_lower_case", "enforceUpperLower" };
+        private static readonly string[] SpecialCharKeys = { "enforceSpecialCharacters", "enforceSpecialCharacter", "enforce_special_characters", "enforce_special_character" };
+        private static readonly string[] NumericCharKeys = { "enforceNumericCharacters", "enforceNumericCharacter", "enforce_numeric_characters", "enforce_numeric_character" };
         private static readonly string[] GenerateUrlKeys = { "api_generate", "apiGenerateUrl", "generateUrl", "generate_url" };
 
         internal PasswordPolicyService(TalkServiceConfiguration configuration)
@@ -83,11 +89,77 @@ namespace NcTalkOutlookAddIn.Services
                     generateRaw = GetFirstString(policy, GenerateUrlKeys);
                 }
                 string generateUrl = ResolvePolicyUrl(generateRaw, baseUrl);
-                bool hasPolicy = minLength > 0 || !string.IsNullOrWhiteSpace(generateUrl);
 
-                DiagnosticsLogger.LogApi("Password policy normalized (hasPolicy=" + hasPolicy + ", minLength=" + minLength + ", hasGenerateUrl=" + (!string.IsNullOrWhiteSpace(generateUrl)) + ").");
-                return new PasswordPolicyInfo(hasPolicy, minLength, generateUrl ?? string.Empty);
+                // Complexity flags can also sit one level down under policies.account, the same
+                // place minLength falls back to.
+                var accountPolicies = NcJson.GetDictionary(NcJson.GetDictionary(policy, "policies"), "account");
+                bool upperLower = GetFirstBool(policy, UpperLowerKeys) || GetFirstBool(accountPolicies, UpperLowerKeys);
+                bool specialChars = GetFirstBool(policy, SpecialCharKeys) || GetFirstBool(accountPolicies, SpecialCharKeys);
+                bool numericChars = GetFirstBool(policy, NumericCharKeys) || GetFirstBool(accountPolicies, NumericCharKeys);
+
+                bool hasPolicy = minLength > 0
+                                 || !string.IsNullOrWhiteSpace(generateUrl)
+                                 || upperLower
+                                 || specialChars
+                                 || numericChars;
+
+                DiagnosticsLogger.LogApi(
+                    "Password policy normalized (hasPolicy=" + hasPolicy
+                    + ", minLength=" + minLength
+                    + ", upperLower=" + upperLower
+                    + ", special=" + specialChars
+                    + ", numeric=" + numericChars
+                    + ", hasGenerateUrl=" + (!string.IsNullOrWhiteSpace(generateUrl)) + ").");
+                return new PasswordPolicyInfo(
+                    hasPolicy,
+                    minLength,
+                    generateUrl ?? string.Empty,
+                    upperLower,
+                    specialChars,
+                    numericChars);
             }
+        }
+
+        // Nextcloud serializes these as real booleans, but older payloads and some proxies hand
+        // them back as "1"/"true" strings.
+        private static bool GetFirstBool(IDictionary<string, object> parent, string[] keys)
+        {
+            if (parent == null)
+            {
+                return false;
+            }
+            for (int i = 0; i < keys.Length; i++)
+            {
+                object raw;
+                if (!parent.TryGetValue(keys[i], out raw) || raw == null)
+                {
+                    continue;
+                }
+                if (raw is bool)
+                {
+                    return (bool)raw;
+                }
+                if (raw is int)
+                {
+                    return (int)raw != 0;
+                }
+                string text = Convert.ToString(raw, CultureInfo.InvariantCulture);
+                if (string.IsNullOrWhiteSpace(text))
+                {
+                    continue;
+                }
+                bool parsedBool;
+                if (bool.TryParse(text.Trim(), out parsedBool))
+                {
+                    return parsedBool;
+                }
+                int parsedInt;
+                if (int.TryParse(text.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out parsedInt))
+                {
+                    return parsedInt != 0;
+                }
+            }
+            return false;
         }
 
         internal string GeneratePassword(PasswordPolicyInfo policy)

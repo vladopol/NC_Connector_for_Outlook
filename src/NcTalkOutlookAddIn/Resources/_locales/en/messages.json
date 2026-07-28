@@ -41,6 +41,15 @@
   "talk_password_policy_error": {
     "message": "Password must be at least $1 characters long."
   },
+  "talk_password_needs_upper_lower": {
+    "message": "The server requires the password to contain both uppercase and lowercase letters."
+  },
+  "talk_password_needs_special": {
+    "message": "The server requires the password to contain a special character."
+  },
+  "talk_password_needs_digit": {
+    "message": "The server requires the password to contain a digit."
+  },
   "ui_create_password_placeholder": {
     "message": "Optional"
   },

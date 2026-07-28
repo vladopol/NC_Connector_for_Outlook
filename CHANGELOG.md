@@ -4,6 +4,38 @@ All notable changes to **NC Connector for Outlook** will be documented in this f
 
 This project follows the principles of **Keep a Changelog** and **Semantic Versioning**.
 
+## [3.1.0.14] - 2026-07-28
+
+Fork patch on upstream 3.1.0.
+
+---
+
+### Room PIN now adapts to the server's password policy
+
+Confirmed in the target environment: Nextcloud runs Talk conversation passwords through the same
+`password_policy` validation it applies to account and share passwords — the app has no per-app
+exemption — so the digits-only PIN introduced in 3.1.0.9 was rejected outright on a server that
+enforces complexity.
+
+The cause was that `PasswordPolicyService` read only `minLength` from capabilities and ignored the
+complexity flags entirely, which is why the dialog happily generated a 10-digit PIN the server was
+always going to refuse.
+
+- **Complexity flags are now read** from `password_policy` capabilities:
+  `enforceUpperLowerCase`, `enforceSpecialCharacters`, `enforceNumericCharacters` — including their
+  singular/snake_case spellings and the `policies.account` nesting, so a key-name mismatch cannot
+  silently read back "no complexity required".
+- **Generation stays a PIN wherever the server allows it.** With no complexity enforced, the
+  password is digits-only exactly as before. When the server does enforce it, the digit run stays
+  the body and only the required characters are appended, always in the same position:
+  `5729481!Kp` — "five seven two nine four eight one, exclamation mark, capital K, small p".
+  Ambiguous glyphs (`I`, `l`, `O`, `0`) are excluded from the letters, and the symbol pool is just
+  `!` and `$`: unambiguous to dictate, present on every keyboard layout, and squarely inside the
+  set Nextcloud counts as special.
+- **Passwords typed by hand are pre-checked** against the same rules, so the dialog reports the
+  actual reason ("the server requires an uppercase and a lowercase letter") instead of letting room
+  creation fail against the server.
+
 ## [3.1.0.13] - 2026-07-28
 
 Fork patch on upstream 3.1.0.

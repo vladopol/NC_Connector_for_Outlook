@@ -41,6 +41,15 @@
   "talk_password_policy_error": {
     "message": "Пароль должен содержать как минимум $1 символов."
   },
+  "talk_password_needs_upper_lower": {
+    "message": "Сервер требует, чтобы пароль содержал заглавные и строчные буквы."
+  },
+  "talk_password_needs_special": {
+    "message": "Сервер требует, чтобы пароль содержал специальный символ."
+  },
+  "talk_password_needs_digit": {
+    "message": "Сервер требует, чтобы пароль содержал цифру."
+  },
   "ui_create_password_placeholder": {
     "message": "Необязательно"
   },

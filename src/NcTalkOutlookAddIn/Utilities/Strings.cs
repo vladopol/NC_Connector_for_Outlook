@@ -571,6 +571,9 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string DialogCancel { get { return Get("ui_button_cancel", "Cancel"); } }
 
         internal static string TalkPasswordTooShort { get { return Get("talk_password_policy_error", "Password must be at least {0} characters long."); } }
+        internal static string TalkPasswordNeedsUpperLower { get { return Get("talk_password_needs_upper_lower", "The server requires the password to contain both uppercase and lowercase letters."); } }
+        internal static string TalkPasswordNeedsSpecial { get { return Get("talk_password_needs_special", "The server requires the password to contain a special character."); } }
+        internal static string TalkPasswordNeedsDigit { get { return Get("talk_password_needs_digit", "The server requires the password to contain a digit."); } }
         internal static string TalkDefaultTitle { get { return Get("ui_default_title", "Meeting"); } }
 
         internal static string TooltipAddUsers
