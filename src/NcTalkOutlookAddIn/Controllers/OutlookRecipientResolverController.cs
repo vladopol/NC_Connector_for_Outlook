@@ -12,6 +12,44 @@ namespace NcTalkOutlookAddIn.Controllers
         // Centralized Outlook recipient resolution for attendee extraction and SMTP mapping.
     internal static class OutlookRecipientResolverController
     {
+        // Resolving an Exchange recipient to its SMTP address goes through AddressEntry.GetExchangeUser()
+        // or the MAPI PropertyAccessor, either of which can round-trip to the Exchange server. These
+        // resolutions happen on Outlook's UI thread inside event handlers and repeat constantly for
+        // the same colleagues, so the mapping (X.500 DN -> SMTP) is memoized for the session.
+        private const int SmtpCacheLimit = 2048;
+        private static readonly object SmtpCacheSyncRoot = new object();
+        private static readonly Dictionary<string, string> SmtpCache =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        private static bool TryGetCachedSmtp(string addressKey, out string smtp)
+        {
+            smtp = null;
+            if (string.IsNullOrWhiteSpace(addressKey))
+            {
+                return false;
+            }
+            lock (SmtpCacheSyncRoot)
+            {
+                return SmtpCache.TryGetValue(addressKey, out smtp);
+            }
+        }
+
+        private static void CacheSmtp(string addressKey, string smtp)
+        {
+            if (string.IsNullOrWhiteSpace(addressKey) || string.IsNullOrWhiteSpace(smtp))
+            {
+                return;
+            }
+            lock (SmtpCacheSyncRoot)
+            {
+                if (SmtpCache.Count >= SmtpCacheLimit)
+                {
+                    SmtpCache.Clear();
+                }
+                SmtpCache[addressKey] = smtp;
+            }
+        }
+
         internal static List<string> CollectAppointmentAttendeeEmails(Outlook.AppointmentItem appointment)
         {
             var emails = new List<string>();            if (appointment == null)
@@ -110,6 +148,14 @@ namespace NcTalkOutlookAddIn.Controllers
                 return address;
             }
 
+            // Everything below can hit the Exchange server; serve a previous resolution instead.
+            string addressKey = address;
+            string cachedSmtp;
+            if (TryGetCachedSmtp(addressKey, out cachedSmtp))
+            {
+                return cachedSmtp;
+            }
+
             Outlook.AddressEntry entry = null;
             try
             {
@@ -156,6 +202,7 @@ namespace NcTalkOutlookAddIn.Controllers
             }
             if (!string.IsNullOrWhiteSpace(address) && address.IndexOf('@') >= 0)
             {
+                CacheSmtp(addressKey, address);
                 return address;
             }
             try
@@ -177,7 +224,12 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to resolve SMTP address via PropertyAccessor.", ex);
             }
-            return !string.IsNullOrWhiteSpace(address) && address.IndexOf('@') >= 0 ? address : null;
+            if (!string.IsNullOrWhiteSpace(address) && address.IndexOf('@') >= 0)
+            {
+                CacheSmtp(addressKey, address);
+                return address;
+            }
+            return null;
         }
     }
 }

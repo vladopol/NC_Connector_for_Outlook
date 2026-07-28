@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Bastian Kleinschmidt
+﻿// Copyright (c) 2025 Bastian Kleinschmidt
 // Licensed under the GNU Affero General Public License v3.0.
 // See LICENSE.txt for details.
 
@@ -19,6 +19,6 @@ using System.Runtime.InteropServices;
 // The following GUID is used as the ID of the type library when this project is made COM-visible.
 [assembly: Guid("f7812432-4b4f-45a6-8f16-22a3d28b1fe4")]
 
-[assembly: AssemblyVersion("3.1.0.9")]
-[assembly: AssemblyFileVersion("3.1.0.9")]
+[assembly: AssemblyVersion("3.1.0.10")]
+[assembly: AssemblyFileVersion("3.1.0.10")]
 

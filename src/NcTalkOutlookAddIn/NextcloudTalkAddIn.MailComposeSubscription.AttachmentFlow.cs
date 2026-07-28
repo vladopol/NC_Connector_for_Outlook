@@ -384,51 +384,90 @@ namespace NcTalkOutlookAddIn
                 RemoveLastAddedAttachmentBatch(lastAdded);
             }
 
+            // Runs inside BeforeAttachmentAdd, which must hand a decision back to Outlook
+            // synchronously — so this must never perform I/O. The backend policy is read from the
+            // process cache only; when nothing is cached the local settings apply and a refresh is
+            // kicked off in the background for the next attachment.
+            //
+            // This used to block the UI thread on an uncached policy request with a 45 s timeout.
+            // With a slow or unreachable server that froze Outlook on every single attachment —
+            // exactly the behaviour that makes Outlook flag an add-in as slow and disable it.
             private AttachmentAutomationSettings ReadAttachmentAutomationSettings()
             {
-                // BeforeAttachmentAdd must hand a decision back to Outlook synchronously.
-                return ReadAttachmentAutomationSettingsAsync().GetAwaiter().GetResult();
+                _owner.EnsureSettingsLoaded();
+                return BuildAttachmentAutomationSettings(PeekPolicyStatus());
             }
 
+            // Used from the debounced evaluation, which is already asynchronous and can afford to
+            // wait for a real request (dispatched off the UI thread, and cached afterwards).
             private async Task<AttachmentAutomationSettings> ReadAttachmentAutomationSettingsAsync()
             {
                 _owner.EnsureSettingsLoaded();
 
+                TalkServiceConfiguration configuration = BuildPolicyConfiguration();
+                if (configuration == null)
+                {
+                    return BuildAttachmentAutomationSettings(null);
+                }
+
+                BackendPolicyStatus policyStatus = await Task
+                    .Run(() => _owner.FetchBackendPolicyStatus(configuration, "compose_attachment_evaluate"))
+                    .ConfigureAwait(true);
+                return BuildAttachmentAutomationSettings(policyStatus);
+            }
+
+            private TalkServiceConfiguration BuildPolicyConfiguration()
+            {
+                if (_owner._currentSettings == null)
+                {
+                    return null;
+                }
+                return new TalkServiceConfiguration(
+                    _owner._currentSettings.ServerUrl,
+                    _owner._currentSettings.Username,
+                    _owner._currentSettings.AppPassword);
+            }
+
+            private BackendPolicyStatus PeekPolicyStatus()
+            {
+                TalkServiceConfiguration configuration = BuildPolicyConfiguration();
+                return configuration == null
+                    ? null
+                    : _owner.PeekBackendPolicyStatus(configuration, "compose_attachment_evaluate");
+            }
+
+            // Applies the administrative overlay (when present) on top of the local settings.
+            private AttachmentAutomationSettings BuildAttachmentAutomationSettings(BackendPolicyStatus policyStatus)
+            {
                 var settings = _owner._currentSettings ?? new AddinSettings();
                 int thresholdMb = OutlookAttachmentAutomationGuardService.NormalizeThresholdMb(settings.SharingAttachmentsOfferAboveMb);
                 bool alwaysConnector = settings.SharingAttachmentsAlwaysConnector;
                 bool offerAboveEnabled = settings.SharingAttachmentsOfferAboveEnabled && !alwaysConnector;
-                if (_owner._currentSettings != null)
-                {
-                    var configuration = new TalkServiceConfiguration(
-                        _owner._currentSettings.ServerUrl,
-                        _owner._currentSettings.Username,
-                        _owner._currentSettings.AppPassword);
-                    BackendPolicyStatus policyStatus = await Task.Run(() => _owner.FetchBackendPolicyStatus(configuration, "compose_attachment_evaluate")).ConfigureAwait(false);
-                    if (policyStatus != null && policyStatus.IsDomainActive("share"))
-                    {
-                        bool policyBool;
-                        int policyInt;
 
-                        if (policyStatus.IsLocked("share", "attachments_always_via_ncconnector")
-                            && policyStatus.TryGetPolicyBool("share", "attachments_always_via_ncconnector", out policyBool))
+                if (policyStatus != null && policyStatus.IsDomainActive("share"))
+                {
+                    bool policyBool;
+                    int policyInt;
+
+                    if (policyStatus.IsLocked("share", "attachments_always_via_ncconnector")
+                        && policyStatus.TryGetPolicyBool("share", "attachments_always_via_ncconnector", out policyBool))
+                    {
+                        alwaysConnector = policyBool;
+                    }
+                    if (policyStatus.IsLocked("share", "attachments_min_size_mb"))
+                    {
+                        if (policyStatus.TryGetPolicyInt("share", "attachments_min_size_mb", out policyInt))
                         {
-                            alwaysConnector = policyBool;
+                            thresholdMb = OutlookAttachmentAutomationGuardService.NormalizeThresholdMb(policyInt);
+                            offerAboveEnabled = true;
                         }
-                        if (policyStatus.IsLocked("share", "attachments_min_size_mb"))
+                        else if (policyStatus.HasPolicyKey("share", "attachments_min_size_mb"))
                         {
-                            if (policyStatus.TryGetPolicyInt("share", "attachments_min_size_mb", out policyInt))
-                            {
-                                thresholdMb = OutlookAttachmentAutomationGuardService.NormalizeThresholdMb(policyInt);
-                                offerAboveEnabled = true;
-                            }
-                            else if (policyStatus.HasPolicyKey("share", "attachments_min_size_mb"))
-                            {
-                                offerAboveEnabled = false;
-                            }
+                            offerAboveEnabled = false;
                         }
                     }
                 }
+
                 return new AttachmentAutomationSettings
                 {
                     AlwaysConnector = alwaysConnector,
