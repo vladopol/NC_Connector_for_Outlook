@@ -41,6 +41,12 @@
   "talk_password_policy_error": {
     "message": "Пароль должен содержать как минимум $1 символов."
   },
+  "talk_password_add": {
+    "message": "Добавить пароль"
+  },
+  "talk_password_remove": {
+    "message": "Убрать пароль"
+  },
   "talk_password_needs_upper_lower": {
     "message": "Сервер требует, чтобы пароль содержал заглавные и строчные буквы."
   },

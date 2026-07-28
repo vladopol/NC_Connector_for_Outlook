@@ -37,7 +37,12 @@ namespace NcTalkOutlookAddIn.UI
         private readonly Label _eventSupportHintLabel = new Label();
         private readonly TextBox _titleTextBox = new TextBox();
         private readonly ComboBox _roomTypeComboBox = new ComboBox();
-        private readonly CheckBox _passwordToggleCheckBox = new CheckBox();
+        // A room password is the exception rather than the rule, and it has no meaningful "off"
+        // state worth displaying — so it is offered as an action rather than a checkbox that sits
+        // unticked most of the time. One button in a fixed position handles both directions, with
+        // only its caption changing: "Add password" / "Remove password".
+        private readonly Button _passwordToggleButton = new Button();
+        private bool _passwordEnabled;
         private readonly TextBox _passwordTextBox = new TextBox();
         private readonly Button _passwordGenerateButton = new Button();
         private readonly CheckBox _addUsersCheckBox = new CheckBox();
@@ -190,9 +195,9 @@ namespace NcTalkOutlookAddIn.UI
 
             // Room type selector hidden — EventConversation is always used.
 
-            _passwordToggleCheckBox.Text = Strings.TalkPasswordSetCheck;
-            _passwordToggleCheckBox.AutoSize = true;
-            _passwordToggleCheckBox.CheckedChanged += (s, e) => UpdatePasswordState();
+            _passwordToggleButton.AutoSize = false;
+            _passwordToggleButton.TextAlign = ContentAlignment.MiddleCenter;
+            _passwordToggleButton.Click += (s, e) => SetPasswordEnabled(!_passwordEnabled);
 
             _passwordLabel.Text = Strings.TalkPasswordLabel;
             _passwordLabel.AutoSize = true;
@@ -355,7 +360,7 @@ namespace NcTalkOutlookAddIn.UI
             Controls.Add(_titleLabel);
             Controls.Add(_titleTextBox);
             Controls.Add(_eventSupportHintLabel);
-            Controls.Add(_passwordToggleCheckBox);
+            Controls.Add(_passwordToggleButton);
             Controls.Add(_passwordLabel);
             Controls.Add(_passwordTextBox);
             Controls.Add(_passwordGenerateButton);
@@ -457,19 +462,30 @@ namespace NcTalkOutlookAddIn.UI
                     _policyWarningPanel.SetBounds(outerPadding, y, Math.Max(ScaleLogical(260), ClientSize.Width - (outerPadding * 2)), 0);
                 }
 
-                _passwordToggleCheckBox.Location = new Point(outerPadding, y);
-                y = _passwordToggleCheckBox.Bottom + ScaleLogical(10);
+                // The toggle keeps a fixed position whichever state it is in, so its target does not
+                // move under the pointer when the password row appears or disappears below it.
+                int toggleMinWidth;
+                FooterButtonLayoutHelper.ApplyButtonSize(_passwordToggleButton, out toggleMinWidth);
+                _passwordToggleButton.SetBounds(inputX, y, _passwordToggleButton.Width, _passwordToggleButton.Height);
+                y = _passwordToggleButton.Bottom + ScaleLogical(10);
 
-                int ignoredGenerateMinWidth;
-                FooterButtonLayoutHelper.ApplyButtonSize(_passwordGenerateButton, out ignoredGenerateMinWidth);
-                int generateButtonWidth = _passwordGenerateButton.Width;
-                int generateButtonHeight = _passwordGenerateButton.Height;
-                int passwordWidth = Math.Max(ScaleLogical(120), inputWidth - generateButtonWidth - ScaleLogical(8));
+                if (_passwordEnabled)
+                {
+                    int ignoredGenerateMinWidth;
+                    FooterButtonLayoutHelper.ApplyButtonSize(_passwordGenerateButton, out ignoredGenerateMinWidth);
+                    int generateButtonWidth = _passwordGenerateButton.Width;
+                    int generateButtonHeight = _passwordGenerateButton.Height;
+                    int passwordWidth = Math.Max(ScaleLogical(120), inputWidth - generateButtonWidth - ScaleLogical(8));
 
-                _passwordLabel.Location = new Point(labelX, y + ScaleLogical(4));
-                _passwordTextBox.SetBounds(inputX, y, passwordWidth, _passwordTextBox.PreferredHeight + ScaleLogical(2));
-                _passwordGenerateButton.SetBounds(_passwordTextBox.Right + ScaleLogical(8), y - ScaleLogical(2), generateButtonWidth, generateButtonHeight);
-                y = Math.Max(_passwordLabel.Bottom, Math.Max(_passwordTextBox.Bottom, _passwordGenerateButton.Bottom)) + ScaleLogical(16);
+                    _passwordLabel.Location = new Point(labelX, y + ScaleLogical(4));
+                    _passwordTextBox.SetBounds(inputX, y, passwordWidth, _passwordTextBox.PreferredHeight + ScaleLogical(2));
+                    _passwordGenerateButton.SetBounds(_passwordTextBox.Right + ScaleLogical(8), y - ScaleLogical(2), generateButtonWidth, generateButtonHeight);
+                    y = Math.Max(_passwordLabel.Bottom, Math.Max(_passwordTextBox.Bottom, _passwordGenerateButton.Bottom)) + ScaleLogical(16);
+                }
+                else
+                {
+                    y += ScaleLogical(6);
+                }
 
                 int groupWidth = Math.Max(ScaleLogical(260), ClientSize.Width - (outerPadding * 2));
 
@@ -651,10 +667,10 @@ namespace NcTalkOutlookAddIn.UI
             TalkTitle = titleDefault;
             _titleTextBox.Text = TalkTitle;
 
-            _passwordToggleCheckBox.Checked = passwordDefault;
+            _passwordEnabled = passwordDefault;
             TalkPassword = string.Empty;
             _passwordTextBox.Text = string.Empty;
-            if (_passwordToggleCheckBox.Checked)
+            if (_passwordEnabled)
             {
                 TalkPassword = PasswordGenerationHelper.GenerateRoomPin(_passwordPolicy, DefaultMinPasswordLength);
                 _passwordTextBox.Text = TalkPassword;
@@ -726,7 +742,7 @@ namespace NcTalkOutlookAddIn.UI
 
             _titleTextBox.Enabled = !lockTitle;
             _roomTypeComboBox.Enabled = !lockRoomType;
-            _passwordToggleCheckBox.Enabled = !lockPassword;
+            _passwordToggleButton.Enabled = !lockPassword;
             _lobbyCheckBox.Enabled = !lockLobby;
             _searchCheckBox.Enabled = !lockSearch;
 
@@ -743,7 +759,7 @@ namespace NcTalkOutlookAddIn.UI
             _disabledTooltipHints.Apply(_titleTextBox, lockTitle ? Strings.PolicyAdminControlledTooltip : string.Empty, lockTitle, _titleLabel);
             _disabledTooltipHints.Apply(_roomTypeComboBox, lockRoomType ? Strings.PolicyAdminControlledTooltip : _toolTip.GetToolTip(_roomTypeComboBox), lockRoomType, _roomTypeLabel);
             _disabledTooltipHints.Apply(
-                _passwordToggleCheckBox,
+                _passwordToggleButton,
                 lockPassword ? Strings.PolicyAdminControlledTooltip : string.Empty,
                 lockPassword,
                 _passwordGenerateButton,
@@ -843,7 +859,7 @@ namespace NcTalkOutlookAddIn.UI
         {
             TalkTitle = _titleTextBox.Text.Trim();
 
-            bool passwordEnabled = _passwordToggleCheckBox.Checked;
+            bool passwordEnabled = _passwordEnabled;
             TalkPassword = passwordEnabled ? _passwordTextBox.Text.Trim() : string.Empty;
 
             // Mirror the server's password_policy locally, so a password that Nextcloud would
@@ -877,9 +893,18 @@ namespace NcTalkOutlookAddIn.UI
 
         private void UpdatePasswordState()
         {
-            bool enabled = _passwordToggleCheckBox.Checked;
+            bool enabled = _passwordEnabled;
             bool lockPassword = IsPolicyLocked("talk_set_password");
             bool allowGenerate = IsPolicyGeneratePasswordEnabled();
+
+            // When the administrator pins talk_set_password the state cannot be changed at all, so
+            // the toggle is disabled rather than hidden — the reason stays visible via its tooltip.
+            _passwordToggleButton.Text = enabled ? Strings.TalkPasswordRemove : Strings.TalkPasswordAdd;
+            _passwordToggleButton.Enabled = !lockPassword;
+            _passwordLabel.Visible = enabled;
+            _passwordTextBox.Visible = enabled;
+            _passwordGenerateButton.Visible = enabled;
+
             _passwordTextBox.Enabled = enabled && !lockPassword;
             _passwordGenerateButton.Enabled = enabled && allowGenerate;
             _disabledTooltipHints.Apply(
@@ -889,9 +914,44 @@ namespace NcTalkOutlookAddIn.UI
                 _passwordLabel);
         }
 
+        // Adding a password fills it in straight away, so the common path is a single click; taking
+        // it away clears the field so a stale value cannot be submitted.
+        private void SetPasswordEnabled(bool enabled)
+        {
+            if (_passwordEnabled == enabled)
+            {
+                return;
+            }
+
+            _passwordEnabled = enabled;
+            if (enabled)
+            {
+                if (string.IsNullOrWhiteSpace(_passwordTextBox.Text))
+                {
+                    _passwordTextBox.Text = PasswordGenerationHelper.GenerateRoomPin(_passwordPolicy, DefaultMinPasswordLength);
+                }
+            }
+            else
+            {
+                _passwordTextBox.Text = string.Empty;
+            }
+
+            UpdatePasswordState();
+            ApplyDialogLayout(true);
+            if (enabled)
+            {
+                _passwordTextBox.Focus();
+                _passwordTextBox.SelectAll();
+            }
+            else
+            {
+                _passwordToggleButton.Focus();
+            }
+        }
+
         private void GeneratePassword()
         {
-            if (!_passwordToggleCheckBox.Checked)
+            if (!_passwordEnabled)
             {
                 return;
             }

@@ -4,6 +4,27 @@ All notable changes to **NC Connector for Outlook** will be documented in this f
 
 This project follows the principles of **Keep a Changelog** and **Semantic Versioning**.
 
+## [3.1.0.15] - 2026-07-28
+
+Fork patch on upstream 3.1.0.
+
+---
+
+### Room password is an action now, not a permanent checkbox
+
+A room password is the exception rather than the rule, and an unticked checkbox occupying the
+dialog permanently communicated nothing. It is replaced by a single button that toggles caption
+with the state — "Add password" / "Remove password" — keeping a fixed position so its target does
+not move under the pointer when the password row appears or disappears below it.
+
+- Adding a password fills one in immediately, so the common path is a single click; removing it
+  clears the field so a stale value cannot be submitted.
+- `TalkDefaultPasswordEnabled` now defaults to **off** for fresh installs, matching how the option
+  is actually used. Existing profiles keep whatever is stored in their settings XML — untick
+  "Set password" in Settings once to adopt the new default.
+- When an administrator pins `talk_set_password`, the toggle is disabled rather than hidden, so the
+  policy tooltip still explains why the state cannot be changed.
+
 ## [3.1.0.14] - 2026-07-28
 
 Fork patch on upstream 3.1.0.
