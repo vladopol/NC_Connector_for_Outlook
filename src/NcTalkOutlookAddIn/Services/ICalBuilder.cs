@@ -75,13 +75,14 @@ namespace NcTalkOutlookAddIn.Services
             string organizerEmail = null;
             string organizerName = SafeRead(() => appointment.Organizer);
 
-            Outlook.Recipient organizer = null;
+            // AppointmentItem.GetOrganizer() hands back an AddressEntry, not a Recipient.
+            Outlook.AddressEntry organizer = null;
             try
             {
                 organizer = appointment.GetOrganizer();
                 if (organizer != null)
                 {
-                    organizerEmail = OutlookRecipientResolverController.TryResolveRecipientSmtpAddress(organizer);
+                    organizerEmail = OutlookRecipientResolverController.TryResolveAddressEntrySmtpAddress(organizer);
                 }
             }
             catch (Exception ex)
@@ -91,7 +92,7 @@ namespace NcTalkOutlookAddIn.Services
             finally
             {
                 if (organizer != null)
-                    ComInteropScope.TryRelease(organizer, LogCategories.CalDav, "Failed to release organizer Recipient COM object.");
+                    ComInteropScope.TryRelease(organizer, LogCategories.CalDav, "Failed to release organizer AddressEntry COM object.");
             }
 
             if (!string.IsNullOrWhiteSpace(organizerEmail))
