@@ -4,6 +4,47 @@ All notable changes to **NC Connector for Outlook** will be documented in this f
 
 This project follows the principles of **Keep a Changelog** and **Semantic Versioning**.
 
+## [3.1.0.11] - 2026-07-28
+
+Fork patch on upstream 3.1.0.
+
+---
+
+### Appointment changes now propagate to the Talk room and the Nextcloud calendar
+
+Editing a meeting that has a Talk room previously synced almost nothing back: for event
+conversations — the room type this fork always uses — the subject and the agenda were skipped
+outright, attendees were only ever added, a changed **end** time was ignored, and any edit made
+without opening the meeting in its own window (dragging it in the calendar grid, editing it in the
+peek pane, changing attendees from the scheduling view) reached the Nextcloud calendar but never
+the Talk room.
+
+- **Attendee removal.** Removing someone from the Outlook invitation now removes them from the Talk
+  room. Only addresses this add-in previously recorded as attendees are eligible — the list is kept
+  in a new `X-NCTALK-ATTENDEES` appointment property — so anyone invited directly in Talk is never
+  touched. Owners and moderators (including a delegated moderator) are never removed.
+- **Subject and agenda.** The room name and description are now updated for event conversations as
+  well. If the server answers that the property belongs to the linked calendar object, the attempt
+  is remembered per room for the rest of the session and silently skipped from then on — no repeated
+  requests and no warning dialogs on every save.
+- **End time.** Timing changes are tracked as a `start#end` pair instead of only the start, so
+  shortening or extending a meeting refreshes the room's event binding and lobby timer.
+- **Edits outside the meeting window.** A folder-level watch on the default calendar picks up
+  changes to Talk appointments that never raise `AppointmentItem.Write`. It only reads the item —
+  it never saves it, so a meeting is never silently marked as needing an update to be resent — and
+  it skips appointments that have an open inspector, which the existing `Write` path already owns.
+  Repeat and irrelevant `ItemChange` notifications are filtered by a content signature.
+- **Attendees in the Nextcloud calendar.** The CalDAV payload now carries `ORGANIZER` and
+  `ATTENDEE` (with role and response status), plus `LAST-MODIFIED` and `STATUS:CANCELLED` for
+  cancelled meetings. Every scheduling property carries `SCHEDULE-AGENT=CLIENT` (RFC 6638) so
+  Nextcloud does not mail its own duplicate invitations on top of the ones Outlook already sends.
+
+**Threading:** the reconciliation was extracted into `TalkRoomSyncService`, which works from a
+COM-free `TalkRoomSyncSnapshot` and runs on a thread-pool thread. Saving a meeting no longer blocks
+Outlook's UI thread on Talk HTTP calls — this also resolves the appointment half of known upstream
+bug #1. The delegation path still runs inline, because the room must be fully in sync before
+moderation is handed over and the organizer leaves the room.
+
 ## [3.1.0.10] - 2026-07-28
 
 Fork patch on upstream 3.1.0.

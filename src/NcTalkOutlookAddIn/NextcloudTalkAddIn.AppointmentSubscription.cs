@@ -5,6 +5,8 @@
 using System;
 using System.Globalization;
 using System.Windows.Forms;
+using NcTalkOutlookAddIn.Controllers;
+using NcTalkOutlookAddIn.Models;
 using NcTalkOutlookAddIn.Utilities;
 using Outlook = Microsoft.Office.Interop.Outlook;
 
@@ -22,7 +24,9 @@ namespace NcTalkOutlookAddIn
             private readonly bool _lobbyEnabled;
             private readonly Outlook.ItemEvents_10_Event _events;
             private readonly bool _isEventConversation;
-            private long? _lastLobbyTimer;
+            // Last start#end pair pushed to Nextcloud. Tracking the pair (rather than only the
+            // start) means a changed end time also refreshes the room's event binding.
+            private string _lastSyncObjectId;
             private bool _roomDeleted;
             private bool _disposed;
             private bool _unsavedCloseCleanupPending;
@@ -51,7 +55,7 @@ namespace NcTalkOutlookAddIn
                 _roomUrl = roomUrl;
                 _lobbyEnabled = lobbyEnabled;
                 _isEventConversation = isEventConversation;
-                _lastLobbyTimer = GetIcalStartEpochOrNull(appointment);
+                _lastSyncObjectId = TalkAppointmentController.GetUserPropertyText(appointment, IcalObjectId);
                 _entryId = entryId;
                 _events = appointment as Outlook.ItemEvents_10_Event;
                 if (_events != null)
@@ -100,8 +104,17 @@ namespace NcTalkOutlookAddIn
                 bool effectiveIsEventConversation;
                 _owner._talkAppointmentController.ResolveRuntimeRoomTraits(_appointment, _roomToken, _lobbyEnabled, _isEventConversation, out effectiveLobbyKnown, out effectiveLobbyEnabled, out effectiveIsEventConversation);
                 LogTalk("OnWrite traits resolved (token=" + _roomToken + ", lobbyKnown=" + effectiveLobbyKnown + ", lobby=" + effectiveLobbyEnabled + ", event=" + effectiveIsEventConversation + ").");
+
+                // What was last pushed to Nextcloud. The in-memory value wins: the deferred pass can
+                // advance it without writing the appointment back, so the stored property may lag.
+                string previousObjectId = _lastSyncObjectId;
+                if (string.IsNullOrWhiteSpace(previousObjectId))
+                {
+                    previousObjectId = TalkAppointmentController.GetUserPropertyText(_appointment, IcalObjectId);
+                }
+
                 long currentStartEpoch;
-                bool hasPersistedStartEpoch = _owner._talkAppointmentController.PersistCoreIcalProperties(
+                _owner._talkAppointmentController.PersistCoreIcalProperties(
                     _appointment,
                     _roomToken,
                     _roomUrl,
@@ -109,100 +122,52 @@ namespace NcTalkOutlookAddIn
                     effectiveIsEventConversation,
                     out currentStartEpoch);
 
+                string currentObjectId = TalkAppointmentController.GetUserPropertyText(_appointment, IcalObjectId);
+                bool timingChanged = !string.Equals(previousObjectId ?? string.Empty, currentObjectId ?? string.Empty, StringComparison.Ordinal);
+
+                TalkRoomSyncSnapshot snapshot = _owner._talkAppointmentController.BuildSyncSnapshot(
+                    _appointment,
+                    _roomToken,
+                    effectiveLobbyKnown,
+                    effectiveLobbyEnabled,
+                    effectiveIsEventConversation,
+                    timingChanged,
+                    "write");
+                if (snapshot == null)
+                {
+                    LogTalk("OnWrite sync skipped: snapshot unavailable (token=" + _roomToken + ").");
+                    _owner.TryDirectCalDavSync(_appointment);
+                    _owner.RefreshEntryBinding(this);
+                    return;
+                }
+
+                // Record the attendee list while the save is still in flight, so the new baseline is
+                // persisted by this very save and no follow-up Save() is needed.
+                _owner._talkAppointmentController.PersistAttendeeBaseline(_appointment, snapshot.CurrentAttendeeEmails);
+                _lastSyncObjectId = currentObjectId;
+
                 string pendingDelegateId;
                 bool delegationPending = _owner._talkAppointmentController.IsDelegationPending(_appointment, out pendingDelegateId);
                 if (delegationPending)
                 {
+                    // The room must be fully in sync before ownership is handed over and this user
+                    // leaves it, so the reconciliation runs inline on this rare one-off path.
                     LogTalk("OnWrite delegation-pending path (token=" + _roomToken + ", delegate=" + pendingDelegateId + ").");
-                }
-                bool roomNameSynced = false;
-                bool lobbySynced = true;
-                bool descriptionSynced = false;
-                bool participantsSynced;
-
-                if (effectiveIsEventConversation)
-                {
-                    roomNameSynced = true;
-                    LogTalk("Room name sync skipped for event conversation (token=" + _roomToken + ").");
+                    _owner.RunRoomSyncInline(snapshot);
+                    _owner._talkAppointmentController.TryApplyDelegation(_appointment, _roomToken);
                 }
                 else
                 {
-                    LogTalk("Updating room name during OnWrite (token=" + _roomToken + ").");
-                    roomNameSynced = _owner._talkAppointmentController.TryUpdateRoomName(_appointment, _roomToken, effectiveIsEventConversation);
+                    _owner.QueueRoomSync(snapshot);
                 }
 
-                bool shouldAttemptLobbyUpdate = effectiveLobbyEnabled || !effectiveLobbyKnown;
-                if (shouldAttemptLobbyUpdate)
+                if (timingChanged || effectiveLobbyEnabled || !effectiveLobbyKnown)
                 {
-                    if (!hasPersistedStartEpoch)
-                    {
-                        LogTalk("Lobby update skipped: X-NCTALK-START is unavailable after local metadata persist (token=" + _roomToken + ").");
-                        lobbySynced = false;
-                    }
-                    else if (!_lastLobbyTimer.HasValue || currentStartEpoch != _lastLobbyTimer.Value)
-                    {
-                        LogTalk("Attempting lobby update during OnWrite (token=" + _roomToken + ", startEpoch=" + currentStartEpoch.ToString(CultureInfo.InvariantCulture) + ", lobbyKnown=" + effectiveLobbyKnown + ").");
-                        if (_owner._talkAppointmentController.TryUpdateLobby(_appointment, _roomToken, effectiveIsEventConversation, currentStartEpoch))
-                        {
-                            _lastLobbyTimer = currentStartEpoch;
-                            LogTalk("Lobby update successful (token=" + _roomToken + ").");
-                        }
-                        else
-                        {
-                            LogTalk("Lobby update failed (token=" + _roomToken + ").");
-                            lobbySynced = false;
-                        }
-                    }
-
+                    // Outlook occasionally still reports the pre-edit time while Write is running;
+                    // the deferred pass re-reads it once the save has settled.
                     ScheduleDeferredWriteLobbyVerification();
                 }
 
-                if (effectiveIsEventConversation)
-                {
-                    descriptionSynced = true;
-                    LogTalk("Room description sync skipped for event conversation (token=" + _roomToken + ").");
-                }
-                else
-                {
-                    LogTalk("Updating room description during OnWrite (token=" + _roomToken + ").");
-                    descriptionSynced = _owner._talkAppointmentController.TryUpdateRoomDescription(_appointment, _roomToken, effectiveIsEventConversation);
-                }
-
-                participantsSynced = _owner._talkAppointmentController.TrySyncRoomParticipants(_appointment, _roomToken, effectiveIsEventConversation);
-                LogTalk(
-                    "OnWrite pre-delegation sync result (token="
-                    + _roomToken
-                    + ", roomName="
-                    + roomNameSynced
-                    + ", lobby="
-                    + lobbySynced
-                    + ", description="
-                    + descriptionSynced
-                    + ", participants="
-                    + participantsSynced
-                    + ").");
-                if (delegationPending)
-                {
-                    // Delegation is always executed when pending; pre-step failures are logged with
-                    // explicit per-step status to keep runtime behavior transparent.
-                    if (!roomNameSynced || !lobbySynced || !descriptionSynced || !participantsSynced)
-                    {
-                        LogTalk(
-                            "Delegation continues despite pre-delegation sync failures (token="
-                            + _roomToken
-                            + ", roomName="
-                            + roomNameSynced
-                            + ", lobby="
-                            + lobbySynced
-                            + ", description="
-                            + descriptionSynced
-                            + ", participants="
-                            + participantsSynced
-                            + ").");
-                    }
-
-                    _owner._talkAppointmentController.TryApplyDelegation(_appointment, _roomToken);
-                }
                 _owner.TryDirectCalDavSync(_appointment);
                 _owner.RefreshEntryBinding(this);
             }
@@ -326,51 +291,44 @@ namespace NcTalkOutlookAddIn
                 bool effectiveLobbyEnabled;
                 bool effectiveIsEventConversation;
                 _owner._talkAppointmentController.ResolveRuntimeRoomTraits(_appointment, _roomToken, _lobbyEnabled, _isEventConversation, out effectiveLobbyKnown, out effectiveLobbyEnabled, out effectiveIsEventConversation);
-                bool shouldAttemptLobbyUpdate = effectiveLobbyEnabled || !effectiveLobbyKnown;
-                if (!shouldAttemptLobbyUpdate)
-                {
-                    _deferredWriteLobbyAttempts = 0;
-                    StopDeferredWriteLobbyTimer();
-                    return;
-                }
 
-                long currentStartEpoch;
-                if (!_owner._talkAppointmentController.TryReadAppointmentStartEpoch(_appointment, _roomToken, out currentStartEpoch))
+                // Strictly read-only: Outlook has already saved the item by the time this runs, so
+                // writing user properties here would leave it dirty and trigger a save prompt.
+                string currentObjectId;
+                if (!_owner._talkAppointmentController.TryReadAppointmentObjectId(_appointment, _roomToken, out currentObjectId))
                 {
                     if (_deferredWriteLobbyAttempts >= DeferredWriteLobbyMaxAttempts)
                     {
                         _deferredWriteLobbyAttempts = 0;
                         StopDeferredWriteLobbyTimer();
-                        LogTalk("Deferred post-write lobby verification stopped after unavailable appointment start (token=" + _roomToken + ").");
+                        LogTalk("Deferred post-write timing verification stopped after unavailable appointment start (token=" + _roomToken + ").");
                     }
                     return;
                 }
-                if (_lastLobbyTimer.HasValue && currentStartEpoch == _lastLobbyTimer.Value)
+                if (string.Equals(_lastSyncObjectId ?? string.Empty, currentObjectId ?? string.Empty, StringComparison.Ordinal))
                 {
                     if (_deferredWriteLobbyAttempts >= DeferredWriteLobbyMaxAttempts)
                     {
                         _deferredWriteLobbyAttempts = 0;
                         StopDeferredWriteLobbyTimer();
-                        LogTalk("Deferred post-write lobby verification completed without detected start change (token=" + _roomToken + ", startEpoch=" + currentStartEpoch.ToString(CultureInfo.InvariantCulture) + ").");
+                        LogTalk("Deferred post-write timing verification completed without detected change (token=" + _roomToken + ", objectId=" + (currentObjectId ?? "n/a") + ").");
                     }
                     return;
                 }
 
-                LogTalk("Deferred post-write lobby verification applying update (token=" + _roomToken + ", startEpoch=" + currentStartEpoch.ToString(CultureInfo.InvariantCulture) + ").");
-                if (_owner._talkAppointmentController.TryUpdateLobby(_appointment, _roomToken, effectiveIsEventConversation, currentStartEpoch))
-                {
-                    _lastLobbyTimer = currentStartEpoch;
-                    _deferredWriteLobbyAttempts = 0;
-                    StopDeferredWriteLobbyTimer();
-                    LogTalk("Deferred post-write lobby verification successful (token=" + _roomToken + ").");
-                    return;
-                }
-                if (_deferredWriteLobbyAttempts >= DeferredWriteLobbyMaxAttempts)
-                {
-                    _deferredWriteLobbyAttempts = 0;
-                    StopDeferredWriteLobbyTimer();
-                    LogTalk("Deferred post-write lobby verification failed after retries (token=" + _roomToken + ").");
-                }
+                LogTalk("Deferred post-write timing verification detected a change (token=" + _roomToken + ", objectId=" + (currentObjectId ?? "n/a") + ").");
+                TalkRoomSyncSnapshot snapshot = _owner._talkAppointmentController.BuildSyncSnapshot(
+                    _appointment,
+                    _roomToken,
+                    effectiveLobbyKnown,
+                    effectiveLobbyEnabled,
+                    effectiveIsEventConversation,
+                    true,
+                    "deferred_write");
+                _lastSyncObjectId = currentObjectId;
+                _deferredWriteLobbyAttempts = 0;
+                StopDeferredWriteLobbyTimer();
+                _owner.QueueRoomSync(snapshot);
             }
 
             private void OnUnsavedCloseCleanupTick(object sender, EventArgs e)

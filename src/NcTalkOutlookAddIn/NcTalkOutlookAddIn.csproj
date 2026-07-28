@@ -93,6 +93,7 @@
     <Compile Include="NextcloudTalkAddIn.MailComposeSubscription.SendCleanup.cs" />
     <Compile Include="NextcloudTalkAddIn.AppointmentSubscription.cs" />
     <Compile Include="NextcloudTalkAddIn.SubscriptionEnsure.cs" />
+    <Compile Include="NextcloudTalkAddIn.CalendarWatcher.cs" />
     <Compile Include="Settings\AddinSettings.cs" />
     <Compile Include="Settings\AuthenticationMode.cs" />
     <Compile Include="Settings\SettingsStorage.cs" />
@@ -111,6 +112,7 @@
     <Compile Include="Models\NextcloudUser.cs" />
     <Compile Include="Models\PasswordPolicyInfo.cs" />
     <Compile Include="Models\TalkParticipant.cs" />
+    <Compile Include="Models\TalkRoomSyncSnapshot.cs" />
     <Compile Include="Models\SeparatePasswordDispatchEntry.cs" />
     <Compile Include="Controllers\TalkDescriptionTemplateController.cs" />
     <Compile Include="Controllers\TalkAppointmentController.cs" />
@@ -139,6 +141,7 @@
     <Compile Include="Services\ICalBuilder.cs" />
     <Compile Include="Services\CalDavSyncService.cs" />
     <Compile Include="Services\CalDavCalendarSync.cs" />
+    <Compile Include="Services\TalkRoomSyncService.cs" />
     <Compile Include="UI\SettingsForm.cs" />
     <Compile Include="UI\SettingsForm.Language.cs" />
     <Compile Include="UI\SettingsTabControl.cs" />
