@@ -63,6 +63,22 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return false;
             }
+            // Read the subject here, on the UI thread and before any await: it becomes the default
+            // share name, so the folder on Nextcloud says what the share is about. Every launch path
+            // funnels through this method, so this is the single place that needs it.
+            launchOptions = launchOptions ?? new FileLinkWizardLaunchOptions();
+            if (string.IsNullOrWhiteSpace(launchOptions.MailSubject))
+            {
+                try
+                {
+                    launchOptions.MailSubject = mail.Subject ?? string.Empty;
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to read the mail subject for the default share name.", ex);
+                }
+            }
+
             var configuration = new TalkServiceConfiguration(
                 settings.ServerUrl,
                 settings.Username,
