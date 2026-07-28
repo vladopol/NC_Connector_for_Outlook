@@ -656,7 +656,7 @@ namespace NcTalkOutlookAddIn.UI
             _passwordTextBox.Text = string.Empty;
             if (_passwordToggleCheckBox.Checked)
             {
-                TalkPassword = PasswordGenerationHelper.GenerateSimpleNumeric(_passwordPolicy, DefaultMinPasswordLength);
+                TalkPassword = PasswordGenerationHelper.GenerateRoomPin(_passwordPolicy, DefaultMinPasswordLength);
                 _passwordTextBox.Text = TalkPassword;
             }
 
@@ -845,11 +845,16 @@ namespace NcTalkOutlookAddIn.UI
 
             bool passwordEnabled = _passwordToggleCheckBox.Checked;
             TalkPassword = passwordEnabled ? _passwordTextBox.Text.Trim() : string.Empty;
-            int minLength = PasswordGenerationHelper.ResolveMinLength(_passwordPolicy, DefaultMinPasswordLength);
-            if (passwordEnabled && TalkPassword.Length > 0 && TalkPassword.Length < minLength)
+
+            // Mirror the server's password_policy locally, so a password that Nextcloud would
+            // reject is caught here with the actual reason instead of failing room creation.
+            string policyViolation = passwordEnabled
+                ? PasswordGenerationHelper.DescribePolicyViolation(TalkPassword, _passwordPolicy, DefaultMinPasswordLength)
+                : null;
+            if (!string.IsNullOrEmpty(policyViolation))
             {
                 MessageBox.Show(
-                    string.Format(CultureInfo.CurrentCulture, Strings.TalkPasswordTooShort, minLength),
+                    policyViolation,
                     Strings.DialogTitle,
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning);
@@ -890,7 +895,7 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-            _passwordTextBox.Text = PasswordGenerationHelper.GenerateSimpleNumeric(_passwordPolicy, DefaultMinPasswordLength);
+            _passwordTextBox.Text = PasswordGenerationHelper.GenerateRoomPin(_passwordPolicy, DefaultMinPasswordLength);
         }
 
         private void SelectRoomType(TalkRoomType type)
