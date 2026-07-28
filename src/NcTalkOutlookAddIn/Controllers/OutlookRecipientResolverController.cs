@@ -128,6 +128,89 @@ namespace NcTalkOutlookAddIn.Controllers
             return emails;
         }
 
+        // Same resolution for an AddressEntry, which is what AppointmentItem.GetOrganizer() returns.
+        // Shares the session cache, since both paths resolve the same X.500 DNs.
+        internal static string TryResolveAddressEntrySmtpAddress(Outlook.AddressEntry entry)
+        {
+            if (entry == null)
+            {
+                return null;
+            }
+
+            string address = null;
+            try
+            {
+                address = entry.Address;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to read AddressEntry.Address.", ex);
+            }
+            if (!string.IsNullOrWhiteSpace(address) && address.IndexOf('@') >= 0)
+            {
+                return address;
+            }
+
+            string addressKey = address;
+            string cachedSmtp;
+            if (TryGetCachedSmtp(addressKey, out cachedSmtp))
+            {
+                return cachedSmtp;
+            }
+
+            Outlook.ExchangeUser exUser = null;
+            try
+            {
+                exUser = entry.GetExchangeUser();
+                if (exUser != null)
+                {
+                    address = exUser.PrimarySmtpAddress;
+                }
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to resolve Exchange user from an address entry.", ex);
+            }
+            finally
+            {
+                if (exUser != null)
+                {
+                    ComInteropScope.TryRelease(exUser, LogCategories.Talk, "Failed to release ExchangeUser COM object.");
+                }
+            }
+            if (!string.IsNullOrWhiteSpace(address) && address.IndexOf('@') >= 0)
+            {
+                CacheSmtp(addressKey, address);
+                return address;
+            }
+            try
+            {
+                Outlook.PropertyAccessor accessor = entry.PropertyAccessor;
+                if (accessor != null)
+                {
+                    try
+                    {
+                        const string SmtpSchema = "http://schemas.microsoft.com/mapi/proptag/0x39FE001E";
+                        address = accessor.GetProperty(SmtpSchema) as string;
+                    }
+                    finally
+                    {
+                        ComInteropScope.TryRelease(accessor, LogCategories.Talk, "Failed to release PropertyAccessor COM object.");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to resolve SMTP address from an address entry via PropertyAccessor.", ex);
+            }
+            if (!string.IsNullOrWhiteSpace(address) && address.IndexOf('@') >= 0)
+            {
+                CacheSmtp(addressKey, address);
+                return address;
+            }
+            return null;
+        }
+
         internal static string TryResolveRecipientSmtpAddress(Outlook.Recipient recipient)
         {            if (recipient == null)
             {
