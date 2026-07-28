@@ -46,7 +46,7 @@ namespace NcTalkOutlookAddIn.Controllers
                 _owner.OnSettingsButtonPressed(control);
                 return;
             }
-            if (!EnsureAuthenticationValid(control))
+            if (!await EnsureAuthenticationValidAsync(control))
             {
                 NextcloudTalkAddIn.LogTalkMessage("Talk link cancelled: authentication failed.");
                 return;
@@ -167,7 +167,12 @@ namespace NcTalkOutlookAddIn.Controllers
                     bool existingIsEvent = existingType.HasValue && existingType.Value == TalkRoomType.EventConversation;
                     NextcloudTalkAddIn.LogTalkMessage("Attempting to delete existing room (event=" + existingIsEvent + ").");
 
-                    if (!_owner.TryDeleteRoom(existingToken, existingIsEvent))
+                    bool existingDeleted;
+                    using (new WaitCursorScope())
+                    {
+                        existingDeleted = await Task.Run(() => _owner.TryDeleteRoom(existingToken, existingIsEvent));
+                    }
+                    if (!existingDeleted)
                     {
                         NextcloudTalkAddIn.LogTalkMessage("Deleting existing room failed.");
                         return;
@@ -181,7 +186,9 @@ namespace NcTalkOutlookAddIn.Controllers
                     {
                         NextcloudTalkAddIn.LogTalkMessage("Sending CreateRoom request to Nextcloud.");
                         var service = _owner.CreateTalkService();
-                        result = service.CreateRoom(request);
+                        // CreateRoom issues several requests in sequence; none of them touch COM,
+                        // so the whole chain belongs off the UI thread.
+                        result = await Task.Run(() => service.CreateRoom(request));
                     }
                     NextcloudTalkAddIn.LogTalkMessage("Room created successfully (token=" + result.RoomToken + ", URL=" + result.RoomUrl + ", event=" + result.CreatedAsEventConversation + ").");
                 }
@@ -217,27 +224,37 @@ namespace NcTalkOutlookAddIn.Controllers
             }
         }
 
-        private bool EnsureAuthenticationValid(IRibbonControl control)
+        // The connectivity probe runs on a thread-pool thread: it is the first thing a Talk click
+        // does, and on a server that accepts the connection but never answers it would otherwise
+        // block Outlook's message loop for the whole timeout.
+        private async Task<bool> EnsureAuthenticationValidAsync(IRibbonControl control)
         {
             try
             {
+                VerifyConnectionOutcome outcome;
                 using (new WaitCursorScope())
                 {
                     var service = _owner.CreateTalkService();
-                    string response;
                     NextcloudTalkAddIn.LogTalkMessage("Starting credential verification request.");
-                    if (service.VerifyConnection(out response))
+                    outcome = await Task.Run(() =>
                     {
-                        _owner.UpdateStoredServerVersion(response);
-                        NextcloudTalkAddIn.LogTalkMessage("Credentials verified (response=" + (string.IsNullOrEmpty(response) ? "OK" : response) + ").");
-                        return true;
-                    }
-                    string message = string.IsNullOrEmpty(response)
-                        ? Strings.ErrorCredentialsNotVerified
-                        : string.Format(CultureInfo.CurrentCulture, Strings.ErrorCredentialsNotVerifiedFormat, response);
-                    NextcloudTalkAddIn.LogTalkMessage("Invalid credentials: " + message);
-                    return PromptOpenSettings(message, control);
+                        string probeResponse;
+                        bool ok = service.VerifyConnection(out probeResponse);
+                        return new VerifyConnectionOutcome(ok, probeResponse);
+                    });
                 }
+
+                if (outcome.Succeeded)
+                {
+                    _owner.UpdateStoredServerVersion(outcome.Response);
+                    NextcloudTalkAddIn.LogTalkMessage("Credentials verified (response=" + (string.IsNullOrEmpty(outcome.Response) ? "OK" : outcome.Response) + ").");
+                    return true;
+                }
+                string message = string.IsNullOrEmpty(outcome.Response)
+                    ? Strings.ErrorCredentialsNotVerified
+                    : string.Format(CultureInfo.CurrentCulture, Strings.ErrorCredentialsNotVerifiedFormat, outcome.Response);
+                NextcloudTalkAddIn.LogTalkMessage("Invalid credentials: " + message);
+                return PromptOpenSettings(message, control);
             }
             catch (TalkServiceException ex)
             {
@@ -263,6 +280,20 @@ namespace NcTalkOutlookAddIn.Controllers
                 NextcloudTalkAddIn.LogTalkMessage("Unexpected error during connection check: " + ex.Message);
                 return PromptOpenSettings(string.Format(Strings.ErrorUnknownAuthentication, ex.Message), control);
             }
+        }
+
+        // VerifyConnection reports through an out parameter, which cannot cross a Task boundary.
+        private sealed class VerifyConnectionOutcome
+        {
+            internal VerifyConnectionOutcome(bool succeeded, string response)
+            {
+                Succeeded = succeeded;
+                Response = response;
+            }
+
+            internal bool Succeeded { get; private set; }
+
+            internal string Response { get; private set; }
         }
 
         private bool PromptOpenSettings(string message, IRibbonControl control)

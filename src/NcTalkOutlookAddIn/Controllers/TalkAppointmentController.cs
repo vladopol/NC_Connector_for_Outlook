@@ -119,7 +119,14 @@ namespace NcTalkOutlookAddIn.Controllers
             NextcloudTalkAddIn.LogTalkMessage("X-NCTALK fields updated (token set, lobby=" + request.LobbyEnabled + ", search=" + request.SearchVisible + ").");
 
             _owner.RegisterSubscription(appointment, result);
-            TryUpdateRoomDescription(appointment, result.RoomToken, result.CreatedAsEventConversation);
+
+            // The description push is a network call and must not run on the UI thread. Read the
+            // body here (COM), then hand the plain string to a background task.
+            if (!result.CreatedAsEventConversation)
+            {
+                string description = BuildDescriptionPayload(appointment) ?? string.Empty;
+                _owner.QueueRoomDescriptionUpdate(result.RoomToken, description, result.CreatedAsEventConversation);
+            }
         }
 
         // Read-only counterpart of the objectId that PersistCoreIcalProperties stores. Used by the
@@ -535,61 +542,6 @@ namespace NcTalkOutlookAddIn.Controllers
             }
         }
 
-        internal bool TryUpdateRoomDescription(Outlook.AppointmentItem appointment, string roomToken, bool isEventConversation)
-        {
-            if (string.IsNullOrWhiteSpace(roomToken))
-            {
-                return false;
-            }
-            if (isEventConversation)
-            {
-                NextcloudTalkAddIn.LogTalkMessage("Room description update skipped for event conversation before request (token=" + roomToken + ").");
-                return true;
-            }
-            string delegateId;
-            if (IsDelegatedToOtherUser(appointment, out delegateId))
-            {
-                NextcloudTalkAddIn.LogTalkMessage("Description update skipped (delegation=" + delegateId + ", token=" + roomToken + ").");
-                return true;
-            }
-            string description = BuildDescriptionPayload(appointment);
-            if (description == null)
-            {
-                description = string.Empty;
-            }
-            try
-            {
-                var service = _owner.CreateTalkService();
-                NextcloudTalkAddIn.LogTalkMessage("Updating room description (token=" + roomToken + ", event=" + isEventConversation + ", textLength=" + description.Length + ").");
-                service.UpdateDescription(roomToken, description, isEventConversation);
-                NextcloudTalkAddIn.LogTalkMessage("Room description updated (token=" + roomToken + ").");
-                return true;
-            }
-            catch (TalkServiceException ex)
-            {
-                if (IsEventConversationDescriptionError(ex))
-                {
-                    NextcloudTalkAddIn.LogTalkMessage("Room description update skipped after event-conversation response (token=" + roomToken + ").");
-                    PersistEventConversationTraits(appointment, roomToken);
-                    return true;
-                }
-                if (IsMissingOrForbiddenRoomMutationError(ex))
-                {
-                    NextcloudTalkAddIn.LogTalkMessage("Room description update skipped after access loss (token=" + roomToken + ", status=" + (int)ex.StatusCode + ").");
-                    return true;
-                }
-
-                NextcloudTalkAddIn.LogTalkMessage("Room description could not be updated: " + ex.Message);
-                NextcloudTalkAddIn.ShowWarningDialog(string.Format(Strings.WarningDescriptionUpdateFailed, ex.Message));
-            }
-            catch (Exception ex)
-            {
-                NextcloudTalkAddIn.LogTalkMessage("Unexpected error while updating room description: " + ex.Message);
-                NextcloudTalkAddIn.ShowWarningDialog(string.Format(Strings.WarningDescriptionUpdateFailed, ex.Message));
-            }
-            return false;
-        }
-
         private static string BuildDescriptionPayload(Outlook.AppointmentItem appointment)
         {
             // Defensive fallback: upstream callers are internal, but COM callbacks can still race.
@@ -617,23 +569,6 @@ namespace NcTalkOutlookAddIn.Controllers
                 }
             }
             return null;
-        }
-
-        private void PersistEventConversationTraits(Outlook.AppointmentItem appointment, string roomToken)
-        {
-            if (appointment == null)
-            {
-                return;
-            }
-            try
-            {
-                SetUserProperty(appointment, NextcloudTalkAddIn.IcalEvent, Outlook.OlUserPropertyType.olText, "event");
-                NextcloudTalkAddIn.LogTalkMessage("Conversation type persisted as event (token=" + (roomToken ?? "n/a") + ").");
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to persist event conversation traits (token=" + (roomToken ?? "n/a") + ").", ex);
-            }
         }
 
         internal void ClearTalkProperties(Outlook.AppointmentItem appointment)
@@ -816,26 +751,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 DiagnosticsLogger.LogException(LogCategories.Core, "Failed to remove user property '" + name + "'.", ex);
             }
-        }
-
-        private static bool IsEventConversationDescriptionError(TalkServiceException ex)
-        {
-            if (ex == null || string.IsNullOrWhiteSpace(ex.Message))
-            {
-                return false;
-            }
-            string normalized = ex.Message.Trim();
-            return string.Equals(normalized, "event", StringComparison.OrdinalIgnoreCase)
-                   || normalized.IndexOf("event conversation", StringComparison.OrdinalIgnoreCase) >= 0;
-        }
-
-        private static bool IsMissingOrForbiddenRoomMutationError(TalkServiceException ex)
-        {
-            if (ex == null)
-            {
-                return false;
-            }
-            return ex.StatusCode == HttpStatusCode.NotFound || ex.StatusCode == HttpStatusCode.Forbidden;
         }
 
         private static string GetNormalizedRoomName(Outlook.AppointmentItem appointment)

@@ -4,6 +4,50 @@ All notable changes to **NC Connector for Outlook** will be documented in this f
 
 This project follows the principles of **Keep a Changelog** and **Semantic Versioning**.
 
+## [3.1.0.13] - 2026-07-28
+
+Fork patch on upstream 3.1.0.
+
+---
+
+### No add-in code path blocks Outlook's UI thread on the network any more
+
+3.1.0.12 only capped how long the wizards could freeze Outlook. This removes the blocking itself, so
+the caps are no longer load-bearing — and with the blocking gone the caps could be cut to values
+that match how a working server actually behaves.
+
+**Talk ribbon flow** (`TalkRibbonController`) — the async plumbing already existed end to end, so
+each blocking call simply moved off the thread:
+
+- The connectivity probe, the room-replacement delete chain and `CreateRoom` (itself several
+  requests in sequence) now run via `Task.Run`. COM access stays on the UI thread.
+- The room description push after creation is queued to the background instead of running inline
+  inside `ApplyRoomToAppointment` (`QueueRoomDescriptionUpdate`); the appointment body is read on the
+  UI thread and handed over as a plain string.
+
+**FileLink wizard** (`FileLinkWizardForm`) — the navigation chain is now asynchronous:
+
+- `Navigate` → `ValidateCurrentStep` → `EnsureShareFolderAvailable` became
+  `NavigateAsync` → `ValidateCurrentStepAsync` → `EnsureShareFolderAvailableAsync`, with the Back and
+  Next handlers awaiting them. Because the message loop keeps pumping across an await, navigation is
+  locked while a server call is in flight so a second click cannot start a parallel transition, and
+  every continuation checks `IsDisposed` before touching controls.
+- **The attachment-mode share name is no longer resolved in the constructor.** It probes WebDAV for
+  a free folder name in a loop, so the wizard window did not appear at all until the server answered.
+  It now runs from `OnShown` with the whole probing loop on a thread-pool thread: the window opens
+  immediately and the name fills in once resolved.
+- `PrepareUpload` (both call sites) moved to `Task.Run`; the share-folder cleanup on cancel/close
+  paths became fire-and-forget, since nothing consumes its result and some callers run from
+  `FormClosing` where awaiting is not possible.
+
+**Timeouts** could then be cut to what a functioning server actually needs: connectivity probe and
+policy fetches 10 s → **5 s**, interactive control-plane calls 15 s → **8 s**, background ones
+30 s → **15 s**, user directory 30 s → **20 s**.
+
+File transfers keep their 120 s ceiling, deliberately. That timeout is the wait for the server's
+*response* — including assembling a chunked upload into its final file — and that work scales with
+the size of the attachment. Shortening it would not make anything faster, only break large uploads.
+
 ## [3.1.0.12] - 2026-07-28
 
 Fork patch on upstream 3.1.0.

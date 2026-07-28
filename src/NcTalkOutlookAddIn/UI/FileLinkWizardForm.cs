@@ -22,6 +22,7 @@ namespace NcTalkOutlookAddIn.UI
     // file/folder selection, note, and upload progress).
     internal sealed partial class FileLinkWizardForm : ScaledForm
     {
+        private const int AttachmentShareNameMaxProbes = 1000;
         private const int DefaultMinPasswordLength = 8;
         private const string AttachmentShareNameBase = "email_attachment";
         private const string AttachmentShareDatePrefixFormat = "yyyyMMdd";
@@ -102,6 +103,8 @@ namespace NcTalkOutlookAddIn.UI
         private bool _uploadCompleted;
         private bool _allowEmptyUpload;
         private bool _shareFinalized;
+        private bool _navigationBusy;
+        private bool _attachmentShareNameResolved;
         private int _pathColumnHorizontalOffset;
         private int _pathColumnMaxHorizontalOffset;
         private ListViewItem _lastAutoScrolledUploadItem;
@@ -319,11 +322,22 @@ namespace NcTalkOutlookAddIn.UI
             PositionProgressBars();
         }
 
-        protected override void OnShown(EventArgs e)
+        protected override async void OnShown(EventArgs e)
         {
             base.OnShown(e);
             AdjustInitialDialogSizeForDisplay();
             ReflowWizardLayout();
+
+            // async void is unavoidable for an event override; the body must therefore never let an
+            // exception escape.
+            try
+            {
+                await ResolveAttachmentShareNameAsync();
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to resolve attachment-mode share name.", ex);
+            }
         }
 
         protected override void OnFormClosing(FormClosingEventArgs e)
@@ -412,7 +426,7 @@ namespace NcTalkOutlookAddIn.UI
 
             _backButton.Text = Strings.ButtonBack;
             _backButton.AutoSize = false;
-            _backButton.Click += (s, e) => Navigate(-1);
+            _backButton.Click += async (s, e) => await NavigateAsync(-1);
             Controls.Add(_backButton);
 
             _uploadButton.Text = Strings.FileLinkWizardUploadButton;
@@ -424,7 +438,7 @@ namespace NcTalkOutlookAddIn.UI
 
             _nextButton.Text = Strings.ButtonNext;
             _nextButton.AutoSize = false;
-            _nextButton.Click += (s, e) => Navigate(1);
+            _nextButton.Click += async (s, e) => await NavigateAsync(1);
             Controls.Add(_nextButton);
 
             _finishButton.Text = Strings.FileLinkWizardFinishButton;
@@ -1039,21 +1053,54 @@ namespace NcTalkOutlookAddIn.UI
             PositionProgressBars();
         }
 
-        private void Navigate(int direction)
+        private async Task NavigateAsync(int direction)
         {
-            if (_attachmentMode)
+            if (_attachmentMode || _navigationBusy)
             {
                 return;
             }
-            if (direction > 0 && !ValidateCurrentStep())
+            if (direction > 0)
             {
-                return;
+                // Validation can await a server round-trip, during which the message loop keeps
+                // pumping — without this guard a second click would start a parallel navigation.
+                _navigationBusy = true;
+                DisableNavigationDuringServerCall();
+                try
+                {
+                    if (!await ValidateCurrentStepAsync())
+                    {
+                        return;
+                    }
+                }
+                finally
+                {
+                    _navigationBusy = false;
+                    if (!IsDisposed)
+                    {
+                        _uploadButton.Enabled = true;
+                        UpdateNavigationState();
+                    }
+                }
+                if (IsDisposed)
+                {
+                    return;
+                }
             }
             int newIndex = _currentStepIndex + direction;
             ShowStep(newIndex);
         }
 
-        private bool ValidateCurrentStep()
+        // Locks the wizard's buttons while an awaited server call is in flight. Re-enabling goes
+        // through UpdateNavigationState, which owns the real per-step and per-mode rules.
+        private void DisableNavigationDuringServerCall()
+        {
+            _backButton.Enabled = false;
+            _nextButton.Enabled = false;
+            _finishButton.Enabled = false;
+            _uploadButton.Enabled = false;
+        }
+
+        private async Task<bool> ValidateCurrentStepAsync()
         {
             if (_attachmentMode)
             {
@@ -1089,7 +1136,7 @@ namespace NcTalkOutlookAddIn.UI
                     _passwordTextBox.Focus();
                     return false;
                 }
-                if (!EnsureShareFolderAvailable())
+                if (!await EnsureShareFolderAvailableAsync())
                 {
                     return false;
                 }
@@ -1184,7 +1231,7 @@ namespace NcTalkOutlookAddIn.UI
         {
             if (_attachmentMode)
             {
-                if (!ValidateCurrentStep())
+                if (!await ValidateCurrentStepAsync())
                 {
                     return;
                 }
@@ -1205,14 +1252,14 @@ namespace NcTalkOutlookAddIn.UI
             }
             else
             {
-                if (!ValidateCurrentStep())
+                if (!await ValidateCurrentStepAsync())
                 {
                     return;
                 }
 
                 ApplyFormData();                if (_allowEmptyUpload && (_uploadContext == null || !_uploadCompleted))
                 {
-                    _uploadContext = _service.PrepareUpload(_request, CancellationToken.None);
+                    _uploadContext = await Task.Run(() => _service.PrepareUpload(_request, CancellationToken.None));
                     _uploadCompleted = true;
                 }
             }
@@ -1349,7 +1396,9 @@ namespace NcTalkOutlookAddIn.UI
             return clone;
         }
 
-        private bool EnsureShareFolderAvailable()
+        // The existence check is a WebDAV round-trip. It used to run on the UI thread, freezing
+        // Outlook for the whole timeout whenever the server accepted the connection and went quiet.
+        private async Task<bool> EnsureShareFolderAvailableAsync()
         {
             string shareNameInput = _shareNameTextBox.Text.Trim();
             string sanitizedShareName = FileLinkService.SanitizeComponent(shareNameInput);
@@ -1365,7 +1414,12 @@ namespace NcTalkOutlookAddIn.UI
                 Cursor.Current = Cursors.WaitCursor;
                 UseWaitCursor = true;
 
-                if (_service.FolderExists(_request.BasePath, folderName, CancellationToken.None))
+                bool exists = await Task.Run(() => _service.FolderExists(_request.BasePath, folderName, CancellationToken.None));
+                if (IsDisposed)
+                {
+                    return false;
+                }
+                if (exists)
                 {
                     MessageBox.Show(
                         string.Format(CultureInfo.CurrentCulture, Strings.FileLinkWizardFolderExistsFormat, folderName),
@@ -1424,28 +1478,34 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-            try
+            // Best-effort cleanup on cancel/close paths — nothing consumes the outcome, and some of
+            // these run from FormClosing where awaiting is not an option. Fire and forget.
+            var service = _service;
+            Task.Run(() =>
             {
-                _service.DeleteShareFolder(relativeFolderPath, CancellationToken.None);
-                DiagnosticsLogger.Log(
-                    LogCategories.FileLink,
-                    "Wizard upload context cleanup succeeded (reason="
-                    + (reason ?? string.Empty)
-                    + ", relativeFolder="
-                    + relativeFolderPath
-                    + ").");
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(
-                    LogCategories.FileLink,
-                    "Wizard upload context cleanup failed (reason="
-                    + (reason ?? string.Empty)
-                    + ", relativeFolder="
-                    + relativeFolderPath
-                    + ").",
-                    ex);
-            }
+                try
+                {
+                    service.DeleteShareFolder(relativeFolderPath, CancellationToken.None);
+                    DiagnosticsLogger.Log(
+                        LogCategories.FileLink,
+                        "Wizard upload context cleanup succeeded (reason="
+                        + (reason ?? string.Empty)
+                        + ", relativeFolder="
+                        + relativeFolderPath
+                        + ").");
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticsLogger.LogException(
+                        LogCategories.FileLink,
+                        "Wizard upload context cleanup failed (reason="
+                        + (reason ?? string.Empty)
+                        + ", relativeFolder="
+                        + relativeFolderPath
+                        + ").",
+                        ex);
+                }
+            });
         }
 
         private void LoadInitialSelections()
@@ -1478,28 +1538,9 @@ namespace NcTalkOutlookAddIn.UI
             _attachmentModeInfoLabel.Text = infoText;
             _attachmentModeInfoLabel.Visible = !string.IsNullOrWhiteSpace(infoText);
 
-            Cursor previousCursor = Cursor.Current;
-            try
-            {
-                Cursor.Current = Cursors.WaitCursor;
-                UseWaitCursor = true;
-                ResolveAttachmentShareName();
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to resolve attachment-mode share name.", ex);
-                MessageBox.Show(
-                    ex.Message,
-                    Strings.DialogTitle,
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
-            }
-            finally
-            {
-                UseWaitCursor = false;
-                Cursor.Current = previousCursor;
-            }
-
+            // The share name needs WebDAV round-trips to find a free folder. This method runs from
+            // the constructor, so doing that here kept the wizard window from appearing at all until
+            // the server answered. It is resolved in OnShown instead, once the form is visible.
             ShowStep(2);
         }
 
@@ -1517,36 +1558,91 @@ namespace NcTalkOutlookAddIn.UI
                 SizeFormatting.FormatMegabytes(_launchOptions.AttachmentLastSizeBytes));
         }
 
-        private void ResolveAttachmentShareName()
+        // Probes for a free share folder name. The whole probing loop runs on a thread-pool thread —
+        // it is a sequence of WebDAV requests, and only the result touches the UI.
+        private async Task ResolveAttachmentShareNameAsync()
         {
-            if (!_attachmentMode)
+            if (!_attachmentMode || _attachmentShareNameResolved)
             {
                 return;
             }
-            for (int suffix = 0; suffix < 1000; suffix++)
-            {
-                string candidate = suffix == 0
-                    ? AttachmentShareNameBase
-                    : AttachmentShareNameBase + "_" + suffix.ToString(CultureInfo.InvariantCulture);
-                string folderName = BuildShareFolderName(candidate);
-                bool exists = _service.FolderExists(_request.BasePath, folderName, CancellationToken.None);
-                DiagnosticsLogger.Log(
-                    LogCategories.FileLink,
-                    "Attachment mode share name check: candidate="
-                    + candidate
-                    + ", folder="
-                    + folderName
-                    + ", exists="
-                    + exists.ToString(CultureInfo.InvariantCulture));
+            _attachmentShareNameResolved = true;
 
-                if (!exists)
-                {
-                    _shareNameTextBox.Text = candidate;
-                    return;
-                }
+            string basePath = _request.BasePath;
+            var candidates = new List<string>();
+            for (int suffix = 0; suffix < AttachmentShareNameMaxProbes; suffix++)
+            {
+                candidates.Add(suffix == 0
+                    ? AttachmentShareNameBase
+                    : AttachmentShareNameBase + "_" + suffix.ToString(CultureInfo.InvariantCulture));
+            }
+            var folderNames = new List<string>();
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                folderNames.Add(BuildShareFolderName(candidates[i]));
             }
 
-            throw new TalkServiceException(Strings.FileLinkWizardFolderExistsFormat, false, 0, null);
+            DisableNavigationDuringServerCall();
+            UseWaitCursor = true;
+            string resolved = null;
+            Exception failure = null;
+            try
+            {
+                resolved = await Task.Run(() =>
+                {
+                    for (int i = 0; i < candidates.Count; i++)
+                    {
+                        bool exists = _service.FolderExists(basePath, folderNames[i], CancellationToken.None);
+                        DiagnosticsLogger.Log(
+                            LogCategories.FileLink,
+                            "Attachment mode share name check: candidate="
+                            + candidates[i]
+                            + ", folder="
+                            + folderNames[i]
+                            + ", exists="
+                            + exists.ToString(CultureInfo.InvariantCulture));
+                        if (!exists)
+                        {
+                            return candidates[i];
+                        }
+                    }
+                    return null;
+                });
+            }
+            catch (Exception ex)
+            {
+                failure = ex;
+            }
+            if (IsDisposed)
+            {
+                return;
+            }
+
+            UseWaitCursor = false;
+            _uploadButton.Enabled = true;
+            UpdateNavigationState();
+
+            if (failure != null)
+            {
+                DiagnosticsLogger.LogException(LogCategories.FileLink, "Attachment-mode share name probing failed.", failure);
+                MessageBox.Show(
+                    failure.Message,
+                    Strings.DialogTitle,
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
+            }
+            if (resolved == null)
+            {
+                MessageBox.Show(
+                    Strings.FileLinkWizardFolderExistsFormat,
+                    Strings.DialogTitle,
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
+            }
+
+            _shareNameTextBox.Text = resolved;
         }
 
         private bool EnsureAttachmentAutomationAllowedForFinalize()
@@ -2462,7 +2558,8 @@ namespace NcTalkOutlookAddIn.UI
                 _cancellationSource = new CancellationTokenSource();
                 CancellationToken token = _cancellationSource.Token;
 
-                preparedContext = _service.PrepareUpload(_request, token);
+                // PrepareUpload creates the share folder over WebDAV; keep it off the UI thread.
+                preparedContext = await Task.Run(() => _service.PrepareUpload(_request, token));
                 var progress = new Progress<FileLinkUploadItemProgress>(HandleUploadProgress);
 
                 await Task.Run(() =>
