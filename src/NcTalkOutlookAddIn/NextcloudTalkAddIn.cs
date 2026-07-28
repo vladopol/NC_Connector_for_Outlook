@@ -691,6 +691,31 @@ namespace NcTalkOutlookAddIn
             });
         }
 
+        // Deletes a room that was created for an appointment the user then discarded. Unlike
+        // QueueSavedEventRoomDeletion this is unconditional — the appointment never existed as far
+        // as anyone else is concerned — but it must still not run on the UI thread: it is triggered
+        // from a WinForms timer tick, where a stalled server would freeze Outlook.
+        internal void QueueDiscardedRoomDeletion(string roomToken, bool isEventConversation)
+        {
+            if (string.IsNullOrWhiteSpace(roomToken))
+            {
+                return;
+            }
+
+            string normalizedRoomToken = roomToken.Trim();
+            Task.Run(() =>
+            {
+                try
+                {
+                    TryDeleteRoom(normalizedRoomToken, isEventConversation, false);
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticsLogger.LogException(LogCategories.Talk, "Discarded-appointment room deletion failed in background (token=" + normalizedRoomToken + ").", ex);
+                }
+            });
+        }
+
         internal void TryQueueCalDavDelete(string entryId)
         {
             if (string.IsNullOrWhiteSpace(entryId) || _currentSettings == null || !_currentSettings.CalDavSyncEnabled)

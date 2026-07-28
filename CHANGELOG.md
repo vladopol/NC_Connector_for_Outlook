@@ -4,6 +4,39 @@ All notable changes to **NC Connector for Outlook** will be documented in this f
 
 This project follows the principles of **Keep a Changelog** and **Semantic Versioning**.
 
+## [3.1.0.10] - 2026-07-28
+
+Fork patch on upstream 3.1.0.
+
+---
+
+### RESOLVED: Outlook freezes and "slow add-in" auto-disable
+
+Outlook times add-in startup and event-handler responsiveness and disables add-ins that exceed its
+thresholds. An audit of every path that runs on Outlook's UI thread found blocking network I/O in
+places that execute during normal mail and calendar work.
+
+- **Attachment handling blocked the UI thread on an uncached HTTP request (the main offender).**
+  `Explorer`/`Inspector` `BeforeAttachmentAdd` must return a decision synchronously, and it called
+  the backend policy endpoint via `.GetAwaiter().GetResult()`. That endpoint was **never cached** and
+  uses a **45 s timeout**, so *every attachment added to any email* froze Outlook until the Nextcloud
+  server answered — up to 45 seconds with the server unreachable (VPN down, server restarting).
+  The handler is now I/O-free: it reads the policy from a process cache, falls back to local settings
+  when nothing is cached, and triggers a background refresh for next time.
+- **Backend policy status is now cached** (`BackendPolicyCache`, 10 min TTL, 2 min back-off after a
+  failure, one in-flight refresh at a time). It was previously re-fetched on every single call.
+- **Exchange address resolution is memoized.** Mapping a recipient to its SMTP address falls through
+  to `AddressEntry.GetExchangeUser()` / `PropertyAccessor`, which can round-trip to Exchange. This
+  happens on the UI thread, repeatedly, for the same colleagues; the X.500 DN → SMTP mapping is now
+  cached for the session.
+- **Startup work moved out of the measured window.** `OnConnection` no longer opens the calendar
+  folder, touches the registry or attaches the CalDAV sync inline — that wiring is posted back to the
+  UI thread and runs once Outlook's message loop is pumping. Only settings loading and the inspector
+  hook remain in the timed path.
+- **Room deletion for a discarded appointment** ran a synchronous HTTP DELETE from a WinForms timer
+  tick on the UI thread. It is now queued to a background thread.
+- **Debug logging** no longer issues a `Directory.CreateDirectory` syscall per written line.
+
 ## [3.1.0.9] - 2026-07-05
 
 Fork patch on upstream 3.1.0.

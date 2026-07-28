@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -133,6 +133,7 @@
     <Compile Include="Services\FileLinkUploadContext.cs" />
     <Compile Include="Services\FileLinkService.cs" />
     <Compile Include="Services\BackendPolicyService.cs" />
+    <Compile Include="Services\BackendPolicyCache.cs" />
     <Compile Include="Services\OutlookAttachmentAutomationGuardService.cs" />
     <Compile Include="Services\PasswordPolicyService.cs" />
     <Compile Include="Services\ICalBuilder.cs" />

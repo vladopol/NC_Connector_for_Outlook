@@ -585,17 +585,14 @@ namespace NcTalkOutlookAddIn
                     Dispose();
                     return;
                 }
-                if (_owner.TryDeleteRoom(_roomToken, _isEventConversation))
-                {
-                    _owner._talkAppointmentController.ClearTalkProperties(_appointment);
-                    _roomDeleted = true;
-                    LogTalk("EnsureRoomDeleted successful (token=" + _roomToken + ").");
-                    Dispose();
-                }
-                else
-                {
-                    LogTalk("EnsureRoomDeleted failed (token=" + _roomToken + ").");
-                }
+                // The HTTP delete goes to a background thread: this runs from a timer tick on the UI
+                // thread, and a stalled server would freeze Outlook. The local metadata is cleared
+                // immediately — the appointment is being discarded either way.
+                _roomDeleted = true;
+                _owner._talkAppointmentController.ClearTalkProperties(_appointment);
+                _owner.QueueDiscardedRoomDeletion(_roomToken, _isEventConversation);
+                LogTalk("EnsureRoomDeleted queued (token=" + _roomToken + ").");
+                Dispose();
             }
 
             private void QueueSavedEventRoomDeletion()

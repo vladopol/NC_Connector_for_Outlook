@@ -61,8 +61,43 @@ namespace NcTalkOutlookAddIn
             // Automatic FileLink attachment sharing is unavailable for Reading Pane inline replies as a
             // result; it still works for popped-out compose windows via NewInspector.
             EnsureInspectorHook();
-            ApplyIfbSettings();
-            ApplyCalDavSyncSettings();
+
+            // Everything below touches the MAPI store (Session.GetDefaultFolder) or the registry and
+            // is not needed for Outlook to finish loading. Outlook times OnConnection and disables
+            // add-ins that exceed its threshold, so this work is posted back to the UI thread and
+            // runs once the message loop is pumping instead of inside the measured window.
+            DeferStartupWiring();
+        }
+
+        private void DeferStartupWiring()
+        {
+            SynchronizationContext context = _uiSynchronizationContext;
+            if (context == null)
+            {
+                RunStartupWiring();
+                return;
+            }
+
+            context.Post(_ => RunStartupWiring(), null);
+        }
+
+        private void RunStartupWiring()
+        {
+            // Shutdown can win the race against the posted callback.
+            if (_outlookApplication == null)
+            {
+                return;
+            }
+            try
+            {
+                ApplyIfbSettings();
+                ApplyCalDavSyncSettings();
+                LogCore("Deferred startup wiring completed.");
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Deferred startup wiring failed.", ex);
+            }
         }
 
         private void TryApplyOfficeUiLanguage()

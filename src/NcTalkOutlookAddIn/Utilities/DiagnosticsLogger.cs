@@ -58,6 +58,7 @@ namespace NcTalkOutlookAddIn.Utilities
             "(\\\\\\\\[^\\\\\\s]+\\\\[^\\\\\\s]+\\\\Users\\\\)([^\\\\]+)",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static DateTime _lastCleanupDateLocal = DateTime.MinValue.Date;
+        private static bool _logDirectoryEnsured;
         private static bool _enabled;
         private static bool _anonymizationEnabled = true;
         private static string[] _serverUrlTokens = new string[0];
@@ -153,7 +154,14 @@ namespace NcTalkOutlookAddIn.Utilities
                 lock (SyncRoot)
                 {
                     DateTime nowLocal = DateTime.Now;
-                    Directory.CreateDirectory(LogDirectory);
+                    // Every log line runs on whichever thread produced it — frequently Outlook's UI
+                    // thread inside a COM event handler — so the per-line syscall is kept to the
+                    // single append. The directory is created once per session, not per line.
+                    if (!_logDirectoryEnsured)
+                    {
+                        Directory.CreateDirectory(LogDirectory);
+                        _logDirectoryEnsured = true;
+                    }
                     CleanupLogsIfNeeded(nowLocal);
 
                     string logFilePath = GetDailyLogFilePath(nowLocal);
@@ -169,6 +177,9 @@ namespace NcTalkOutlookAddIn.Utilities
             }
             catch (Exception ex)
             {
+                // Re-create the directory on the next line in case it was removed mid-session.
+                _logDirectoryEnsured = false;
+
                 // Logging must never throw. Fall back to Trace to make failures discoverable.
                 try
                 {
