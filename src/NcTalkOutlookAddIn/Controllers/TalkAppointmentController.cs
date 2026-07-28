@@ -50,10 +50,10 @@ namespace NcTalkOutlookAddIn.Controllers
                 + (request.ModeratorIds == null ? 0 : request.ModeratorIds.Count)
                 + ").");
 
-            if (!string.IsNullOrWhiteSpace(request.Title))
-            {
-                appointment.Subject = request.Title.Trim();
-            }
+            // The appointment's subject is deliberately left alone. It is the source of the room
+            // name, not a copy of it — writing back here used to silently rename the user's meeting
+            // whenever Outlook had not yet committed a freshly typed subject to the COM object, and
+            // the dialog fell back to its placeholder title.
 
             appointment.Location = result.RoomUrl;
             string normalizedDescriptionType = NextcloudTalkAddIn.NormalizeTalkEventDescriptionType(request.DescriptionType);
