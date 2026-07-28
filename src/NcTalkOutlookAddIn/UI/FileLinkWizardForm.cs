@@ -578,9 +578,7 @@ namespace NcTalkOutlookAddIn.UI
             panel.Controls.Add(_shareNameLabel);
 
             _shareNameTextBox.Width = 360;
-            _shareNameTextBox.Text = string.IsNullOrWhiteSpace(_defaults.SharingDefaultShareName)
-                ? Strings.FileLinkWizardFallbackShareName
-                : _defaults.SharingDefaultShareName;
+            _shareNameTextBox.Text = ResolveDefaultShareName();
             _shareNameTextBox.TextChanged += (s, e) => InvalidateUpload();
             panel.Controls.Add(_shareNameTextBox);
 
@@ -1449,6 +1447,57 @@ namespace NcTalkOutlookAddIn.UI
             return true;
         }
 
+        // Where the default share name comes from, most specific first:
+        //   1. an administrator's share_name_template (already folded into _defaults by policy)
+        //      or a value the user deliberately typed in Settings,
+        //   2. the subject of the mail the wizard was launched from,
+        //   3. the localized fallback.
+        //
+        // The subject is what makes the folder on Nextcloud self-describing. It is only a default —
+        // the field stays editable.
+        private string ResolveDefaultShareName()
+        {
+            if (!string.IsNullOrWhiteSpace(_defaults.SharingDefaultShareName))
+            {
+                return _defaults.SharingDefaultShareName.Trim();
+            }
+
+            string fromSubject = NormalizeShareNameFromSubject(
+                _launchOptions != null ? _launchOptions.MailSubject : null);
+            if (!string.IsNullOrEmpty(fromSubject))
+            {
+                return fromSubject;
+            }
+
+            return Strings.FileLinkWizardFallbackShareName;
+        }
+
+        // Subjects become folder names, so they are trimmed to something a file system and a WebDAV
+        // path can carry comfortably. Truncation is on a word boundary where one is available, so
+        // the result still reads as a phrase rather than a cut-off word.
+        private static string NormalizeShareNameFromSubject(string subject)
+        {
+            const int MaxLength = 60;
+
+            string candidate = FileLinkService.SanitizeComponent(subject ?? string.Empty).Trim();
+            if (candidate.Length == 0)
+            {
+                return string.Empty;
+            }
+            if (candidate.Length <= MaxLength)
+            {
+                return candidate;
+            }
+
+            string clipped = candidate.Substring(0, MaxLength);
+            int lastSpace = clipped.LastIndexOf(' ');
+            if (lastSpace >= MaxLength / 2)
+            {
+                clipped = clipped.Substring(0, lastSpace);
+            }
+            return clipped.Trim();
+        }
+
         private string BuildShareFolderName(string sanitizedShareName)
         {
             string prefixFormat = FileLinkService.NormalizeShareDatePrefixFormat(_request.ShareDatePrefixFormat);
@@ -1569,12 +1618,22 @@ namespace NcTalkOutlookAddIn.UI
             _attachmentShareNameResolved = true;
 
             string basePath = _request.BasePath;
+
+            // Attachment shares get the same subject-derived name as manual ones, falling back to
+            // the generic base when the mail has no subject yet. The suffix probing is unchanged.
+            string nameBase = NormalizeShareNameFromSubject(
+                _launchOptions != null ? _launchOptions.MailSubject : null);
+            if (string.IsNullOrEmpty(nameBase))
+            {
+                nameBase = AttachmentShareNameBase;
+            }
+
             var candidates = new List<string>();
             for (int suffix = 0; suffix < AttachmentShareNameMaxProbes; suffix++)
             {
                 candidates.Add(suffix == 0
-                    ? AttachmentShareNameBase
-                    : AttachmentShareNameBase + "_" + suffix.ToString(CultureInfo.InvariantCulture));
+                    ? nameBase
+                    : nameBase + "_" + suffix.ToString(CultureInfo.InvariantCulture));
             }
             var folderNames = new List<string>();
             for (int i = 0; i < candidates.Count; i++)

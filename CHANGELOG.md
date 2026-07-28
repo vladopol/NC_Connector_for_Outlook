@@ -4,6 +4,33 @@ All notable changes to **NC Connector for Outlook** will be documented in this f
 
 This project follows the principles of **Keep a Changelog** and **Semantic Versioning**.
 
+## [3.1.0.20] - 2026-07-29
+
+Fork patch on upstream 3.1.0.
+
+---
+
+### Share folders are named after the mail subject
+
+3.1.0.19 stopped share folders being named after a settings label, but the result was still
+generic: every share landed as `20260729_Общий доступ`, and several shares on the same day were
+indistinguishable. The mail's own subject is the obvious name, the same way the Talk room takes the
+meeting subject.
+
+Default share name, most specific source first:
+
+1. an administrator's `share_name_template`, or a value deliberately typed in Settings,
+2. the subject of the mail the wizard was launched from,
+3. the localized fallback ("Общий доступ" / "Share").
+
+The field stays editable — this only changes what it starts with. Attachment-mode shares use the
+same subject-derived name (falling back to `email_attachment`), keeping their existing suffix
+probing for collisions.
+
+Subjects are sanitized for use as a path component and capped at 60 characters, truncated on a word
+boundary where one is available. Mail subjects that Outlook has not yet committed to the item — the
+subject typed immediately before pressing the button — read back empty, and the fallback applies.
+
 ## [3.1.0.19] - 2026-07-29
 
 Fork patch on upstream 3.1.0.

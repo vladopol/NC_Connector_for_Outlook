@@ -15,6 +15,10 @@ namespace NcTalkOutlookAddIn.Models
             InitialSelections = new List<FileLinkSelection>();
         }
 
+        // Subject of the mail the wizard was launched from. Used as the default share name so the
+        // folder on Nextcloud says what the share is about instead of carrying a generic label.
+        internal string MailSubject { get; set; }
+
         internal bool AttachmentMode { get; set; }
 
         internal string AttachmentTrigger { get; set; }
