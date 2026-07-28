@@ -4,6 +4,34 @@ All notable changes to **NC Connector for Outlook** will be documented in this f
 
 This project follows the principles of **Keep a Changelog** and **Semantic Versioning**.
 
+## [3.1.0.17] - 2026-07-29
+
+Fork patch on upstream 3.1.0.
+
+---
+
+### FIXED: creating a Talk room could silently rename the meeting
+
+The dialog's "Title" field defaulted to the appointment subject and, on OK, wrote itself back into
+`appointment.Subject`. Outlook does not commit a freshly typed subject to the item until the field
+loses focus, so pressing the Talk button right after typing gave the dialog an **empty** subject —
+it fell back to its placeholder ("Встреча" / "Meeting"), and clicking OK replaced the subject the
+user had just typed.
+
+The field is removed. The meeting subject is the single source of the room name.
+
+- `ApplyRoomToAppointment` no longer writes `appointment.Subject`. The subject is the source of the
+  room name, not a copy of it.
+- The field had also become redundant: since 3.1.0.11 `TalkRoomSyncService` pushes the appointment
+  subject to the room name on every save, so anything typed into it was overwritten at the first
+  save regardless.
+- The `talk_title` backend policy is no longer applied — there is nothing left for it to control,
+  and a pinned title would be overwritten by the same sync. Two owners for one value is worse than
+  none.
+
+A meeting created with no subject at all still names its room "Meeting"; the first save replaces
+that with the real subject.
+
 ## [3.1.0.16] - 2026-07-28
 
 Fork patch on upstream 3.1.0.

@@ -30,12 +30,10 @@ namespace NcTalkOutlookAddIn.UI
         private const int ModeratorDropdownMargin = 4;
         private readonly UiThemePalette _themePalette = UiThemeManager.DetectPalette();
 
-        private readonly Label _titleLabel = new Label();
         private readonly Label _roomTypeLabel = new Label();
         private readonly Label _passwordLabel = new Label();
         private readonly GroupBox _settingsGroup = new GroupBox();
         private readonly Label _eventSupportHintLabel = new Label();
-        private readonly TextBox _titleTextBox = new TextBox();
         private readonly ComboBox _roomTypeComboBox = new ComboBox();
         // A room password is the exception rather than the rule, and it has no meaningful "off"
         // state worth displaying — so it is offered as an action rather than a checkbox that sits
@@ -190,9 +188,6 @@ namespace NcTalkOutlookAddIn.UI
                 // Builds all dialog controls (title, password, options, buttons).
         private void InitializeComponents()
         {
-            _titleLabel.Text = Strings.TalkTitleLabel;
-            _titleLabel.AutoSize = true;
-
             // Room type selector hidden — EventConversation is always used.
 
             _passwordToggleButton.AutoSize = false;
@@ -313,8 +308,6 @@ namespace NcTalkOutlookAddIn.UI
             _cancelButton.AutoSize = false;
             _cancelButton.DialogResult = DialogResult.Cancel;
 
-            Controls.Add(_titleLabel);
-            Controls.Add(_titleTextBox);
             Controls.Add(_eventSupportHintLabel);
             Controls.Add(_passwordToggleButton);
             Controls.Add(_passwordLabel);
@@ -381,9 +374,6 @@ namespace NcTalkOutlookAddIn.UI
                 int y = _headerPanel.Bottom + ScaleLogical(16);
                 int inputWidth = Math.Max(ScaleLogical(180), ClientSize.Width - inputX - ScaleLogical(18));
 
-                _titleLabel.Location = new Point(labelX, y + ScaleLogical(4));
-                _titleTextBox.SetBounds(inputX, y, inputWidth, _titleTextBox.PreferredHeight + ScaleLogical(2));
-                y = Math.Max(_titleLabel.Bottom, _titleTextBox.Bottom) + rowGap;
 
                 _eventSupportHintLabel.Visible = !_eventConversationsSupported;
                 if (_eventSupportHintLabel.Visible)
@@ -551,6 +541,8 @@ namespace NcTalkOutlookAddIn.UI
 
         private void ApplyDefaults(AddinSettings defaults, string appointmentSubject)
         {
+            // The room name is the meeting subject; there is no separate editing surface for it,
+            // so this only picks a placeholder for a meeting that has no subject yet.
             string titleDefault = string.IsNullOrWhiteSpace(appointmentSubject) ? DefaultTitle : appointmentSubject.Trim();
             bool passwordDefault = defaults == null || defaults.TalkDefaultPasswordEnabled;
             bool addUsersDefault = defaults == null || defaults.TalkDefaultAddUsers;
@@ -564,11 +556,9 @@ namespace NcTalkOutlookAddIn.UI
                 bool policyBool;
                 string policyString;
 
-                policyString = _backendPolicyStatus.GetPolicyString("talk", "talk_title");
-                if (!string.IsNullOrWhiteSpace(policyString))
-                {
-                    titleDefault = policyString;
-                }
+                // talk_title is deliberately not applied: the room name follows the meeting
+                // subject now, and TalkRoomSyncService would overwrite a pinned title on the very
+                // next save anyway. Two owners for one value is worse than none.
                 if (_backendPolicyStatus.TryGetPolicyBool("talk", "talk_set_password", out policyBool))
                 {
                     passwordDefault = policyBool;
@@ -600,7 +590,6 @@ namespace NcTalkOutlookAddIn.UI
             }
 
             TalkTitle = titleDefault;
-            _titleTextBox.Text = TalkTitle;
 
             _passwordEnabled = passwordDefault;
             TalkPassword = string.Empty;
@@ -666,7 +655,6 @@ namespace NcTalkOutlookAddIn.UI
 
         private void ApplyPolicyLockState()
         {
-            bool lockTitle = IsPolicyLocked("talk_title");
             bool lockRoomType = IsPolicyLocked("talk_room_type");
             bool lockPassword = IsPolicyLocked("talk_set_password");
             bool lockLobby = IsPolicyLocked("talk_lobby_active");
@@ -674,7 +662,6 @@ namespace NcTalkOutlookAddIn.UI
             bool lockUsers = IsPolicyLocked("talk_add_users");
             bool lockGuests = IsPolicyLocked("talk_add_guests");
 
-            _titleTextBox.Enabled = !lockTitle;
             _roomTypeComboBox.Enabled = !lockRoomType;
             _passwordToggleButton.Enabled = !lockPassword;
             _lobbyCheckBox.Enabled = !lockLobby;
@@ -690,7 +677,6 @@ namespace NcTalkOutlookAddIn.UI
                 _addGuestsCheckBox.Enabled = true;
             }
 
-            _disabledTooltipHints.Apply(_titleTextBox, lockTitle ? Strings.PolicyAdminControlledTooltip : string.Empty, lockTitle, _titleLabel);
             _disabledTooltipHints.Apply(_roomTypeComboBox, lockRoomType ? Strings.PolicyAdminControlledTooltip : _toolTip.GetToolTip(_roomTypeComboBox), lockRoomType, _roomTypeLabel);
             _disabledTooltipHints.Apply(
                 _passwordToggleButton,
@@ -784,7 +770,6 @@ namespace NcTalkOutlookAddIn.UI
                 // Collects user input, validates the password, and exposes the selection to the caller.
         private void OnOkButtonClick(object sender, EventArgs e)
         {
-            TalkTitle = _titleTextBox.Text.Trim();
 
             bool passwordEnabled = _passwordEnabled;
             TalkPassword = passwordEnabled ? _passwordTextBox.Text.Trim() : string.Empty;
