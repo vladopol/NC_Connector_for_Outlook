@@ -538,9 +538,11 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string TalkStandardRadio { get { return Get("ui_create_mode_standard", "Group conversation"); } }
         internal static string TalkDeleteRoomOnEventDeleteCheck { get { return Get("options_talk_delete_room_on_event_delete_label", "Delete Talk room when deleting a saved event"); } }
         internal static string TooltipDeleteRoomOnEventDelete { get { return Get("options_talk_delete_room_on_event_delete_tooltip", "Requires NC Connector Talk metadata and this opt-in. Unsaved appointment cleanup remains active."); } }
-        internal static string TalkModeratorGroup { get { return Get("ui_create_moderator_label", "Moderator (optional)"); } }
+        internal static string TalkModeratorGroup { get { return Get("talk_moderator_group_additional", "Additional moderators"); } }
         internal static string TalkModeratorClear { get { return Get("ui_button_clear", "Clear"); } }
-        internal static string TalkModeratorHint { get { return Get("ui_create_moderator_hint", "If provided, moderation is transferred to this user after creation and you leave the room."); } }
+        internal static string TalkModeratorHint { get { return Get("talk_moderator_hint_additional", "The meeting organizer is a moderator by default. Tick attendees who should also be able to moderate the room."); } }
+        internal static string TalkModeratorHintNoAttendees { get { return Get("talk_moderator_hint_no_attendees", "Add attendees to the meeting first — moderators are chosen from them. The organizer is a moderator by default."); } }
+        internal static string TalkModeratorHintNoCandidates { get { return Get("talk_moderator_hint_no_candidates", "None of the meeting attendees have a Nextcloud account. The organizer remains the only moderator."); } }
         internal static string TalkModeratorHintNoDirectory { get { return Get("outlook_moderator_hint_no_directory", "User directory unavailable. Please enter the username manually."); } }
         internal static string TalkModeratorNoMatches { get { return Get("ui_delegate_status_none_with_email", "No matches."); } }
         internal static string TalkSystemAddressbookRequiredShort { get { return Get("talk_system_addressbook_required_short", "Requires an active Nextcloud system address book."); } }

@@ -3,6 +3,7 @@
 // See LICENSE.txt for details.
 
 using System;
+using System.Collections.Generic;
 
 namespace NcTalkOutlookAddIn.Models
 {
@@ -35,8 +36,8 @@ namespace NcTalkOutlookAddIn.Models
 
         public bool AddGuests { get; set; }
 
-        public string DelegateModeratorId { get; set; }
-
-        public string DelegateModeratorName { get; set; }
+        // Nextcloud user ids promoted to moderator after the room is created. The organizer stays
+        // owner and stays in the room — this is not the ownership handover the older builds did.
+        public List<string> ModeratorIds { get; set; }
     }
 }
