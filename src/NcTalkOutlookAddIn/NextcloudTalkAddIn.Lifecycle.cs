@@ -50,6 +50,7 @@ namespace NcTalkOutlookAddIn
             ConfigureDiagnosticsLogger(_currentSettings);
             TryApplyTransportSecurityFromSettings("startup", false);
             TryApplyOfficeUiLanguage();
+            MigrateShareNameSeededFromLabel();
             LogCore("Add-in connected (Outlook version=" + (_outlookApplication != null ? _outlookApplication.Version : "unknown") + ").");
             if (!string.IsNullOrWhiteSpace(outlookProfileName))
             {
@@ -106,6 +107,38 @@ namespace NcTalkOutlookAddIn
             catch (Exception ex)
             {
                 DiagnosticsLogger.LogException(LogCategories.Core, "Deferred startup wiring failed.", ex);
+            }
+        }
+
+        // Older builds seeded SharingDefaultShareName with the settings field's own caption, so the
+        // stored value was a UI label — and it ended up as the real folder name on Nextcloud
+        // ("20260729_Share name"). Clear it once so the wizard's localized fallback applies again.
+        //
+        // Runs after TryApplyOfficeUiLanguage so the caption is compared in the same language it
+        // would have been written in. The English literal is checked too, for profiles written
+        // before a language change.
+        private void MigrateShareNameSeededFromLabel()
+        {
+            if (_currentSettings == null || string.IsNullOrWhiteSpace(_currentSettings.SharingDefaultShareName))
+            {
+                return;
+            }
+
+            string stored = _currentSettings.SharingDefaultShareName.Trim();
+            if (!string.Equals(stored, Strings.SharingDefaultShareNameLabel, StringComparison.Ordinal)
+                && !string.Equals(stored, "Share name", StringComparison.Ordinal))
+            {
+                return;
+            }
+            try
+            {
+                _currentSettings.SharingDefaultShareName = string.Empty;
+                _settingsStorage.Save(_currentSettings);
+                LogCore("SharingDefaultShareName cleared: it held the settings label, not a share name.");
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to clear the label-seeded share name.", ex);
             }
         }
 
