@@ -508,9 +508,42 @@ namespace NcTalkOutlookAddIn.Services
                 string actorType = NcJson.GetString(dict, "actorType") ?? string.Empty;
                 string actorId = NcJson.GetString(dict, "actorId") ?? string.Empty;
                 int attendeeId = NcJson.GetInt(dict, "attendeeId");
-                participants.Add(new TalkParticipant(actorType, actorId, attendeeId));
+                int participantType = NcJson.GetInt(dict, "participantType");
+                participants.Add(new TalkParticipant(actorType, actorId, attendeeId, participantType));
             }
             return participants;
+        }
+
+        // Removes an attendee from the room. A missing attendee (404) counts as success so that
+        // repeated reconciliation runs stay idempotent.
+        internal bool RemoveParticipant(string token, int attendeeId)
+        {
+            if (string.IsNullOrWhiteSpace(token) || attendeeId <= 0)
+            {
+                return false;
+            }
+
+            EnsureConfiguration();
+            string baseUrl = _configuration.GetNormalizedBaseUrl();
+            // NcHttpClient never sends a body on DELETE, so the OCS parameter goes into the query
+            // string — Nextcloud's request router resolves DELETE parameters from there as well.
+            string url = baseUrl
+                         + "/ocs/v2.php/apps/spreed/api/v4/room/"
+                         + Uri.EscapeDataString(token.Trim())
+                         + "/attendees?attendeeId="
+                         + attendeeId.ToString(CultureInfo.InvariantCulture);
+
+            HttpStatusCode statusCode;
+            IDictionary<string, object> parsed;
+            string responseText = ExecuteJsonRequest("DELETE", url, (string)null, out statusCode, out parsed);
+
+            if (IsSuccessStatus(statusCode) || statusCode == HttpStatusCode.NotFound)
+            {
+                return true;
+            }
+
+            ThrowServiceError(statusCode, responseText, parsed);
+            return false;
         }
 
         internal bool PromoteModerator(string token, int attendeeId, out string errorMessage)

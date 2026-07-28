@@ -69,6 +69,10 @@ namespace NcTalkOutlookAddIn
         internal const string IcalDelegateName = "X-NCTALK-DELEGATE-NAME";
         internal const string IcalDelegated = "X-NCTALK-DELEGATED";
         internal const string IcalDelegateReady = "X-NCTALK-DELEGATE-READY";
+        // Attendee addresses recorded at the last successful sync. Acts as the "managed by this
+        // add-in" set: only participants derived from these addresses are ever removed from a
+        // Talk room, so anyone invited directly in Talk is left alone.
+        internal const string IcalAttendees = "X-NCTALK-ATTENDEES";
 
         public NextcloudTalkAddIn()
         {
@@ -569,14 +573,83 @@ namespace NcTalkOutlookAddIn
                 _currentSettings.AppPassword));
         }
 
+        internal TalkRoomSyncService CreateRoomSyncService()
+        {
+            if (_currentSettings == null)
+            {
+                return null;
+            }
+
+            var configuration = new TalkServiceConfiguration(
+                _currentSettings.ServerUrl,
+                _currentSettings.Username,
+                _currentSettings.AppPassword);
+            if (!configuration.IsComplete())
+            {
+                return null;
+            }
+
+            var cache = new IfbAddressBookCache(_settingsStorage != null ? _settingsStorage.DataDirectory : null);
+            return new TalkRoomSyncService(configuration, cache, _currentSettings.IfbCacheHours, _currentSettings.Username);
+        }
+
+        // Runs the room reconciliation off the UI thread. The snapshot is COM-free, so nothing in
+        // the background task touches Outlook.
+        internal void QueueRoomSync(TalkRoomSyncSnapshot snapshot)
+        {
+            if (snapshot == null || string.IsNullOrWhiteSpace(snapshot.RoomToken))
+            {
+                return;
+            }
+
+            TalkRoomSyncService service = CreateRoomSyncService();
+            if (service == null)
+            {
+                LogTalk("Room sync skipped: settings incomplete (token=" + snapshot.RoomToken + ").");
+                return;
+            }
+
+            Task.Run(() =>
+            {
+                try
+                {
+                    service.Run(snapshot);
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticsLogger.LogException(LogCategories.Talk, "Background room sync failed (token=" + snapshot.RoomToken + ").", ex);
+                }
+            });
+        }
+
+        // Same reconciliation, executed inline. Used on the delegation path, where the room must be
+        // fully in sync before ownership is handed over and the organizer leaves the room.
+        internal void RunRoomSyncInline(TalkRoomSyncSnapshot snapshot)
+        {
+            if (snapshot == null || string.IsNullOrWhiteSpace(snapshot.RoomToken))
+            {
+                return;
+            }
+
+            TalkRoomSyncService service = CreateRoomSyncService();
+            if (service == null)
+            {
+                LogTalk("Inline room sync skipped: settings incomplete (token=" + snapshot.RoomToken + ").");
+                return;
+            }
+            try
+            {
+                service.Run(snapshot);
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Talk, "Inline room sync failed (token=" + snapshot.RoomToken + ").", ex);
+            }
+        }
+
         internal void ApplyRoomToAppointment(Outlook.AppointmentItem appointment, TalkRoomRequest request, TalkRoomCreationResult result)
         {
             _talkAppointmentController.ApplyRoomToAppointment(appointment, request, result);
-        }
-
-        private static long? GetIcalStartEpochOrNull(Outlook.AppointmentItem appointment)
-        {
-            return TalkAppointmentController.GetIcalStartEpochOrNull(appointment);
         }
 
         private static string GetEntryId(Outlook.AppointmentItem appointment)

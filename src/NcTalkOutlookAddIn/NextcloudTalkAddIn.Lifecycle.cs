@@ -90,6 +90,7 @@ namespace NcTalkOutlookAddIn
             }
             try
             {
+                EnsureTalkCalendarWatcher();
                 ApplyIfbSettings();
                 ApplyCalDavSyncSettings();
                 LogCore("Deferred startup wiring completed.");
@@ -195,6 +196,7 @@ namespace NcTalkOutlookAddIn
         private void TearDownAddInState(string origin, bool clearOutlookApplication)
         {
             UnhookInspector();
+            UnhookTalkCalendarWatcher();
             UnhookMailComposeSubscriptions();
             _freeBusyManager = null;
 
