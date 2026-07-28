@@ -31,7 +31,10 @@ namespace NcTalkOutlookAddIn.Settings
             TransportTlsEnable13 = false;
             LastKnownServerVersion = string.Empty;
             FileLinkBasePath = DefaultFileLinkBasePath;
-            SharingDefaultShareName = Strings.SharingDefaultShareNameLabel;
+            // Empty on purpose. Seeding this with Strings.SharingDefaultShareNameLabel put the
+            // field's own caption into the value, which then became the real folder name on
+            // Nextcloud. Left empty, FileLinkWizardForm applies its localized fallback instead.
+            SharingDefaultShareName = string.Empty;
             SharingDefaultPermCreate = false;
             SharingDefaultPermWrite = false;
             SharingDefaultPermDelete = false;

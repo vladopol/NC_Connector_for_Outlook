@@ -4,6 +4,27 @@ All notable changes to **NC Connector for Outlook** will be documented in this f
 
 This project follows the principles of **Keep a Changelog** and **Semantic Versioning**.
 
+## [3.1.0.19] - 2026-07-29
+
+Fork patch on upstream 3.1.0.
+
+---
+
+### FIXED: share folders were named after a UI label
+
+`AddinSettings` seeded `SharingDefaultShareName` with `Strings.SharingDefaultShareNameLabel` — the
+settings field's own caption. The value was therefore never empty, so the FileLink wizard's
+whitespace check never fired and its localized fallback ("Общий доступ" / "Share") was dead code.
+The caption went straight into `BuildShareFolderName`, and every share created with defaults landed
+on Nextcloud as **`20260729_Название общего доступа`**.
+
+Same class of bug as the Talk room title fixed in 3.1.0.17: a UI string leaking into stored data.
+
+- The default is now empty, so the wizard's fallback applies as intended.
+- Profiles that already stored the caption are cleared once at startup. The check runs after the
+  Office UI language is resolved, so the caption is compared in the language it would have been
+  written in, and the English literal is checked as well.
+
 ## [3.1.0.18] - 2026-07-29
 
 Fork patch on upstream 3.1.0.
