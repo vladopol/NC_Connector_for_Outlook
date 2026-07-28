@@ -91,7 +91,6 @@ namespace NcTalkOutlookAddIn.UI
         private readonly GroupBox _talkDefaultsGroup = new GroupBox();
         private readonly Label _talkDefaultRoomTypeLabel = new Label();
         private readonly ComboBox _talkDefaultRoomTypeCombo = new ComboBox();
-        private readonly CheckBox _talkDefaultPasswordCheckBox = new CheckBox();
         private readonly CheckBox _talkDefaultAddUsersCheckBox = new CheckBox();
         private readonly CheckBox _talkDefaultAddGuestsCheckBox = new CheckBox();
         private readonly CheckBox _talkDefaultLobbyCheckBox = new CheckBox();
@@ -520,9 +519,6 @@ namespace NcTalkOutlookAddIn.UI
 
             // Room type selector hidden — EventConversation is always used for Outlook meetings.
 
-            _talkDefaultPasswordCheckBox.Location = new Point(innerPadding, y);
-            y = _talkDefaultPasswordCheckBox.Bottom + checkGap;
-
             _talkDefaultAddUsersCheckBox.Location = new Point(innerPadding, y);
             y = _talkDefaultAddUsersCheckBox.Bottom + checkGap;
 
@@ -759,10 +755,10 @@ namespace NcTalkOutlookAddIn.UI
 
             // Room type label and combo hidden — EventConversation is always used.
 
-            _talkDefaultPasswordCheckBox.Text = Strings.TalkPasswordSetCheck;
-            _talkDefaultPasswordCheckBox.AutoSize = true;
-            _talkDefaultPasswordCheckBox.Location = new Point(12, 58);
-            _talkDefaultsGroup.Controls.Add(_talkDefaultPasswordCheckBox);
+            // Default password hidden — the room dialog adds a password per room on demand, so a
+            // persistent "always set a password" default contradicts it. The value is pinned to
+            // false in Lifecycle.OnConnection; the backend policy talk_set_password can still
+            // force a password on, and the room dialog honours that.
 
             _talkDefaultAddUsersCheckBox.Text = Strings.TalkAddUsersCheck;
             _talkDefaultAddUsersCheckBox.AutoSize = true;
@@ -1074,7 +1070,6 @@ namespace NcTalkOutlookAddIn.UI
                     _sharingAttachmentsOfferAboveMbUpDown.Minimum,
                     Math.Min(_sharingAttachmentsOfferAboveMbUpDown.Maximum, (decimal)offerAboveMb));
                 _sharingAttachmentsOfferAboveMbUpDown.Value = clampedOfferAbove;
-                _talkDefaultPasswordCheckBox.Checked = Result.TalkDefaultPasswordEnabled;
                 _talkDefaultAddUsersCheckBox.Checked = Result.TalkDefaultAddUsers;
                 _talkDefaultAddGuestsCheckBox.Checked = Result.TalkDefaultAddGuests;
                 _talkDefaultLobbyCheckBox.Checked = Result.TalkDefaultLobbyEnabled;
@@ -1144,7 +1139,9 @@ namespace NcTalkOutlookAddIn.UI
             Result.SharingAttachmentsAlwaysConnector = _sharingAttachmentsAlwaysCheckBox.Checked;
             Result.SharingAttachmentsOfferAboveEnabled = _sharingAttachmentsOfferAboveCheckBox.Checked;
             Result.SharingAttachmentsOfferAboveMb = (int)_sharingAttachmentsOfferAboveMbUpDown.Value;
-            Result.TalkDefaultPasswordEnabled = _talkDefaultPasswordCheckBox.Checked;
+            // Pinned off: the room dialog offers a password per room on demand, so there is no
+            // persistent default to store. The backend policy talk_set_password can still force one.
+            Result.TalkDefaultPasswordEnabled = false;
             Result.TalkDefaultAddUsers = _talkDefaultAddUsersCheckBox.Checked;
             Result.TalkDefaultAddGuests = _talkDefaultAddGuestsCheckBox.Checked;
             Result.TalkDefaultLobbyEnabled = _talkDefaultLobbyCheckBox.Checked;
@@ -1548,10 +1545,6 @@ namespace NcTalkOutlookAddIn.UI
                 && !string.IsNullOrWhiteSpace(policyString))
             {
                 SelectLanguageChoice(_shareBlockLangCombo, policyString);
-            }
-            if (_backendPolicyStatus.TryGetPolicyBool("talk", "talk_set_password", out policyBool))
-            {
-                _talkDefaultPasswordCheckBox.Checked = policyBool;
             }
             if (_backendPolicyStatus.TryGetPolicyBool("talk", "talk_add_users", out policyBool))
             {
@@ -1959,7 +1952,6 @@ namespace NcTalkOutlookAddIn.UI
             bool lockSharePasswordSeparate = IsPolicyLocked("share", "share_send_password_separately");
             bool lockShareExpire = IsPolicyLocked("share", "share_expire_days");
             bool lockShareLang = IsPolicyLocked("share", "language_share_html_block");
-            bool lockTalkPassword = IsPolicyLocked("talk", "talk_set_password");
             bool lockTalkLobby = IsPolicyLocked("talk", "talk_lobby_active");
             bool lockTalkSearch = IsPolicyLocked("talk", "talk_show_in_search");
             bool lockTalkRoomType = IsPolicyLocked("talk", "talk_room_type");
@@ -1989,7 +1981,6 @@ namespace NcTalkOutlookAddIn.UI
             _sharingDefaultExpireDaysUpDown.Enabled = !lockShareExpire && !_isBusy;
             _shareBlockLangCombo.Enabled = !lockShareLang && !_isBusy;
 
-            _talkDefaultPasswordCheckBox.Enabled = !lockTalkPassword && !_isBusy;
             _talkDefaultLobbyCheckBox.Enabled = !lockTalkLobby && !_isBusy;
             _talkDefaultSearchCheckBox.Enabled = !lockTalkSearch && !_isBusy;
             _talkDefaultRoomTypeCombo.Enabled = !lockTalkRoomType && !_isBusy;
@@ -2012,7 +2003,6 @@ namespace NcTalkOutlookAddIn.UI
                 !separatePasswordAvailable || lockSharePasswordSeparate);
             _disabledTooltipHints.Apply(_sharingDefaultExpireDaysUpDown, lockShareExpire ? Strings.PolicyAdminControlledTooltip : string.Empty, lockShareExpire, _sharingDefaultExpireDaysLabel);
             _disabledTooltipHints.Apply(_shareBlockLangCombo, lockShareLang ? Strings.PolicyAdminControlledTooltip : string.Empty, lockShareLang, _shareBlockLangLabel);
-            _disabledTooltipHints.Apply(_talkDefaultPasswordCheckBox, lockTalkPassword ? Strings.PolicyAdminControlledTooltip : string.Empty, lockTalkPassword);
             _disabledTooltipHints.Apply(_talkDefaultLobbyCheckBox, lockTalkLobby ? Strings.PolicyAdminControlledTooltip : Strings.TooltipLobby, lockTalkLobby);
             _disabledTooltipHints.Apply(_talkDefaultSearchCheckBox, lockTalkSearch ? Strings.PolicyAdminControlledTooltip : Strings.TooltipSearchVisible, lockTalkSearch);
             _disabledTooltipHints.Apply(_talkDeleteRoomOnEventDeleteCheckBox, lockTalkDeleteRoomOnEventDelete ? Strings.PolicyAdminControlledTooltip : Strings.TooltipDeleteRoomOnEventDelete, lockTalkDeleteRoomOnEventDelete);

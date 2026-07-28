@@ -39,6 +39,14 @@ namespace NcTalkOutlookAddIn
                 _settingsStorage.Save(_currentSettings);
                 LogCore("TalkDefaultRoomType force-set to EventConversation and saved.");
             }
+            if (_currentSettings != null && _currentSettings.TalkDefaultPasswordEnabled)
+            {
+                // The room dialog adds a password per room on demand, so the stored "always set a
+                // password" default no longer has a UI and would silently pre-fill every room.
+                _currentSettings.TalkDefaultPasswordEnabled = false;
+                _settingsStorage.Save(_currentSettings);
+                LogCore("TalkDefaultPasswordEnabled force-disabled and saved.");
+            }
             ConfigureDiagnosticsLogger(_currentSettings);
             TryApplyTransportSecurityFromSettings("startup", false);
             TryApplyOfficeUiLanguage();

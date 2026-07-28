@@ -4,6 +4,24 @@ All notable changes to **NC Connector for Outlook** will be documented in this f
 
 This project follows the principles of **Keep a Changelog** and **Semantic Versioning**.
 
+## [3.1.0.18] - 2026-07-29
+
+Fork patch on upstream 3.1.0.
+
+---
+
+### "Set password" removed from Talk defaults
+
+With the room dialog offering a password per room on demand (3.1.0.15), a persistent "always set a
+password" default contradicts it: it silently pre-filled a password for every room, which is the
+behaviour the on-demand button was introduced to avoid.
+
+- The checkbox is gone from Settings → Talk link.
+- `TalkDefaultPasswordEnabled` is force-disabled in `OnConnection` and saved back, so existing
+  profiles that stored `true` are corrected once rather than keeping a value with no UI.
+- The `talk_set_password` backend policy is untouched — an administrator can still require a
+  password, and the room dialog honours it by disabling the toggle.
+
 ## [3.1.0.17] - 2026-07-29
 
 Fork patch on upstream 3.1.0.
