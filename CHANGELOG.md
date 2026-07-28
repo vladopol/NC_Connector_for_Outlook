@@ -4,6 +4,36 @@ All notable changes to **NC Connector for Outlook** will be documented in this f
 
 This project follows the principles of **Keep a Changelog** and **Semantic Versioning**.
 
+## [3.1.0.16] - 2026-07-28
+
+Fork patch on upstream 3.1.0.
+
+---
+
+### Additional moderators — several, chosen from the meeting's attendees, without leaving the room
+
+The single "Moderator (optional)" field was not what its name suggested: it performed a **handover**.
+It promoted the chosen user and then called `LeaveRoom` for the organizer, who was dropped out of
+their own meeting. It also wrote `X-NCTALK-DELEGATED`, after which this add-in stopped managing the
+appointment entirely — no participant sync, no time or lobby updates, no room deletion.
+
+- **Several moderators instead of one**, and they are **added**, not handed over to. The organizer
+  stays the room owner, stays in the room, and appointment synchronization keeps working.
+- **Candidates are the meeting's own attendees**, mapped to Nextcloud accounts — not the whole user
+  directory. Attendee addresses are read on the UI thread and mapped on a background thread, since
+  the lookup can refresh the address-book cache.
+- The autocomplete field, dropdown and avatar loading are replaced by a plain checked list. With the
+  candidate list bounded by the meeting's own invitees, search was solving a problem that no longer
+  exists.
+- The group is now labelled **"Additional moderators"**, and the hint states that the organizer is a
+  moderator by default. Empty states are reported by cause rather than as one vague message:
+  no attendees invited yet ("add attendees first" — the common case when the room is created before
+  anyone is invited), no system address book, or attendees that have no Nextcloud account.
+
+**Migration:** appointments delegated by builds up to 3.1.0.15 keep their old behaviour. Nothing
+writes `X-NCTALK-DELEGATED` any more, but the reader is deliberately kept — dropping it would make
+the add-in start managing rooms whose organizer deliberately handed them over and left.
+
 ## [3.1.0.15] - 2026-07-28
 
 Fork patch on upstream 3.1.0.

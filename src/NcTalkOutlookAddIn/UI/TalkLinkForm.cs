@@ -50,10 +50,10 @@ namespace NcTalkOutlookAddIn.UI
         private readonly CheckBox _lobbyCheckBox = new CheckBox();
         private readonly CheckBox _searchCheckBox = new CheckBox();
         private readonly GroupBox _moderatorGroup = new GroupBox();
-        private readonly PictureBox _moderatorAvatarBox = new PictureBox();
-        private readonly TextBox _moderatorTextBox = new TextBox();
-        private readonly Button _moderatorClearButton = new Button();
-        private readonly ListBox _moderatorListBox = new ListBox();
+        // Candidates are the meeting's own attendees that map to Nextcloud accounts — not the whole
+        // user directory. That keeps the list short enough for a plain checked list and stops the
+        // dialog offering people who were never invited.
+        private readonly CheckedListBox _moderatorListBox = new CheckedListBox();
         private readonly Panel _moderatorAddressbookWarningPanel = new Panel();
         private readonly Label _moderatorAddressbookWarningTitleLabel = new Label();
         private readonly Label _moderatorAddressbookWarningTextLabel = new Label();
@@ -74,15 +74,18 @@ namespace NcTalkOutlookAddIn.UI
         private readonly PasswordPolicyInfo _passwordPolicy;
         private readonly TalkServiceConfiguration _configuration;
         private readonly BackendPolicyStatus _backendPolicyStatus;
-        private readonly List<NextcloudUser> _userDirectory;
+        // Meeting attendees that map to Nextcloud accounts — the moderator candidates.
+        private readonly List<NextcloudUser> _moderatorCandidates;
         private readonly bool _systemAddressbookAvailable;
+        // How many people the meeting actually invites, regardless of Nextcloud accounts. Lets the
+        // moderator list explain an empty state properly: "invite someone first" is a different
+        // problem from "none of the invitees have an account".
+        private readonly int _meetingAttendeeCount;
         private readonly string _systemAddressbookError;
-        private NextcloudUser _selectedModerator;
         private readonly Dictionary<string, Image> _avatarCache = new Dictionary<string, Image>(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _avatarLoading = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly object _avatarLock = new object();
         private bool _layoutApplying;
-        private bool _moderatorSearchLockLogged;
 
         private string _talkTitle;
         private string _talkPassword;
@@ -91,8 +94,7 @@ namespace NcTalkOutlookAddIn.UI
         private TalkRoomType _selectedRoomType;
         private bool _addUsers;
         private bool _addGuests;
-        private string _delegateModeratorId;
-        private string _delegateModeratorName;
+        private List<string> _moderatorIds = new List<string>();
 
         internal string TalkTitle
         {
@@ -136,16 +138,11 @@ namespace NcTalkOutlookAddIn.UI
             private set { _addGuests = value; }
         }
 
-        internal string DelegateModeratorId
+        // Nextcloud user ids ticked in the dialog. The organizer is the room owner regardless.
+        internal List<string> ModeratorIds
         {
-            get { return _delegateModeratorId; }
-            private set { _delegateModeratorId = value; }
-        }
-
-        internal string DelegateModeratorName
-        {
-            get { return _delegateModeratorName; }
-            private set { _delegateModeratorName = value; }
+            get { return _moderatorIds; }
+            private set { _moderatorIds = value ?? new List<string>(); }
         }
 
         internal TalkLinkForm(
@@ -153,7 +150,8 @@ namespace NcTalkOutlookAddIn.UI
             TalkServiceConfiguration configuration,
             PasswordPolicyInfo passwordPolicy,
             BackendPolicyStatus policyStatus,
-            List<NextcloudUser> userDirectory,
+            List<NextcloudUser> moderatorCandidates,
+            int meetingAttendeeCount,
             IfbAddressBookCache.SystemAddressbookStatus addressbookStatus,
             string appointmentSubject,
             DateTime startTime,
@@ -164,7 +162,8 @@ namespace NcTalkOutlookAddIn.UI
             _configuration = configuration;
             _backendPolicyStatus = policyStatus;
             _disabledTooltipHints = new DisabledControlTooltipHintHelper(_toolTip);
-            _userDirectory = userDirectory ?? new List<NextcloudUser>();
+            _moderatorCandidates = moderatorCandidates ?? new List<NextcloudUser>();
+            _meetingAttendeeCount = meetingAttendeeCount;
             _systemAddressbookAvailable = addressbookStatus != null && addressbookStatus.Available;
             _systemAddressbookError = addressbookStatus != null ? (addressbookStatus.Error ?? string.Empty) : string.Empty;
 
@@ -181,6 +180,7 @@ namespace NcTalkOutlookAddIn.UI
 
             BrandedHeader.AttachToParent(_headerPanel, Controls, HeaderHeight);
             InitializeComponents();
+            PopulateModeratorCandidates(_moderatorCandidates);
             ApplyDefaults(defaults, appointmentSubject);
             ApplyDialogLayout(true);
 
@@ -218,22 +218,6 @@ namespace NcTalkOutlookAddIn.UI
 
             _moderatorGroup.Text = Strings.TalkModeratorGroup;
 
-            _moderatorAvatarBox.Size = new Size(32, 32);
-            _moderatorAvatarBox.SizeMode = PictureBoxSizeMode.Zoom;
-            _moderatorAvatarBox.BackColor = Color.Transparent;
-            _moderatorGroup.Controls.Add(_moderatorAvatarBox);
-
-            _moderatorTextBox.TextChanged += (s, e) => UpdateModeratorResults();
-            _moderatorTextBox.Enter += (s, e) => UpdateModeratorResults();
-            _moderatorTextBox.MouseDown += (s, e) => UpdateModeratorResults();
-            _moderatorGroup.Controls.Add(_moderatorTextBox);
-
-            _moderatorClearButton.Text = Strings.TalkModeratorClear;
-            _moderatorClearButton.AutoSize = false;
-            _moderatorClearButton.TextAlign = ContentAlignment.MiddleCenter;
-            _moderatorClearButton.Click += (s, e) => ClearModerator();
-            _moderatorGroup.Controls.Add(_moderatorClearButton);
-
             _moderatorAddressbookWarningPanel.Visible = false;
             _moderatorAddressbookWarningPanel.BackColor = Color.FromArgb(20, 176, 0, 32);
             _moderatorAddressbookWarningPanel.Paint += (s, e) =>
@@ -266,41 +250,13 @@ namespace NcTalkOutlookAddIn.UI
             _moderatorAddressbookWarningLinkLabel.LinkClicked += (s, e) => OpenSystemAddressbookSetupGuide();
             _moderatorAddressbookWarningPanel.Controls.Add(_moderatorAddressbookWarningLinkLabel);
 
-            _moderatorListBox.DrawMode = DrawMode.OwnerDrawFixed;
-            _moderatorListBox.ItemHeight = 34;
+            _moderatorListBox.CheckOnClick = true;
             _moderatorListBox.IntegralHeight = false;
-            _moderatorListBox.ScrollAlwaysVisible = true;
-            _moderatorListBox.Visible = false;
-            _moderatorListBox.DoubleClick += (s, e) => SelectModeratorFromList();
-            _moderatorListBox.DrawItem += OnModeratorDrawItem;
-            _moderatorTextBox.Leave += (s, e) =>
-            {
-                BeginInvoke((Action)(() =>
-                {
-                    if (!_moderatorListBox.Focused)
-                    {
-                        HideModeratorDropdown();
-                    }
-                }));
-            };
-            _moderatorListBox.Leave += (s, e) =>
-            {
-                BeginInvoke((Action)(() =>
-                {
-                    if (!_moderatorTextBox.Focused)
-                    {
-                        HideModeratorDropdown();
-                    }
-                }));
-            };
+            _moderatorListBox.BorderStyle = BorderStyle.FixedSingle;
+            _moderatorGroup.Controls.Add(_moderatorListBox);
 
             _moderatorHintLabel.Text = Strings.TalkModeratorHint;
             _moderatorHintLabel.ForeColor = Color.DimGray;
-            _moderatorHintLabel.Click += (s, e) =>
-            {
-                _moderatorTextBox.Focus();
-                UpdateModeratorResults();
-            };
             _moderatorGroup.Controls.Add(_moderatorHintLabel);
 
             _eventSupportHintLabel.AutoSize = true;
@@ -379,8 +335,7 @@ namespace NcTalkOutlookAddIn.UI
             _toolTip.SetToolTip(_addUsersCheckBox, Strings.TooltipAddUsers);
             _toolTip.SetToolTip(_lobbyCheckBox, Strings.TooltipLobby);
             _toolTip.SetToolTip(_searchCheckBox, Strings.TooltipSearchVisible);
-            _toolTip.SetToolTip(_moderatorTextBox, Strings.TooltipModerator);
-            _toolTip.SetToolTip(_moderatorClearButton, Strings.TooltipModerator);
+            _toolTip.SetToolTip(_moderatorListBox, Strings.TooltipModerator);
             Controls.Add(_moderatorListBox);
             ApplyDialogLayout(false);
         }
@@ -532,7 +487,6 @@ namespace NcTalkOutlookAddIn.UI
                     FooterButtonLayoutHelper.DefaultBottomPadding,
                     FooterButtonLayoutHelper.DefaultSpacing);
 
-                PositionModeratorDropdown();
             }
             finally
             {
@@ -543,31 +497,12 @@ namespace NcTalkOutlookAddIn.UI
         private int LayoutModeratorGroupControls()
         {
             int innerPadding = ScaleLogical(12);
-            int avatarSize = ScaleLogical(32);
-            int textTop = ScaleLogical(24);
-            int ignoredClearMinWidth;
-            FooterButtonLayoutHelper.ApplyButtonSize(_moderatorClearButton, out ignoredClearMinWidth);
-            int clearButtonWidth = _moderatorClearButton.Width;
-            int clearButtonHeight = _moderatorClearButton.Height;
+            int listTop = ScaleLogical(22);
+            int listWidth = Math.Max(ScaleLogical(160), _moderatorGroup.ClientSize.Width - (innerPadding * 2));
+            int listHeight = ScaleLogical(_moderatorListBox.Items.Count > 0 ? 96 : 44);
+            _moderatorListBox.SetBounds(innerPadding, listTop, listWidth, listHeight);
 
-            _moderatorAvatarBox.SetBounds(innerPadding, ScaleLogical(22), avatarSize, avatarSize);
-
-            int textLeft = _moderatorAvatarBox.Right + ScaleLogical(8);
-            int textWidth = Math.Max(
-                ScaleLogical(120),
-                _moderatorGroup.ClientSize.Width - textLeft - innerPadding - clearButtonWidth - ScaleLogical(8));
-            _moderatorTextBox.SetBounds(textLeft, textTop, textWidth, _moderatorTextBox.PreferredHeight + ScaleLogical(2));
-
-            _moderatorClearButton.SetBounds(
-                _moderatorTextBox.Right + ScaleLogical(8),
-                textTop - ScaleLogical(2),
-                clearButtonWidth,
-                clearButtonHeight);
-
-            int rowBottom = Math.Max(
-                _moderatorAvatarBox.Bottom,
-                Math.Max(_moderatorTextBox.Bottom, _moderatorClearButton.Bottom));
-            int contentTop = rowBottom + ScaleLogical(8);
+            int contentTop = _moderatorListBox.Bottom + ScaleLogical(8);
 
             if (_moderatorAddressbookWarningPanel.Visible)
             {
@@ -692,8 +627,7 @@ namespace NcTalkOutlookAddIn.UI
             SearchVisible = _searchCheckBox.Checked;
             AddUsers = _addUsersCheckBox.Checked;
             AddGuests = _addGuestsCheckBox.Checked;
-            DelegateModeratorId = string.Empty;
-            DelegateModeratorName = string.Empty;
+            ModeratorIds = new List<string>();
 
             ApplyPolicyWarningUi();
             ApplyPolicyLockState();
@@ -792,18 +726,12 @@ namespace NcTalkOutlookAddIn.UI
             {
                 _addUsersCheckBox.Checked = false;
                 _addGuestsCheckBox.Checked = false;
-                _selectedModerator = null;
-                _moderatorTextBox.Text = string.Empty;
-                _moderatorListBox.Items.Clear();
-                HideModeratorDropdown();
-                _moderatorAvatarBox.Image = null;
-                _moderatorSearchLockLogged = false;
+                ClearModeratorSelection();
             }
 
             _addUsersCheckBox.Enabled = !lockActive && !usersPolicyLocked;
             _addGuestsCheckBox.Enabled = !lockActive && !guestsPolicyLocked;
-            _moderatorTextBox.Enabled = !lockActive;
-            _moderatorClearButton.Enabled = !lockActive;
+            _moderatorListBox.Enabled = !lockActive;
 
             _moderatorAddressbookWarningPanel.Visible = lockActive;
             _moderatorAddressbookWarningTextLabel.Text = lockActive
@@ -818,8 +746,7 @@ namespace NcTalkOutlookAddIn.UI
                 _addGuestsCheckBox,
                 lockActive ? Strings.TooltipAddGuestsLocked : (guestsPolicyLocked ? Strings.PolicyAdminControlledTooltip : Strings.TooltipAddGuests),
                 lockActive || guestsPolicyLocked);
-            _disabledTooltipHints.Apply(_moderatorTextBox, lockActive ? Strings.TooltipModeratorLocked : Strings.TooltipModerator, lockActive, _moderatorHintLabel);
-            _disabledTooltipHints.Apply(_moderatorClearButton, lockActive ? Strings.TooltipModeratorLocked : Strings.TooltipModerator, lockActive, _moderatorHintLabel);
+            _disabledTooltipHints.Apply(_moderatorListBox, lockActive ? Strings.TooltipModeratorLocked : Strings.TooltipModerator, lockActive, _moderatorHintLabel);
 
             DiagnosticsLogger.Log(
                 LogCategories.Talk,
@@ -886,9 +813,7 @@ namespace NcTalkOutlookAddIn.UI
             AddGuests = false;
             SelectedRoomType = TalkRoomType.EventConversation;
 
-            string moderatorCandidate = _selectedModerator != null ? _selectedModerator.UserId : _moderatorTextBox.Text.Trim();
-            DelegateModeratorId = string.IsNullOrWhiteSpace(moderatorCandidate) ? string.Empty : moderatorCandidate.Trim();
-            DelegateModeratorName = _selectedModerator != null ? _selectedModerator.DisplayLabel : DelegateModeratorId;
+            ModeratorIds = CollectCheckedModeratorIds();
         }
 
         private void UpdatePasswordState()

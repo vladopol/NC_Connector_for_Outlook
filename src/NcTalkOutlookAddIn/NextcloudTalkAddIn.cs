@@ -764,6 +764,95 @@ namespace NcTalkOutlookAddIn
             });
         }
 
+        // Promotes the selected attendees to moderator after the room is created.
+        //
+        // This is an addition, not a handover: the organizer keeps ownership and stays in the room,
+        // so appointment synchronization keeps working for the meeting. (Older builds transferred
+        // moderation and then left the room, which switched this add-in off for that appointment.)
+        internal void QueueModeratorPromotion(string roomToken, List<string> moderatorIds)
+        {
+            if (string.IsNullOrWhiteSpace(roomToken) || moderatorIds == null || moderatorIds.Count == 0)
+            {
+                return;
+            }
+
+            string normalizedRoomToken = roomToken.Trim();
+            var ids = new List<string>();
+            for (int i = 0; i < moderatorIds.Count; i++)
+            {
+                string id = (moderatorIds[i] ?? string.Empty).Trim();
+                if (id.Length > 0 && !ids.Contains(id))
+                {
+                    ids.Add(id);
+                }
+            }
+            if (ids.Count == 0)
+            {
+                return;
+            }
+
+            Task.Run(() =>
+            {
+                try
+                {
+                    var service = CreateTalkService();
+
+                    // Make sure every candidate is in the room before promoting: an attendee who is
+                    // not a participant has no attendeeId to promote.
+                    for (int i = 0; i < ids.Count; i++)
+                    {
+                        try
+                        {
+                            service.AddUserParticipant(normalizedRoomToken, ids[i]);
+                        }
+                        catch (Exception ex)
+                        {
+                            DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to add a moderator candidate to the room (token=" + normalizedRoomToken + ").", ex);
+                        }
+                    }
+
+                    List<TalkParticipant> participants = service.GetParticipants(normalizedRoomToken);
+                    int promoted = 0;
+                    for (int i = 0; i < ids.Count; i++)
+                    {
+                        int attendeeId = 0;
+                        for (int p = 0; p < participants.Count; p++)
+                        {
+                            TalkParticipant participant = participants[p];
+                            if (participant != null
+                                && string.Equals(participant.ActorType, "users", StringComparison.OrdinalIgnoreCase)
+                                && string.Equals(participant.ActorId, ids[i], StringComparison.OrdinalIgnoreCase))
+                            {
+                                attendeeId = participant.AttendeeId;
+                                break;
+                            }
+                        }
+                        if (attendeeId <= 0)
+                        {
+                            LogTalk("Moderator promotion skipped: attendee not found in the room (token=" + normalizedRoomToken + ").");
+                            continue;
+                        }
+
+                        string promoteError;
+                        if (service.PromoteModerator(normalizedRoomToken, attendeeId, out promoteError))
+                        {
+                            promoted++;
+                        }
+                        else
+                        {
+                            LogTalk("Moderator promotion failed (token=" + normalizedRoomToken + "): " + (promoteError ?? "unknown"));
+                        }
+                    }
+
+                    LogTalk("Moderator promotion completed (token=" + normalizedRoomToken + ", requested=" + ids.Count + ", promoted=" + promoted + ").");
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticsLogger.LogException(LogCategories.Talk, "Moderator promotion failed (token=" + normalizedRoomToken + ").", ex);
+                }
+            });
+        }
+
         // Pushes a freshly created room's description. Runs in the background: room creation happens
         // on the UI thread from the ribbon flow, and this is one more network round-trip.
         internal void QueueRoomDescriptionUpdate(string roomToken, string description, bool isEventConversation)

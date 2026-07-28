@@ -46,8 +46,8 @@ namespace NcTalkOutlookAddIn.Controllers
                 + request.AddUsers
                 + ", addGuests="
                 + request.AddGuests
-                + ", delegate="
-                + (string.IsNullOrEmpty(request.DelegateModeratorId) ? "n/a" : request.DelegateModeratorId)
+                + ", moderators="
+                + (request.ModeratorIds == null ? 0 : request.ModeratorIds.Count)
                 + ").");
 
             if (!string.IsNullOrWhiteSpace(request.Title))
@@ -88,23 +88,13 @@ namespace NcTalkOutlookAddIn.Controllers
                     request.InvitationTemplate);
             }
 
-            if (!string.IsNullOrWhiteSpace(request.DelegateModeratorId))
-            {
-                string delegateId = request.DelegateModeratorId.Trim();
-                string delegateName = !string.IsNullOrWhiteSpace(request.DelegateModeratorName) ? request.DelegateModeratorName.Trim() : delegateId;
-
-                SetUserProperty(appointment, NextcloudTalkAddIn.IcalDelegate, Outlook.OlUserPropertyType.olText, delegateId);
-                SetUserProperty(appointment, NextcloudTalkAddIn.IcalDelegateName, Outlook.OlUserPropertyType.olText, delegateName);
-                SetUserProperty(appointment, NextcloudTalkAddIn.IcalDelegated, Outlook.OlUserPropertyType.olText, "FALSE");
-                SetUserProperty(appointment, NextcloudTalkAddIn.IcalDelegateReady, Outlook.OlUserPropertyType.olText, "TRUE");
-            }
-            else
-            {
-                RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalDelegate);
-                RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalDelegateName);
-                RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalDelegated);
-                RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalDelegateReady);
-            }
+            // Additional moderators are promoted after creation; the organizer keeps ownership and
+            // stays in the room. The X-NCTALK-DELEGATE* properties are deliberately not written any
+            // more — see IsDelegatedToOtherUser for why the reader side is still kept.
+            RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalDelegate);
+            RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalDelegateName);
+            RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalDelegated);
+            RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalDelegateReady);
 
             long ignoredStartEpoch;
             PersistCoreIcalProperties(
@@ -127,6 +117,8 @@ namespace NcTalkOutlookAddIn.Controllers
                 string description = BuildDescriptionPayload(appointment) ?? string.Empty;
                 _owner.QueueRoomDescriptionUpdate(result.RoomToken, description, result.CreatedAsEventConversation);
             }
+
+            _owner.QueueModeratorPromotion(result.RoomToken, request.ModeratorIds);
         }
 
         // Read-only counterpart of the objectId that PersistCoreIcalProperties stores. Used by the
@@ -265,6 +257,10 @@ namespace NcTalkOutlookAddIn.Controllers
             isEventConversation = resolvedEventConversation.HasValue ? resolvedEventConversation.Value : fallbackIsEventConversation;
         }
 
+        // Retained for appointments delegated by builds up to 3.1.0.15, which transferred moderation
+        // and left the room. Nothing writes X-NCTALK-DELEGATED any more, so this returns false for
+        // anything created since — but dropping the check would make the add-in start managing rooms
+        // the organizer deliberately handed over and left.
         internal bool IsDelegatedToOtherUser(Outlook.AppointmentItem appointment, out string delegateId)
         {
             delegateId = GetUserPropertyText(appointment, NextcloudTalkAddIn.IcalDelegate) ?? string.Empty;

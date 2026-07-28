@@ -41,6 +41,18 @@
   "talk_password_policy_error": {
     "message": "Password must be at least $1 characters long."
   },
+  "talk_moderator_hint_no_attendees": {
+    "message": "Add attendees to the meeting first — moderators are chosen from them. The organizer is a moderator by default."
+  },
+  "talk_moderator_group_additional": {
+    "message": "Additional moderators"
+  },
+  "talk_moderator_hint_additional": {
+    "message": "The meeting organizer is a moderator by default. Tick attendees who should also be able to moderate the room."
+  },
+  "talk_moderator_hint_no_candidates": {
+    "message": "None of the meeting attendees have a Nextcloud account. The organizer remains the only moderator."
+  },
   "talk_password_add": {
     "message": "Add password"
   },

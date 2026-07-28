@@ -90,25 +90,34 @@ namespace NcTalkOutlookAddIn.Controllers
                 NextcloudTalkAddIn.LogTalkMessage("System address book unavailable on talk click: " + talkClickAddressbookStatus.Error);
             }
 
-            List<NextcloudUser> userDirectory;
+            // Moderator candidates are the meeting's own attendees, not the whole directory. The
+            // recipient list is read here on the UI thread (COM), then mapped to Nextcloud accounts
+            // on a background thread because the lookup can refresh the address-book cache.
+            List<string> attendeeEmails = NextcloudTalkAddIn.GetAppointmentAttendeeEmails(appointment);
+            int cacheHours = settings.IfbCacheHours;
+            List<NextcloudUser> moderatorCandidates;
             try
             {
-                userDirectory = talkClickAddressbookStatus.Available
-                    ? await Task.Run(() => addressbookCache.GetUsers(configuration, settings.IfbCacheHours, false))
+                moderatorCandidates = talkClickAddressbookStatus.Available
+                    ? await Task.Run(() => ResolveModeratorCandidates(addressbookCache, configuration, cacheHours, attendeeEmails))
                     : new List<NextcloudUser>();
             }
             catch (Exception ex)
             {
-                NextcloudTalkAddIn.LogTalkMessage("System address book could not be loaded: " + ex.Message);
-                userDirectory = new List<NextcloudUser>();
+                NextcloudTalkAddIn.LogTalkMessage("Moderator candidates could not be resolved: " + ex.Message);
+                moderatorCandidates = new List<NextcloudUser>();
             }
+            NextcloudTalkAddIn.LogTalkMessage(
+                "Moderator candidates resolved (attendees=" + attendeeEmails.Count
+                + ", withNextcloudAccount=" + moderatorCandidates.Count + ").");
 
             using (var dialog = new TalkLinkForm(
                 settings,
                 configuration,
                 passwordPolicy,
                 policyStatus,
-                userDirectory,
+                moderatorCandidates,
+                attendeeEmails.Count,
                 talkClickAddressbookStatus,
                 subject,
                 start,
@@ -143,8 +152,7 @@ namespace NcTalkOutlookAddIn.Controllers
                     Description = initialDescription,
                     AddUsers = dialog.AddUsers,
                     AddGuests = dialog.AddGuests,
-                    DelegateModeratorId = dialog.DelegateModeratorId,
-                    DelegateModeratorName = dialog.DelegateModeratorName
+                    ModeratorIds = dialog.ModeratorIds
                 };
                 NextcloudTalkAddIn.LogTalkMessage("Room request prepared (title='" + request.Title + "', type=" + request.RoomType + ", lobby=" + request.LobbyEnabled + ", search=" + request.SearchVisible + ", passwordSet=" + (!string.IsNullOrEmpty(request.Password)) + ").");
 
@@ -294,6 +302,51 @@ namespace NcTalkOutlookAddIn.Controllers
             internal bool Succeeded { get; private set; }
 
             internal string Response { get; private set; }
+        }
+
+        // Maps the meeting's attendee addresses onto Nextcloud accounts. Attendees without an
+        // account simply drop out — they can join the room as guests but cannot moderate it.
+        private static List<NextcloudUser> ResolveModeratorCandidates(
+            IfbAddressBookCache addressBookCache,
+            TalkServiceConfiguration configuration,
+            int cacheHours,
+            List<string> attendeeEmails)
+        {
+            var result = new List<NextcloudUser>();
+            if (addressBookCache == null || attendeeEmails == null)
+            {
+                return result;
+            }
+
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            for (int i = 0; i < attendeeEmails.Count; i++)
+            {
+                string email = attendeeEmails[i];
+                if (string.IsNullOrWhiteSpace(email))
+                {
+                    continue;
+                }
+                try
+                {
+                    string uid;
+                    if (!addressBookCache.TryGetUid(configuration, cacheHours, email, out uid)
+                        || string.IsNullOrWhiteSpace(uid))
+                    {
+                        continue;
+                    }
+                    if (!seen.Add(uid.Trim()))
+                    {
+                        continue;
+                    }
+
+                    result.Add(new NextcloudUser(uid.Trim(), email.Trim()));
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to map an attendee to a Nextcloud account.", ex);
+                }
+            }
+            return result;
         }
 
         private bool PromptOpenSettings(string message, IRibbonControl control)
