@@ -294,7 +294,7 @@ namespace NcTalkOutlookAddIn.Services
                 Method = "GET",
                 Url = addressBookUrl,
                 Accept = "text/vcard,text/x-vcard,text/plain,*/*",
-                TimeoutMs = 60000,
+                TimeoutMs = NcTimeouts.DirectoryMs,
                 IncludeAuthHeader = true,
                 IncludeOcsApiHeader = false,
                 ParseJson = false

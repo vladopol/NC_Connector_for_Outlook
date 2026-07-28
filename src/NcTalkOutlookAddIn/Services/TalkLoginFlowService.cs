@@ -122,6 +122,9 @@ namespace NcTalkOutlookAddIn.Services
                 Payload = payload,
                 Accept = "application/json",
                 ContentType = "application/json",
+                // Deliberately long and deliberately not an NcTimeouts value: this polls Nextcloud's
+                // Login Flow v2 endpoint while the user authenticates in a browser, so the wait is
+                // the user's own, not a stalled server. Runs from Task.Run in the settings dialog.
                 TimeoutMs = 60000,
                 IncludeAuthHeader = false,
                 IncludeOcsApiHeader = true,

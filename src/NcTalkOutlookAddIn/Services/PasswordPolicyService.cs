@@ -136,7 +136,7 @@ namespace NcTalkOutlookAddIn.Services
                 Method = method,
                 Url = url,
                 Payload = payload,
-                TimeoutMs = 60000,
+                TimeoutMs = NcTimeouts.PolicyMs,
                 IncludeAuthHeader = true,
                 IncludeOcsApiHeader = true,
                 ParseJson = true
