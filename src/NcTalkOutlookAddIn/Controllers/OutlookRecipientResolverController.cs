@@ -50,6 +50,75 @@ namespace NcTalkOutlookAddIn.Controllers
             }
         }
 
+        // Attendee display name paired with the SMTP address. Recipient.Name is Outlook's resolved
+        // name for the entry ("Мамина Алина"), which is what a person should be listed as — the
+        // Nextcloud login is an account identifier, not a name.
+        internal static Dictionary<string, string> CollectAppointmentAttendeeNamesByEmail(Outlook.AppointmentItem appointment)
+        {
+            var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (appointment == null)
+            {
+                return result;
+            }
+
+            Outlook.Recipients recipients = null;
+            try
+            {
+                recipients = appointment.Recipients;
+                if (recipients == null)
+                {
+                    return result;
+                }
+
+                int count = recipients.Count;
+                for (int i = 1; i <= count; i++)
+                {
+                    Outlook.Recipient recipient = null;
+                    try
+                    {
+                        recipient = recipients[i];
+                        if (recipient == null)
+                        {
+                            continue;
+                        }
+
+                        string email = TryResolveRecipientSmtpAddress(recipient);
+                        if (string.IsNullOrWhiteSpace(email))
+                        {
+                            continue;
+                        }
+
+                        string name = null;
+                        try
+                        {
+                            name = recipient.Name;
+                        }
+                        catch (Exception ex)
+                        {
+                            DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to read Recipient.Name.", ex);
+                        }
+                        if (!string.IsNullOrWhiteSpace(name))
+                        {
+                            result[email.Trim().ToLowerInvariant()] = name.Trim();
+                        }
+                    }
+                    finally
+                    {
+                        ComInteropScope.TryRelease(recipient, LogCategories.Talk, "Failed to release Recipient COM object.");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to enumerate appointment recipients for display names.", ex);
+            }
+            finally
+            {
+                ComInteropScope.TryRelease(recipients, LogCategories.Talk, "Failed to release Recipients COM object.");
+            }
+            return result;
+        }
+
         internal static List<string> CollectAppointmentAttendeeEmails(Outlook.AppointmentItem appointment)
         {
             var emails = new List<string>();            if (appointment == null)
