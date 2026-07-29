@@ -16,6 +16,7 @@ disagrees with them, this file is correct for this build.
 - [Appointment to Talk room synchronization](#appointment-to-talk-room-synchronization)
 - [CalDAV calendar synchronization](#caldav-calendar-synchronization)
 - [UI-thread budget](#ui-thread-budget)
+- [Diagnosing a slow Outlook on a restricted terminal server](#diagnosing-a-slow-outlook-on-a-restricted-terminal-server)
 - [Invariants](#invariants)
 - [Settings force-applied at startup](#settings-force-applied-at-startup)
 - [Upstream bugs fixed here](#upstream-bugs-fixed-here)
@@ -117,6 +118,10 @@ attendees mapped to Nextcloud accounts, not the whole user directory — the add
 UI thread and mapped on a background thread, since the lookup can refresh the address-book cache.
 With the list bounded by the invitees, the autocomplete field, dropdown and avatar loading were
 removed in favour of a checked list.
+
+The organizer is filtered out of the candidates: they create the room and own it, so they already
+are a moderator — the hint says exactly that, and listing them to tick implied the opposite. The
+filter matches on the Nextcloud account creating the room, which is the account that becomes owner.
 
 Empty states are reported by cause, because the remedies differ: no attendees invited yet (the
 common case when the room is created first), no system address book, or attendees with no Nextcloud
@@ -222,7 +227,10 @@ Talk change watcher and once for the CalDAV sync — which on an online-mode Exc
 round-trip per open. That runs from a one-shot timer 5 s after connection and logs its own timings.
 
 So when Outlook launches slowly, or the first click on a mail stalls for tens of seconds, the add-in
-is usually not the thing doing the waiting. Attribute it before changing anything:
+is usually not the thing doing the waiting. **This was investigated in the target environment and
+confirmed environmental**: the stall reproduced identically with the add-in disabled, happens on the
+first clicks after every launch, and clears on its own. Do not re-investigate it as an add-in
+problem. Attribute it before changing anything:
 
 1. **Disable the add-in** (File → Options → Add-ins → COM Add-ins) and repeat the action. If the
    stall persists, it is not this add-in. This is the only decisive test.
@@ -299,6 +307,19 @@ end time is invisible.
 **`TalkService.RemoveParticipant` passes `attendeeId` in the query string** — `NcHttpClient` drops
 the body on DELETE requests.
 
+**In WinForms the last `Controls.Add` wins.** Adding a control to a container and then to the form
+re-parents it: it keeps being positioned by the container's layout code but is drawn in form
+coordinates. This put the moderator list at the top of the dialog while its group box sat empty.
+
+**Layout must not depend on when it runs.** Give every control bounds in all of its states — a
+control skipped while hidden keeps WinForms' default size and position and shows through later — and
+populate list contents before the first layout pass, not after the constructor returns. Both of
+these produced a dialog that only lined up once some unrelated button forced a relayout.
+
+**`Inspector.CurrentItem` returns a new COM reference on every read.** Read it once and release it
+unless something retains it. Reading it twice per event and releasing neither leaked two references
+for every item opened in a window.
+
 **Never seed a stored setting from a `Strings.*` value.** It has happened twice — the Talk room title
 and the share name — and in both cases a UI caption ended up as real data on the server. When adding
 a setting, default it to empty and let the consumer apply its own fallback.
@@ -333,8 +354,12 @@ Candidates for contributing back:
 5. `ComposeAttachmentPromptForm` not `TopMost`.
 6. Subscribing to `ExplorerEvents_10_Event.InlineResponse` breaking the Reading Pane inline-reply
    command bar.
-7. `AppointmentItem.GetOrganizer()` returns an `AddressEntry`, not a `Recipient` — a fork-introduced
-   compile error, but the API confusion is worth noting.
+7. `OnNewInspector` reading `Inspector.CurrentItem` twice and releasing neither reference, leaking
+   two COM references for every item opened in its own window.
+8. `AddinSettings` seeding `SharingDefaultShareName` with the settings field's own caption, so every
+   share folder was named after a UI label.
+9. The Talk dialog's title field writing itself back into `appointment.Subject`, silently renaming a
+   meeting whose subject Outlook had not yet committed.
 
 ## Verification status
 
@@ -345,15 +370,21 @@ runs on push to `main` and on manual dispatch; it creates no tags and no release
 `gh` resolves an ambiguous repository when both `origin` and `upstream` remotes exist — always pass
 `-R vladopol/NC_Connector_for_Outlook`, or set a default once with `gh repo set-default`.
 
-Versions 3.1.0.10 through 3.1.0.20 compile in CI. **They have not been verified inside Outlook.**
-The areas most worth exercising, because they cannot be checked by compilation:
+**Versions 3.1.0.10 through 3.1.0.25 are verified in Outlook** in the target environment. Confirmed
+working against a live Nextcloud and Exchange:
 
-- Dialog layout in the Talk room window: two rows were removed (title, password checkbox), the
-  moderator list has three distinct empty states, and the password row appears and disappears on a
-  button, all of which recompute the window height.
-- That creating a Talk room no longer changes the meeting subject.
-- Participant removal against a real room, including that manually invited Talk participants survive.
-- Calendar-grid edits (drag to a new time, attendee changes from the scheduling view) reaching the
-  room.
-- That attendees do not receive a second invitation from Nextcloud (the `SCHEDULE-AGENT=CLIENT`
-  guarantee).
+- appointment edits reaching the Talk room, from the meeting window and from the calendar grid;
+- creating a Talk room leaving the meeting subject alone;
+- the policy-aware room PIN accepted by a server that enforces password complexity;
+- additional moderators promoted without the organizer leaving the room;
+- share folders named from the mail subject;
+- the Talk room dialog laying out correctly on first open.
+
+Three defects were found only by running it, each after a build that compiled cleanly — worth
+remembering when judging how much CI proves here:
+
+| Symptom | Cause |
+|---|---|
+| Moderator list drawn at the top of the dialog, outside its group | A leftover `Controls.Add` re-parented it to the form; the **last** `Controls.Add` wins |
+| Hint overlapping the list, correct only after pressing any button | The first layout pass ran before the candidates were added, and the list was only given bounds when non-empty |
+| Numeric room PIN rejected by the server | Only `minLength` was read from the password policy; the complexity flags were ignored |
