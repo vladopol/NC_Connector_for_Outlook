@@ -4,6 +4,31 @@ All notable changes to **NC Connector for Outlook** will be documented in this f
 
 This project follows the principles of **Keep a Changelog** and **Semantic Versioning**.
 
+## [3.1.0.24] - 2026-07-29
+
+Fork patch on upstream 3.1.0.
+
+---
+
+### Startup wiring moved off the user's first interaction, and timed
+
+The add-in performs **no network requests at startup** — settings file, registry and MAPI only. Its
+one potentially expensive startup step is opening the default calendar folder, which it does twice:
+once for the Talk change watcher and once for the CalDAV sync. On an online-mode Exchange profile —
+common on terminal servers, where a cached OST is impractical — each folder open and each `Items`
+binding is a round-trip to the server.
+
+That work was posted to the UI thread, meaning it ran at the next message-loop turn: exactly while
+the user is clicking their first mail.
+
+- The wiring now runs from a one-shot timer 5 s after connection, clear of Outlook's own startup
+  burst and of the user's first interactions.
+- Each step is timed individually and the elapsed values are logged, so a sluggish launch can be
+  attributed from the debug log instead of guessed at.
+
+This does not by itself explain a minute-long stall — see `docs/FORK.md` for what else to check on a
+restricted terminal server.
+
 ## [3.1.0.23] - 2026-07-29
 
 Fork patch on upstream 3.1.0.
