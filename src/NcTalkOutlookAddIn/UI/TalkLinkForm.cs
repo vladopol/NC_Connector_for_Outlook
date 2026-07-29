@@ -410,7 +410,7 @@ namespace NcTalkOutlookAddIn.UI
                 FooterButtonLayoutHelper.ApplyButtonSize(_passwordToggleButton, out toggleMinWidth);
                 int toggleWidth = _passwordToggleButton.Width;
                 int toggleHeight = _passwordToggleButton.Height;
-                _passwordToggleButton.SetBounds(inputX, y, toggleWidth, toggleHeight);
+                _passwordToggleButton.SetBounds(outerPadding, y, toggleWidth, toggleHeight);
 
                 if (_passwordEnabled)
                 {
@@ -420,10 +420,13 @@ namespace NcTalkOutlookAddIn.UI
                     int generateButtonHeight = _passwordGenerateButton.Height;
                     int gap = ScaleLogical(8);
 
+                    int passwordRowRight = Math.Max(
+                        ScaleLogical(260) + outerPadding,
+                        ClientSize.Width - outerPadding);
                     int passwordLeft = _passwordToggleButton.Right + gap;
                     int passwordWidth = Math.Max(
                         ScaleLogical(110),
-                        inputX + inputWidth - passwordLeft - generateButtonWidth - gap);
+                        passwordRowRight - passwordLeft - generateButtonWidth - gap);
                     int passwordHeight = _passwordTextBox.PreferredHeight + ScaleLogical(2);
 
                     // Vertically centre the field against the buttons so the row reads as one line.
@@ -452,12 +455,7 @@ namespace NcTalkOutlookAddIn.UI
 
                 y = _settingsGroup.Bottom + verticalGap;
                 _moderatorGroup.SetBounds(outerPadding, y, groupWidth, ScaleLogical(72));
-                int moderatorGroupHeight = LayoutModeratorGroupControls();
-                if (moderatorGroupHeight != _moderatorGroup.Height)
-                {
-                    _moderatorGroup.Height = moderatorGroupHeight;
-                    LayoutModeratorGroupControls();
-                }
+                _moderatorGroup.Height = LayoutModeratorGroupControls(groupWidth);
                 var footerButtons = new List<Button> { _okButton, _cancelButton };
                 int minClientWidth = FooterButtonLayoutHelper.LayoutCentered(
                     this,
@@ -490,10 +488,13 @@ namespace NcTalkOutlookAddIn.UI
             }
         }
 
-        private int LayoutModeratorGroupControls()
+        // The width is passed in rather than read from _moderatorGroup.ClientSize: the group may not
+        // have been sized yet when this runs, and reading a default size once produced a narrow list
+        // sitting on top of the hint instead of above it.
+        private int LayoutModeratorGroupControls(int groupWidth)
         {
             int innerPadding = ScaleLogical(12);
-            int contentWidth = Math.Max(ScaleLogical(160), _moderatorGroup.ClientSize.Width - (innerPadding * 2));
+            int contentWidth = Math.Max(ScaleLogical(160), groupWidth - (innerPadding * 3));
             int contentTop = ScaleLogical(22);
 
             // The list is only shown when there is something to tick; otherwise the hint alone
@@ -511,7 +512,7 @@ namespace NcTalkOutlookAddIn.UI
             if (_moderatorAddressbookWarningPanel.Visible)
             {
                 int panelPadding = ScaleLogical(8);
-                int panelWidth = Math.Max(ScaleLogical(160), _moderatorGroup.ClientSize.Width - (innerPadding * 2));
+                int panelWidth = contentWidth;
                 int warningTextWidth = Math.Max(ScaleLogical(120), panelWidth - (panelPadding * 2));
 
                 _moderatorAddressbookWarningTitleLabel.Location = new Point(panelPadding, panelPadding);

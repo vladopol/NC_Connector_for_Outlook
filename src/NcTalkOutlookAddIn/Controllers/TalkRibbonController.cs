@@ -94,12 +94,14 @@ namespace NcTalkOutlookAddIn.Controllers
             // recipient list is read here on the UI thread (COM), then mapped to Nextcloud accounts
             // on a background thread because the lookup can refresh the address-book cache.
             List<string> attendeeEmails = NextcloudTalkAddIn.GetAppointmentAttendeeEmails(appointment);
+            Dictionary<string, string> attendeeNames =
+                OutlookRecipientResolverController.CollectAppointmentAttendeeNamesByEmail(appointment);
             int cacheHours = settings.IfbCacheHours;
             List<NextcloudUser> moderatorCandidates;
             try
             {
                 moderatorCandidates = talkClickAddressbookStatus.Available
-                    ? await Task.Run(() => ResolveModeratorCandidates(addressbookCache, configuration, cacheHours, attendeeEmails))
+                    ? await Task.Run(() => ResolveModeratorCandidates(addressbookCache, configuration, cacheHours, attendeeEmails, attendeeNames))
                     : new List<NextcloudUser>();
             }
             catch (Exception ex)
@@ -310,7 +312,8 @@ namespace NcTalkOutlookAddIn.Controllers
             IfbAddressBookCache addressBookCache,
             TalkServiceConfiguration configuration,
             int cacheHours,
-            List<string> attendeeEmails)
+            List<string> attendeeEmails,
+            Dictionary<string, string> attendeeNames)
         {
             var result = new List<NextcloudUser>();
             if (addressBookCache == null || attendeeEmails == null)
@@ -339,7 +342,12 @@ namespace NcTalkOutlookAddIn.Controllers
                         continue;
                     }
 
-                    result.Add(new NextcloudUser(uid.Trim(), email.Trim()));
+                    string displayName;
+                    if (attendeeNames == null || !attendeeNames.TryGetValue(email.Trim().ToLowerInvariant(), out displayName))
+                    {
+                        displayName = null;
+                    }
+                    result.Add(new NextcloudUser(uid.Trim(), email.Trim(), displayName));
                 }
                 catch (Exception ex)
                 {

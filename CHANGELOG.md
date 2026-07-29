@@ -4,6 +4,26 @@ All notable changes to **NC Connector for Outlook** will be documented in this f
 
 This project follows the principles of **Keep a Changelog** and **Semantic Versioning**.
 
+## [3.1.0.22] - 2026-07-29
+
+Fork patch on upstream 3.1.0.
+
+---
+
+### Talk room dialog: alignment, moderator list order and names
+
+- **The password button is aligned with the group boxes below it** instead of sitting in the old
+  input column, where it was indented far to the right with nothing above or below to line up with.
+- **The moderator hint sits below the list, not underneath it.** `LayoutModeratorGroupControls` read
+  its width from `_moderatorGroup.ClientSize`, which could still be the default size when the method
+  ran; the list then came out at its minimum width and the hint was positioned as though no list was
+  present, so the list — earlier in z-order — painted over it. The width is now passed in by the
+  caller, which already knows it.
+- **Attendees are listed by name.** `Фамилия Имя <mail@example.org>` instead of
+  `login <mail@example.org>` — a Nextcloud login identifies an account, not a person. The name comes
+  from Outlook's resolved `Recipient.Name` for the meeting attendee; the login is still shown when
+  Outlook has no name for the entry.
+
 ## [3.1.0.21] - 2026-07-29
 
 Fork patch on upstream 3.1.0.
