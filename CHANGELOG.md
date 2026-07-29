@@ -4,6 +4,25 @@ All notable changes to **NC Connector for Outlook** will be documented in this f
 
 This project follows the principles of **Keep a Changelog** and **Semantic Versioning**.
 
+## [3.1.0.23] - 2026-07-29
+
+Fork patch on upstream 3.1.0.
+
+---
+
+### FIXED: COM reference leak on every item opened in its own window
+
+`OnNewInspector` read `Inspector.CurrentItem` **twice** and released neither reference. Every
+`CurrentItem` read hands back a separate COM reference, and the handler runs for every item opened
+in a window — including received mail, which the add-in does nothing with. Two references leaked per
+opened item, held until garbage collection finalized them.
+
+`CurrentItem` is now read once and released unless something retains it (an appointment tracking
+subscription, or a compose-mail subscription). Received mail, contacts, tasks and notes — everything
+the add-in ignores — no longer leak.
+
+This is an upstream defect, present since the handler was written.
+
 ## [3.1.0.22] - 2026-07-29
 
 Fork patch on upstream 3.1.0.

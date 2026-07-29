@@ -57,14 +57,33 @@ namespace NcTalkOutlookAddIn
             {
                 return;
             }
+            // Fetched once and released unless something keeps it. Every Inspector.CurrentItem read
+            // hands back a separate COM reference, and this fires for *every* item opened in its own
+            // window — including received mail, which the add-in does nothing with. Reading it twice
+            // and releasing neither leaked two references per opened item, for the whole session.
+            object currentItem = null;
+            bool retained = false;
             try
             {
-                var appointment = inspector.CurrentItem as Outlook.AppointmentItem;                if (appointment != null)
+                currentItem = inspector.CurrentItem;
+                if (currentItem == null)
                 {
-                    EnsureSubscriptionForAppointment(appointment);
+                    return;
                 }
-                var mail = inspector.CurrentItem as Outlook.MailItem;                if (mail != null && IsMailComposeCandidate(mail, "new_inspector"))
+
+                var appointment = currentItem as Outlook.AppointmentItem;
+                if (appointment != null)
                 {
+                    // A tracking subscription may hold on to the item.
+                    retained = true;
+                    EnsureSubscriptionForAppointment(appointment);
+                    return;
+                }
+
+                var mail = currentItem as Outlook.MailItem;
+                if (mail != null && IsMailComposeCandidate(mail, "new_inspector"))
+                {
+                    retained = true;
                     string inspectorIdentityKey = ComInteropScope.ResolveIdentityKey(inspector, LogCategories.FileLink, "Inspector");
                     DeferMailComposeSubscriptionEnsure(mail, inspectorIdentityKey, false, "new_inspector");
                 }
@@ -72,6 +91,13 @@ namespace NcTalkOutlookAddIn
             catch (Exception ex)
             {
                 DiagnosticsLogger.LogException(LogCategories.Core, "Failed to process NewInspector event.", ex);
+            }
+            finally
+            {
+                if (!retained && currentItem != null)
+                {
+                    ComInteropScope.TryRelease(currentItem, LogCategories.Core, "Failed to release Inspector.CurrentItem COM object.");
+                }
             }
         }
 
