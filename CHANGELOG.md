@@ -4,6 +4,30 @@ All notable changes to **NC Connector for Outlook** will be documented in this f
 
 This project follows the principles of **Keep a Changelog** and **Semantic Versioning**.
 
+## [3.1.0.21] - 2026-07-29
+
+Fork patch on upstream 3.1.0.
+
+---
+
+### FIXED: Talk room dialog layout
+
+- **The moderator list rendered outside its group box, at the top of the dialog.** A leftover
+  `Controls.Add(_moderatorListBox)` from the old search dropdown re-parented the control to the form
+  after it had been added to the group — the last `Add` wins — so it was positioned in form
+  coordinates while the "Additional moderators" box below sat empty. The stray line is gone.
+- **The password row is one line:** `[Add/Remove password] [field] [Generate]`. The field now grows
+  to the right of the button instead of appearing on a line below it, and is vertically centred
+  against the buttons.
+- **The "Password" caption is removed.** The button already says what the row is, and the caption
+  sat in a column of its own with nothing else in it.
+- **The moderator list is hidden entirely when there is nothing to tick**, rather than leaving an
+  empty box; the hint alone explains what to do. When shown, it sizes to its content up to five
+  rows.
+- **The moderator hint is measured instead of stretched.** It used to be sized to fill whatever
+  remained of a fixed-height group, which left a large empty gap between the list and the text. The
+  group now sizes to its content.
+
 ## [3.1.0.20] - 2026-07-29
 
 Fork patch on upstream 3.1.0.
