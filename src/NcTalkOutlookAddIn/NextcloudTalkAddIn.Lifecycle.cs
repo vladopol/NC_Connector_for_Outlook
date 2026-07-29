@@ -18,6 +18,12 @@ namespace NcTalkOutlookAddIn
         // Add-in lifecycle and bootstrap/teardown flow.
     public sealed partial class NextcloudTalkAddIn
     {
+        // Long enough to clear Outlook's own startup burst, short enough that calendar changes made
+        // in the first seconds are not missed by much.
+        private const int StartupWiringDelayMs = 5000;
+
+        private System.Windows.Forms.Timer _startupWiringTimer;
+
                 // Outlook calls this method when the add-in is loaded.
         // Stores the Application instance for later actions.
         public void OnConnection(object application, ext_ConnectMode connectMode, object addInInst, ref Array custom)
@@ -78,31 +84,92 @@ namespace NcTalkOutlookAddIn
             DeferStartupWiring();
         }
 
+        // Posting this to the UI thread runs it at the next message-loop turn — which is exactly
+        // when the user is clicking their first mail. The work itself opens the default calendar
+        // folder, and on an online-mode Exchange profile (common on terminal servers, where the OST
+        // is impractical) every folder open is a round-trip to the server. A short delay keeps it
+        // out of the window where the user is waiting on their own first interaction.
         private void DeferStartupWiring()
         {
-            SynchronizationContext context = _uiSynchronizationContext;
-            if (context == null)
+            if (_startupWiringTimer != null)
             {
-                RunStartupWiring();
                 return;
             }
+            try
+            {
+                _startupWiringTimer = new System.Windows.Forms.Timer();
+                _startupWiringTimer.Interval = StartupWiringDelayMs;
+                _startupWiringTimer.Tick += OnStartupWiringTick;
+                _startupWiringTimer.Start();
+                return;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to schedule deferred startup wiring.", ex);
+                StopStartupWiringTimer();
+            }
 
-            context.Post(_ => RunStartupWiring(), null);
+            RunStartupWiring();
+        }
+
+        private void OnStartupWiringTick(object sender, EventArgs e)
+        {
+            StopStartupWiringTimer();
+            RunStartupWiring();
+        }
+
+        private void StopStartupWiringTimer()
+        {
+            if (_startupWiringTimer == null)
+            {
+                return;
+            }
+            try
+            {
+                _startupWiringTimer.Stop();
+                _startupWiringTimer.Tick -= OnStartupWiringTick;
+                _startupWiringTimer.Dispose();
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to dispose the startup wiring timer.", ex);
+            }
+            finally
+            {
+                _startupWiringTimer = null;
+            }
         }
 
         private void RunStartupWiring()
         {
-            // Shutdown can win the race against the posted callback.
+            // Shutdown can win the race against the deferred callback.
             if (_outlookApplication == null)
             {
                 return;
             }
             try
             {
+                // Timed individually: on a slow profile these are the add-in's only expensive
+                // startup steps, and the log is the only way to tell them apart from Outlook's own
+                // startup work when diagnosing a sluggish launch.
+                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
                 EnsureTalkCalendarWatcher();
+                long watcherMs = stopwatch.ElapsedMilliseconds;
+
                 ApplyIfbSettings();
+                long ifbMs = stopwatch.ElapsedMilliseconds - watcherMs;
+
                 ApplyCalDavSyncSettings();
-                LogCore("Deferred startup wiring completed.");
+                long calDavMs = stopwatch.ElapsedMilliseconds - watcherMs - ifbMs;
+
+                LogCore(
+                    "Deferred startup wiring completed (calendarWatcher="
+                    + watcherMs.ToString(CultureInfo.InvariantCulture)
+                    + "ms, freeBusyRegistry="
+                    + ifbMs.ToString(CultureInfo.InvariantCulture)
+                    + "ms, calDavSync="
+                    + calDavMs.ToString(CultureInfo.InvariantCulture)
+                    + "ms).");
             }
             catch (Exception ex)
             {
@@ -236,6 +303,7 @@ namespace NcTalkOutlookAddIn
         // This path must be idempotent, because Outlook can call both callbacks.
         private void TearDownAddInState(string origin, bool clearOutlookApplication)
         {
+            StopStartupWiringTimer();
             UnhookInspector();
             UnhookTalkCalendarWatcher();
             UnhookMailComposeSubscriptions();

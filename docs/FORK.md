@@ -214,6 +214,41 @@ the user's attachment. Shortening it makes nothing faster, it only breaks large 
 Flow v2 poll keeps its own 60 s and is annotated — that wait is the user authenticating in a
 browser, not a stalled server.
 
+## Diagnosing a slow Outlook on a restricted terminal server
+
+The add-in performs **no network requests at startup**: settings file, registry and MAPI only. Its
+only potentially expensive startup step is opening the default calendar folder — twice, once for the
+Talk change watcher and once for the CalDAV sync — which on an online-mode Exchange profile is a
+round-trip per open. That runs from a one-shot timer 5 s after connection and logs its own timings.
+
+So when Outlook launches slowly, or the first click on a mail stalls for tens of seconds, the add-in
+is usually not the thing doing the waiting. Attribute it before changing anything:
+
+1. **Disable the add-in** (File → Options → Add-ins → COM Add-ins) and repeat the action. If the
+   stall persists, it is not this add-in. This is the only decisive test.
+2. **Read Outlook's own measurements** at
+   `HKCU\Software\Microsoft\Office\16.0\Outlook\Resiliency\AddinPerformanceMetrics` — Outlook
+   records per-add-in load and response times there itself.
+3. **Enable debug logging** and compare timestamps around the action. `Deferred startup wiring
+   completed (...)` reports how long each startup step actually took. Note the logger appends to
+   the file synchronously per line, so it is a diagnostic mode, not a permanent one.
+
+Environmental causes worth checking, roughly in order of how often they explain a stall of tens of
+seconds that only happens on the first action:
+
+- **Certificate revocation checks (CRL / OCSP).** Validating a certificate fetches a revocation list.
+  If outbound access is *dropped* rather than refused, each check waits out its timeout — and the
+  result is cached afterwards, which is exactly why the first action is slow and later ones are not.
+  Test by turning off "Check for publisher's certificate revocation" and "Check for server
+  certificate revocation" in Internet Options → Advanced. (This add-in's MSI and assembly are
+  unsigned, so they do not trigger an Authenticode check themselves.)
+- **WPAD proxy auto-detection.** "Automatically detect settings" with no WPAD host makes every new
+  connection wait for discovery.
+- **Online-mode Exchange profile.** Without a cached OST, opening a mail fetches its body over the
+  network — the first click after launch competes with Outlook's own startup traffic.
+- **Outlook's own startup network work:** AutoDiscover, OAB download, licensing, Connected
+  Experiences. On a restricted network these can each hang.
+
 ## Invariants
 
 Break these and the symptoms are slow, intermittent and hard to attribute. Each exists because it
