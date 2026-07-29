@@ -101,7 +101,7 @@ namespace NcTalkOutlookAddIn.Controllers
             try
             {
                 moderatorCandidates = talkClickAddressbookStatus.Available
-                    ? await Task.Run(() => ResolveModeratorCandidates(addressbookCache, configuration, cacheHours, attendeeEmails, attendeeNames))
+                    ? await Task.Run(() => ResolveModeratorCandidates(addressbookCache, configuration, cacheHours, attendeeEmails, attendeeNames, settings.Username))
                     : new List<NextcloudUser>();
             }
             catch (Exception ex)
@@ -313,7 +313,8 @@ namespace NcTalkOutlookAddIn.Controllers
             TalkServiceConfiguration configuration,
             int cacheHours,
             List<string> attendeeEmails,
-            Dictionary<string, string> attendeeNames)
+            Dictionary<string, string> attendeeNames,
+            string selfUserId)
         {
             var result = new List<NextcloudUser>();
             if (addressBookCache == null || attendeeEmails == null)
@@ -334,6 +335,14 @@ namespace NcTalkOutlookAddIn.Controllers
                     string uid;
                     if (!addressBookCache.TryGetUid(configuration, cacheHours, email, out uid)
                         || string.IsNullOrWhiteSpace(uid))
+                    {
+                        continue;
+                    }
+                    // The organizer creates the room and is its owner, so they are already a
+                    // moderator — the hint says so. Offering them as something to tick would imply
+                    // the opposite.
+                    if (!string.IsNullOrWhiteSpace(selfUserId)
+                        && string.Equals(uid.Trim(), selfUserId.Trim(), StringComparison.OrdinalIgnoreCase))
                     {
                         continue;
                     }

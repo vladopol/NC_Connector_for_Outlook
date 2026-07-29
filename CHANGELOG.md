@@ -4,6 +4,29 @@ All notable changes to **NC Connector for Outlook** will be documented in this f
 
 This project follows the principles of **Keep a Changelog** and **Semantic Versioning**.
 
+## [3.1.0.25] - 2026-07-29
+
+Fork patch on upstream 3.1.0.
+
+---
+
+### Talk room dialog: organizer removed from the moderator list, hint no longer overlaps it
+
+- **The organizer is no longer offered as a moderator to tick.** They create the room and own it, so
+  they already are one — which the hint says. Listing them implied the opposite. Filtered by the
+  Nextcloud account creating the room, which is the account that becomes the owner.
+- **The hint sits below the list on first display.** The list was only given bounds when it had
+  items, so the very first layout pass — which runs before the candidates are added — left it at
+  WinForms' default size and position and placed the hint as though no list existed. Any later
+  relayout corrected it, which is why the group only lined up after pressing a button.
+
+  The candidates are now filled before the first layout pass, the list is given bounds in both
+  states so it can never keep its default ones, and the hint's background is transparent so a stray
+  overlap could not hide the list behind it.
+
+Startup timing instrumentation added in 3.1.0.24 is kept: it goes through the diagnostics logger,
+which returns immediately when debug logging is off, so it costs nothing in normal operation.
+
 ## [3.1.0.24] - 2026-07-29
 
 Fork patch on upstream 3.1.0.

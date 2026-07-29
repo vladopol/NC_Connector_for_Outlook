@@ -177,7 +177,6 @@ namespace NcTalkOutlookAddIn.UI
 
             BrandedHeader.AttachToParent(_headerPanel, Controls, HeaderHeight);
             InitializeComponents();
-            PopulateModeratorCandidates(_moderatorCandidates);
             ApplyDefaults(defaults, appointmentSubject);
             ApplyDialogLayout(true);
 
@@ -249,7 +248,19 @@ namespace NcTalkOutlookAddIn.UI
 
             _moderatorHintLabel.Text = Strings.TalkModeratorHint;
             _moderatorHintLabel.ForeColor = Color.DimGray;
+            // Labels paint their background; transparent keeps a stray overlap from hiding the list
+            // behind it rather than showing both.
+            _moderatorHintLabel.BackColor = Color.Transparent;
             _moderatorGroup.Controls.Add(_moderatorHintLabel);
+
+            // Filled here rather than after the constructor finishes: the first layout pass runs at
+            // the end of this method, and a pass that sees an empty list positions the hint as
+            // though no list existed. Later passes fixed it, which is why the group only lined up
+            // once some other control forced a relayout.
+            PopulateModeratorCandidates(_moderatorCandidates);
+            // Settle the hint text too: it wraps, so its height feeds the group's height and the
+            // first pass should already measure the final wording.
+            UpdateModeratorHint();
 
             _eventSupportHintLabel.AutoSize = true;
             _eventSupportHintLabel.MaximumSize = new Size(ScaleLogical(260), 0);
@@ -499,13 +510,17 @@ namespace NcTalkOutlookAddIn.UI
 
             // The list is only shown when there is something to tick; otherwise the hint alone
             // explains what to do, and an empty box would just be a hole in the dialog.
-            _moderatorListBox.Visible = _moderatorListBox.Items.Count > 0;
-            if (_moderatorListBox.Visible)
+            // SetBounds runs in both cases. Skipping it while hidden left the control at WinForms'
+            // default size and position, which then showed through as a small box overlapping the
+            // hint as soon as the list became visible.
+            bool hasCandidates = _moderatorListBox.Items.Count > 0;
+            int rowHeight = _moderatorListBox.ItemHeight > 0 ? _moderatorListBox.ItemHeight : ScaleLogical(17);
+            int visibleRows = Math.Min(Math.Max(_moderatorListBox.Items.Count, 1), 5);
+            int listHeight = hasCandidates ? (rowHeight * visibleRows) + ScaleLogical(6) : 0;
+            _moderatorListBox.SetBounds(innerPadding, contentTop, contentWidth, listHeight);
+            _moderatorListBox.Visible = hasCandidates;
+            if (hasCandidates)
             {
-                int rowHeight = _moderatorListBox.ItemHeight > 0 ? _moderatorListBox.ItemHeight : ScaleLogical(17);
-                int visibleRows = Math.Min(_moderatorListBox.Items.Count, 5);
-                int listHeight = (rowHeight * visibleRows) + ScaleLogical(6);
-                _moderatorListBox.SetBounds(innerPadding, contentTop, contentWidth, listHeight);
                 contentTop = _moderatorListBox.Bottom + ScaleLogical(8);
             }
 
