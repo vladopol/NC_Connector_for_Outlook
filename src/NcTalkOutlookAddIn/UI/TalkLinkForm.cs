@@ -31,7 +31,6 @@ namespace NcTalkOutlookAddIn.UI
         private readonly UiThemePalette _themePalette = UiThemeManager.DetectPalette();
 
         private readonly Label _roomTypeLabel = new Label();
-        private readonly Label _passwordLabel = new Label();
         private readonly GroupBox _settingsGroup = new GroupBox();
         private readonly Label _eventSupportHintLabel = new Label();
         private readonly ComboBox _roomTypeComboBox = new ComboBox();
@@ -194,8 +193,6 @@ namespace NcTalkOutlookAddIn.UI
             _passwordToggleButton.TextAlign = ContentAlignment.MiddleCenter;
             _passwordToggleButton.Click += (s, e) => SetPasswordEnabled(!_passwordEnabled);
 
-            _passwordLabel.Text = Strings.TalkPasswordLabel;
-            _passwordLabel.AutoSize = true;
 
             _passwordTextBox.UseSystemPasswordChar = false;
 
@@ -310,7 +307,6 @@ namespace NcTalkOutlookAddIn.UI
 
             Controls.Add(_eventSupportHintLabel);
             Controls.Add(_passwordToggleButton);
-            Controls.Add(_passwordLabel);
             Controls.Add(_passwordTextBox);
             Controls.Add(_passwordGenerateButton);
             Controls.Add(_settingsGroup);
@@ -329,7 +325,6 @@ namespace NcTalkOutlookAddIn.UI
             _toolTip.SetToolTip(_lobbyCheckBox, Strings.TooltipLobby);
             _toolTip.SetToolTip(_searchCheckBox, Strings.TooltipSearchVisible);
             _toolTip.SetToolTip(_moderatorListBox, Strings.TooltipModerator);
-            Controls.Add(_moderatorListBox);
             ApplyDialogLayout(false);
         }
 
@@ -407,12 +402,15 @@ namespace NcTalkOutlookAddIn.UI
                     _policyWarningPanel.SetBounds(outerPadding, y, Math.Max(ScaleLogical(260), ClientSize.Width - (outerPadding * 2)), 0);
                 }
 
-                // The toggle keeps a fixed position whichever state it is in, so its target does not
-                // move under the pointer when the password row appears or disappears below it.
+                // One row, always: [toggle] [password] [generate]. The toggle keeps a fixed position
+                // so its target does not move under the pointer, and the field grows to the right of
+                // it instead of pushing everything below down a line. No caption — the button says
+                // what the row is.
                 int toggleMinWidth;
                 FooterButtonLayoutHelper.ApplyButtonSize(_passwordToggleButton, out toggleMinWidth);
-                _passwordToggleButton.SetBounds(inputX, y, _passwordToggleButton.Width, _passwordToggleButton.Height);
-                y = _passwordToggleButton.Bottom + ScaleLogical(10);
+                int toggleWidth = _passwordToggleButton.Width;
+                int toggleHeight = _passwordToggleButton.Height;
+                _passwordToggleButton.SetBounds(inputX, y, toggleWidth, toggleHeight);
 
                 if (_passwordEnabled)
                 {
@@ -420,17 +418,25 @@ namespace NcTalkOutlookAddIn.UI
                     FooterButtonLayoutHelper.ApplyButtonSize(_passwordGenerateButton, out ignoredGenerateMinWidth);
                     int generateButtonWidth = _passwordGenerateButton.Width;
                     int generateButtonHeight = _passwordGenerateButton.Height;
-                    int passwordWidth = Math.Max(ScaleLogical(120), inputWidth - generateButtonWidth - ScaleLogical(8));
+                    int gap = ScaleLogical(8);
 
-                    _passwordLabel.Location = new Point(labelX, y + ScaleLogical(4));
-                    _passwordTextBox.SetBounds(inputX, y, passwordWidth, _passwordTextBox.PreferredHeight + ScaleLogical(2));
-                    _passwordGenerateButton.SetBounds(_passwordTextBox.Right + ScaleLogical(8), y - ScaleLogical(2), generateButtonWidth, generateButtonHeight);
-                    y = Math.Max(_passwordLabel.Bottom, Math.Max(_passwordTextBox.Bottom, _passwordGenerateButton.Bottom)) + ScaleLogical(16);
+                    int passwordLeft = _passwordToggleButton.Right + gap;
+                    int passwordWidth = Math.Max(
+                        ScaleLogical(110),
+                        inputX + inputWidth - passwordLeft - generateButtonWidth - gap);
+                    int passwordHeight = _passwordTextBox.PreferredHeight + ScaleLogical(2);
+
+                    // Vertically centre the field against the buttons so the row reads as one line.
+                    int passwordTop = y + Math.Max(0, (toggleHeight - passwordHeight) / 2);
+                    _passwordTextBox.SetBounds(passwordLeft, passwordTop, passwordWidth, passwordHeight);
+                    _passwordGenerateButton.SetBounds(
+                        _passwordTextBox.Right + gap,
+                        y,
+                        generateButtonWidth,
+                        generateButtonHeight);
                 }
-                else
-                {
-                    y += ScaleLogical(6);
-                }
+
+                y = _passwordToggleButton.Bottom + ScaleLogical(16);
 
                 int groupWidth = Math.Max(ScaleLogical(260), ClientSize.Width - (outerPadding * 2));
 
@@ -445,9 +451,9 @@ namespace NcTalkOutlookAddIn.UI
                 _settingsGroup.Height = Math.Max(ScaleLogical(108), settingsGroupHeight);
 
                 y = _settingsGroup.Bottom + verticalGap;
-                _moderatorGroup.SetBounds(outerPadding, y, groupWidth, ScaleLogical(122));
+                _moderatorGroup.SetBounds(outerPadding, y, groupWidth, ScaleLogical(72));
                 int moderatorGroupHeight = LayoutModeratorGroupControls();
-                if (moderatorGroupHeight > _moderatorGroup.Height)
+                if (moderatorGroupHeight != _moderatorGroup.Height)
                 {
                     _moderatorGroup.Height = moderatorGroupHeight;
                     LayoutModeratorGroupControls();
@@ -487,12 +493,20 @@ namespace NcTalkOutlookAddIn.UI
         private int LayoutModeratorGroupControls()
         {
             int innerPadding = ScaleLogical(12);
-            int listTop = ScaleLogical(22);
-            int listWidth = Math.Max(ScaleLogical(160), _moderatorGroup.ClientSize.Width - (innerPadding * 2));
-            int listHeight = ScaleLogical(_moderatorListBox.Items.Count > 0 ? 96 : 44);
-            _moderatorListBox.SetBounds(innerPadding, listTop, listWidth, listHeight);
+            int contentWidth = Math.Max(ScaleLogical(160), _moderatorGroup.ClientSize.Width - (innerPadding * 2));
+            int contentTop = ScaleLogical(22);
 
-            int contentTop = _moderatorListBox.Bottom + ScaleLogical(8);
+            // The list is only shown when there is something to tick; otherwise the hint alone
+            // explains what to do, and an empty box would just be a hole in the dialog.
+            _moderatorListBox.Visible = _moderatorListBox.Items.Count > 0;
+            if (_moderatorListBox.Visible)
+            {
+                int rowHeight = _moderatorListBox.ItemHeight > 0 ? _moderatorListBox.ItemHeight : ScaleLogical(17);
+                int visibleRows = Math.Min(_moderatorListBox.Items.Count, 5);
+                int listHeight = (rowHeight * visibleRows) + ScaleLogical(6);
+                _moderatorListBox.SetBounds(innerPadding, contentTop, contentWidth, listHeight);
+                contentTop = _moderatorListBox.Bottom + ScaleLogical(8);
+            }
 
             if (_moderatorAddressbookWarningPanel.Visible)
             {
@@ -514,9 +528,12 @@ namespace NcTalkOutlookAddIn.UI
                 _moderatorAddressbookWarningPanel.SetBounds(innerPadding, contentTop, panelWidth, panelHeight);
                 contentTop = _moderatorAddressbookWarningPanel.Bottom + ScaleLogical(8);
             }
-            int hintTop = contentTop;
-            int hintHeight = Math.Max(ScaleLogical(38), _moderatorGroup.ClientSize.Height - hintTop - innerPadding);
-            _moderatorHintLabel.SetBounds(innerPadding, hintTop, Math.Max(ScaleLogical(120), _moderatorGroup.ClientSize.Width - (innerPadding * 2)), hintHeight);
+            // Let the hint wrap to its own height instead of being stretched to fill the group —
+            // stretching left a large empty gap between the list and the text. Same AutoSize +
+            // MaximumSize pattern the warning labels above use.
+            _moderatorHintLabel.AutoSize = true;
+            _moderatorHintLabel.MaximumSize = new Size(contentWidth, 0);
+            _moderatorHintLabel.Location = new Point(innerPadding, contentTop);
             return _moderatorHintLabel.Bottom + innerPadding;
         }
 
@@ -683,9 +700,7 @@ namespace NcTalkOutlookAddIn.UI
                 lockPassword ? Strings.PolicyAdminControlledTooltip : string.Empty,
                 lockPassword,
                 _passwordGenerateButton,
-                _passwordLabel,
-                _passwordTextBox,
-                _passwordGenerateButton);
+                _passwordTextBox);
             _disabledTooltipHints.Apply(_lobbyCheckBox, lockLobby ? Strings.PolicyAdminControlledTooltip : Strings.TooltipLobby, lockLobby);
             _disabledTooltipHints.Apply(_searchCheckBox, lockSearch ? Strings.PolicyAdminControlledTooltip : Strings.TooltipSearchVisible, lockSearch);
 
@@ -811,7 +826,6 @@ namespace NcTalkOutlookAddIn.UI
             // the toggle is disabled rather than hidden — the reason stays visible via its tooltip.
             _passwordToggleButton.Text = enabled ? Strings.TalkPasswordRemove : Strings.TalkPasswordAdd;
             _passwordToggleButton.Enabled = !lockPassword;
-            _passwordLabel.Visible = enabled;
             _passwordTextBox.Visible = enabled;
             _passwordGenerateButton.Visible = enabled;
 
@@ -820,8 +834,7 @@ namespace NcTalkOutlookAddIn.UI
             _disabledTooltipHints.Apply(
                 _passwordGenerateButton,
                 !enabled ? string.Empty : (allowGenerate ? string.Empty : Strings.PolicyAdminControlledTooltip),
-                enabled && !allowGenerate,
-                _passwordLabel);
+                enabled && !allowGenerate);
         }
 
         // Adding a password fills it in straight away, so the common path is a single click; taking
