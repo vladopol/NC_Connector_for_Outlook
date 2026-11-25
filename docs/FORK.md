@@ -172,8 +172,14 @@ The watcher's attendee baseline is in memory only (`_calendarWatchStates`), beca
 would require a `Save()`. It can drift one edit from the stored property, which is harmless: a
 repeat add answers 409 and a repeat removal answers 404, and both are treated as success.
 
-For event conversations, name and description updates are attempted and a server rejection is cached
-per room for the session. These are never surfaced as dialogs — the sync runs on every save.
+Name and description are reconciled against the room as the server holds it: the sync reads the room
+first (`TalkService.TryGetRoomState`). An event conversation is left alone — Talk copies name,
+description and time from the linked calendar object (`CalDavEventListener`) and rejects direct
+updates with 400 `event` — so later edits reach it only through CalDAV sync, which is therefore on by
+default (one-time switch via `CalDavSyncDefaultApplied`, 3.1.0.26). A regular room, including one
+Talk unbound from its event (recurring meeting, room reused for another event), is updated only when
+the value differs. If the read fails, the update is attempted and a rejection is cached per room for
+the session. None of this is ever surfaced as a dialog — the sync runs on every save.
 
 ## CalDAV calendar synchronization
 

@@ -53,6 +53,15 @@ namespace NcTalkOutlookAddIn
                 _settingsStorage.Save(_currentSettings);
                 LogCore("TalkDefaultPasswordEnabled force-disabled and saved.");
             }
+            if (_currentSettings != null && !_currentSettings.CalDavSyncDefaultApplied)
+            {
+                // One-time switch, not a force: profiles saved by an older build carry an explicit
+                // "false" that was only ever the old default. After this the checkbox is the user's.
+                _currentSettings.CalDavSyncEnabled = true;
+                _currentSettings.CalDavSyncDefaultApplied = true;
+                _settingsStorage.Save(_currentSettings);
+                LogCore("CalDavSyncEnabled switched on once (new default) and saved.");
+            }
             ConfigureDiagnosticsLogger(_currentSettings);
             TryApplyTransportSecurityFromSettings("startup", false);
             TryApplyOfficeUiLanguage();

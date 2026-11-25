@@ -472,6 +472,7 @@ namespace NcTalkOutlookAddIn.Settings
             AppendElement(document, root, "TalkDefaultAddUsers", settings.TalkDefaultAddUsers.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "TalkDefaultAddGuests", settings.TalkDefaultAddGuests.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "CalDavSyncEnabled", settings.CalDavSyncEnabled.ToString(CultureInfo.InvariantCulture));
+            AppendElement(document, root, "CalDavSyncDefaultApplied", settings.CalDavSyncDefaultApplied.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "CalDavCalendarName", Safe(settings.CalDavCalendarName));
             AppendElement(document, root, "TalkDeleteRoomOnEventDelete", settings.TalkDeleteRoomOnEventDelete.ToString(CultureInfo.InvariantCulture));
 
@@ -681,6 +682,13 @@ namespace NcTalkOutlookAddIn.Settings
                     if (bool.TryParse(value, out calDavSyncEnabled))
                     {
                         settings.CalDavSyncEnabled = calDavSyncEnabled;
+                    }
+                    break;
+                case "CalDavSyncDefaultApplied":
+                    bool calDavSyncDefaultApplied;
+                    if (bool.TryParse(value, out calDavSyncDefaultApplied))
+                    {
+                        settings.CalDavSyncDefaultApplied = calDavSyncDefaultApplied;
                     }
                     break;
                 case "CalDavCalendarName":

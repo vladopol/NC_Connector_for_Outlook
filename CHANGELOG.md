@@ -4,6 +4,41 @@ All notable changes to **NC Connector for Outlook** will be documented in this f
 
 This project follows the principles of **Keep a Changelog** and **Semantic Versioning**.
 
+## [3.1.0.26] - 2026-11-25
+
+Fork patch on upstream 3.1.0.
+
+---
+
+### Talk room sync reads the room first: no more rejected updates of event conversations
+
+- **Name and description are no longer pushed to an event conversation.** Talk owns both for a room
+  linked to a calendar event — it copies them from the meeting in the Nextcloud calendar — and answers
+  a direct update with `400 {"error":"event"}`. Every room created from Outlook therefore produced two
+  rejected requests per Outlook session (seen on the server for every creation since at least
+  13.10.2026). The sync now reads the room (`GET /room/<token>`) before reconciling: an event
+  conversation is left to the calendar, any other room is updated only when its name or description
+  actually differs from the appointment.
+- **Rooms Talk turned into regular ones keep syncing.** Talk drops the event binding for recurring
+  meetings and for a room already linked to another event; from then on a direct update is accepted
+  and is the only way the name changes. Deciding by the room's actual state, rather than by the
+  appointment's own "event" marker, keeps that case working.
+- **A deleted room is not updated.** When the read answers 404/403 (the meeting still points at a
+  room that no longer exists), name and description are skipped instead of producing two more 404s.
+- **Fallback unchanged.** If the room cannot be read, the updates are attempted as before, and a
+  rejection is still remembered per room for the session.
+
+### CalDAV sync on by default
+
+- **"Sync meetings with Nextcloud Calendar" is now enabled by default.** For an event conversation
+  that sync is what carries later edits of the meeting (subject, description, time) into the Talk
+  room; without it they never arrive.
+- **Applied once to existing profiles.** Settings saved by older builds hold an explicit `false` that
+  was only ever the old default, so on first start the add-in switches it on once and records that in
+  `CalDavSyncDefaultApplied`. A user who turns it off afterwards keeps it off. Enabling it pushes
+  nothing in bulk: only appointments with a Talk room that are created or changed from then on are
+  written to the calendar.
+
 ## [3.1.0.25] - 2026-07-29
 
 Fork patch on upstream 3.1.0.

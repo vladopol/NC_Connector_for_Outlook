@@ -22,9 +22,11 @@ namespace NcTalkOutlookAddIn.Services
         private const string ActorTypeUsers = "users";
         private const string ActorTypeEmails = "emails";
 
-        // Event conversations derive their name and description from the linked calendar object on
-        // some Talk versions and reject direct updates. The first rejection per room is remembered
-        // for the rest of the session so later saves don't repeat a request that cannot succeed.
+        // Event conversations derive their name and description from the linked calendar object and
+        // reject direct updates. Normally the room state read before each sync avoids sending them at
+        // all; these sets are the fallback for when that read fails: the first rejection per room is
+        // remembered for the rest of the session so later saves don't repeat a request that cannot
+        // succeed.
         private static readonly HashSet<string> NameSyncRejectedTokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private static readonly HashSet<string> DescriptionSyncRejectedTokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private static readonly object RejectionSyncRoot = new object();
@@ -78,9 +80,18 @@ namespace NcTalkOutlookAddIn.Services
                 return false;
             }
 
+            // One read decides how name and description are reconciled: an event conversation takes
+            // both from its calendar object and rejects direct updates, any other room is updated
+            // only when it differs. If the read fails, the updates are attempted as before.
+            TalkService.RoomState roomState;
+            if (!service.TryGetRoomState(token, out roomState))
+            {
+                roomState = null;
+            }
+
             bool ok = true;
-            ok &= SyncName(service, token, snapshot);
-            ok &= SyncDescription(service, token, snapshot);
+            ok &= SyncName(service, token, snapshot, roomState);
+            ok &= SyncDescription(service, token, snapshot, roomState);
             ok &= SyncTiming(service, token, snapshot);
             ok &= SyncParticipants(service, token, snapshot);
 
@@ -88,14 +99,31 @@ namespace NcTalkOutlookAddIn.Services
             return ok;
         }
 
-        private bool SyncName(TalkService service, string token, TalkRoomSyncSnapshot snapshot)
+        private bool SyncName(TalkService service, string token, TalkRoomSyncSnapshot snapshot, TalkService.RoomState roomState)
         {
             string roomName = (snapshot.Subject ?? string.Empty).Trim();
             if (roomName.Length == 0)
             {
                 return true;
             }
-            if (IsRejected(NameSyncRejectedTokens, token))
+            if (roomState != null)
+            {
+                if (roomState.IsUnavailable)
+                {
+                    LogTalk("Room name sync skipped: room not available (token=" + token + ").");
+                    return true;
+                }
+                if (roomState.IsEventConversation)
+                {
+                    LogTalk("Room name left to the linked calendar event (token=" + token + ").");
+                    return true;
+                }
+                if (string.Equals((roomState.Name ?? string.Empty).Trim(), roomName, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+            else if (IsRejected(NameSyncRejectedTokens, token))
             {
                 return true;
             }
@@ -129,10 +157,27 @@ namespace NcTalkOutlookAddIn.Services
             return false;
         }
 
-        private bool SyncDescription(TalkService service, string token, TalkRoomSyncSnapshot snapshot)
+        private bool SyncDescription(TalkService service, string token, TalkRoomSyncSnapshot snapshot, TalkService.RoomState roomState)
         {
             string description = (snapshot.Description ?? string.Empty).Trim();
-            if (IsRejected(DescriptionSyncRejectedTokens, token))
+            if (roomState != null)
+            {
+                if (roomState.IsUnavailable)
+                {
+                    LogTalk("Room description sync skipped: room not available (token=" + token + ").");
+                    return true;
+                }
+                if (roomState.IsEventConversation)
+                {
+                    LogTalk("Room description left to the linked calendar event (token=" + token + ").");
+                    return true;
+                }
+                if (string.Equals((roomState.Description ?? string.Empty).Trim(), description, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+            else if (IsRejected(DescriptionSyncRejectedTokens, token))
             {
                 return true;
             }

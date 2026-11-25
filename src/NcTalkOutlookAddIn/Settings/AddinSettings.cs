@@ -54,7 +54,11 @@ namespace NcTalkOutlookAddIn.Settings
             TalkDefaultPasswordEnabled = false;
             TalkDefaultAddUsers = true;
             TalkDefaultAddGuests = false;
-            CalDavSyncEnabled = false;
+            // On by default: an event conversation takes its name, description and time from the
+            // meeting in the Nextcloud calendar, so without this sync later edits to the meeting never
+            // reach the Talk room (Talk rejects direct updates of event conversations).
+            CalDavSyncEnabled = true;
+            CalDavSyncDefaultApplied = false;
             CalDavCalendarName = DefaultCalDavCalendarName;
             TalkDeleteRoomOnEventDelete = false;
         }
@@ -122,6 +126,10 @@ namespace NcTalkOutlookAddIn.Settings
         public bool TalkDefaultAddGuests { get; set; }
 
         public bool CalDavSyncEnabled { get; set; }
+
+        // One-time marker: set once the "CalDAV sync on by default" change of 3.1.0.26 has been
+        // applied to this profile, so a user who turns the sync off afterwards keeps it off.
+        public bool CalDavSyncDefaultApplied { get; set; }
 
         public string CalDavCalendarName { get; set; }
 

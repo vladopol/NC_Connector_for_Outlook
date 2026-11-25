@@ -411,6 +411,78 @@ namespace NcTalkOutlookAddIn.Services
             TryUpdateRoomName(token, roomName, baseUrl);
         }
 
+        // What the server currently holds for a room, as far as name/description sync needs it.
+        internal sealed class RoomState
+        {
+            internal string ObjectType { get; set; }
+
+            internal string Name { get; set; }
+
+            internal string Description { get; set; }
+
+            // The room is gone or no longer visible to this user (404/403): nothing to reconcile.
+            internal bool IsUnavailable { get; set; }
+
+            // Talk owns name and description of an event conversation itself: it copies them from the
+            // linked calendar object and answers a direct update with 400 {"error":"event"}.
+            internal bool IsEventConversation
+            {
+                get { return string.Equals(ObjectType, "event", StringComparison.OrdinalIgnoreCase); }
+            }
+        }
+
+        // Reads the room as the current user sees it. Never throws: returns false when the state could
+        // not be read, so the caller can fall back to attempting the update directly.
+        internal bool TryGetRoomState(string token, out RoomState state)
+        {
+            state = null;
+            if (string.IsNullOrWhiteSpace(token) || !_configuration.IsComplete())
+            {
+                return false;
+            }
+
+            try
+            {
+                string baseUrl = _configuration.GetNormalizedBaseUrl();
+                string url = baseUrl + "/ocs/v2.php/apps/spreed/api/v4/room/" + Uri.EscapeDataString(token.Trim());
+
+                HttpStatusCode statusCode;
+                IDictionary<string, object> parsed;
+                ExecuteJsonRequest("GET", url, (string)null, out statusCode, out parsed, false, NcTimeouts.BackgroundMs);
+                if (statusCode == HttpStatusCode.NotFound || statusCode == HttpStatusCode.Forbidden)
+                {
+                    state = new RoomState { IsUnavailable = true };
+                    return true;
+                }
+                if (!IsSuccessStatus(statusCode))
+                {
+                    DiagnosticsLogger.Log(LogCategories.Talk, "Room state not available (token=" + token + ", status=" + (int)statusCode + ").");
+                    return false;
+                }
+
+                IDictionary<string, object> data = NcJson.GetOcsData(parsed);
+                if (data == null)
+                {
+                    DiagnosticsLogger.Log(LogCategories.Talk, "Room state response had no data (token=" + token + ").");
+                    return false;
+                }
+
+                state = new RoomState
+                {
+                    ObjectType = NcJson.GetString(data, "objectType") ?? string.Empty,
+                    Name = NcJson.GetString(data, "name"),
+                    Description = NcJson.GetString(data, "description")
+                };
+                return true;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to read room state (token=" + token + ").", ex);
+                state = null;
+                return false;
+            }
+        }
+
         internal bool AddUserParticipant(string token, string userId)
         {
             return AddParticipant(token, ActorTypeUsers, userId);
